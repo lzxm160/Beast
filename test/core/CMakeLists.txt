@@ -9,30 +9,30 @@ add_executable (core-tests
     ${EXTRAS_INCLUDES}
     ${ZLIB_SOURCES}
     ../../extras/beast/unit_test/main.cpp
-    buffer_test.hpp
-    async_completion.cpp
-    basic_streambuf.cpp
-    bind_handler.cpp
-    buffer_cat.cpp
-    buffer_concepts.cpp
-    buffers_adapter.cpp
-    consuming_buffers.cpp
-    dynabuf_readstream.cpp
-    error.cpp
-    handler_alloc.cpp
-    handler_concepts.cpp
-    placeholders.cpp
-    prepare_buffers.cpp
-    static_streambuf.cpp
-    static_string.cpp
-    stream_concepts.cpp
-    streambuf.cpp
-    to_string.cpp
-    write_dynabuf.cpp
-    base64.cpp
-    empty_base_optimization.cpp
-    get_lowest_layer.cpp
-    sha1.cpp
+#    buffer_test.hpp
+#    async_completion.cpp
+#    basic_streambuf.cpp
+#    bind_handler.cpp
+#    buffer_cat.cpp
+#    buffer_concepts.cpp
+#    buffers_adapter.cpp
+#    consuming_buffers.cpp
+#    dynabuf_readstream.cpp
+#    error.cpp
+#    handler_alloc.cpp
+#    handler_concepts.cpp
+#    placeholders.cpp
+#    prepare_buffers.cpp
+#    static_streambuf.cpp
+#    static_string.cpp
+#    stream_concepts.cpp
+#    streambuf.cpp
+#    to_string.cpp
+#    write_dynabuf.cpp
+#    base64.cpp
+#    empty_base_optimization.cpp
+#    get_lowest_layer.cpp
+#    sha1.cpp
 )
 
 if (NOT WIN32)
