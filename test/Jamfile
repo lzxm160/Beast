@@ -7,37 +7,63 @@
 
 import os ;
 
+zlib_sources =
+    ../include/beast/core/detail/zlib/adler32.c
+    ../include/beast/core/detail/zlib/compress.c
+    ../include/beast/core/detail/zlib/crc32.c
+    ../include/beast/core/detail/zlib/deflate.c
+    ../include/beast/core/detail/zlib/infback.c
+    ../include/beast/core/detail/zlib/inffast.c
+    ../include/beast/core/detail/zlib/inflate.c
+    ../include/beast/core/detail/zlib/inftrees.c
+    ../include/beast/core/detail/zlib/trees.c
+    ../include/beast/core/detail/zlib/uncompr.c
+    ../include/beast/core/detail/zlib/zutil.c
+    ../include/beast/core/detail/zlib/crc32.h
+    ../include/beast/core/detail/zlib/deflate.h
+    ../include/beast/core/detail/zlib/gzguts.h
+    ../include/beast/core/detail/zlib/inffast.h
+    ../include/beast/core/detail/zlib/inffixed.h
+    ../include/beast/core/detail/zlib/inflate.h
+    ../include/beast/core/detail/zlib/inftrees.h
+    ../include/beast/core/detail/zlib/trees.h
+    ../include/beast/core/detail/zlib/zconf.h
+    ../include/beast/core/detail/zlib/zlib.h
+    ../include/beast/core/detail/zlib/zutil.h
+    ;
+
 #compile core.cpp : : ;
 #compile http.cpp : : ;
 #compile version.cpp : : ;
 #compile websocket.cpp : : ;
 
-#unit-test core-tests :
-#    ../extras/beast/unit_test/main.cpp
-#    core/async_completion.cpp
-#    core/basic_streambuf.cpp
-#    core/bind_handler.cpp
-#    core/buffer_cat.cpp
-#    core/buffer_concepts.cpp
-#    core/buffers_adapter.cpp
-#    core/consuming_buffers.cpp
-#    core/dynabuf_readstream.cpp
-#    core/error.cpp
-#    core/handler_alloc.cpp
-#    core/handler_concepts.cpp
-#    core/placeholders.cpp
-#    core/prepare_buffers.cpp
-#    core/static_streambuf.cpp
-#    core/static_string.cpp
-#    core/stream_concepts.cpp
-#    core/streambuf.cpp
-#    core/to_string.cpp
-#    core/write_dynabuf.cpp
-#    core/base64.cpp
-#    core/empty_base_optimization.cpp
-#    core/get_lowest_layer.cpp
-#    core/sha1.cpp
-#    ;
+unit-test core-tests :
+    $(zlib_sources)
+    ../extras/beast/unit_test/main.cpp
+    core/async_completion.cpp
+    core/basic_streambuf.cpp
+    core/bind_handler.cpp
+    core/buffer_cat.cpp
+    core/buffer_concepts.cpp
+    core/buffers_adapter.cpp
+    core/consuming_buffers.cpp
+    core/dynabuf_readstream.cpp
+    core/error.cpp
+    core/handler_alloc.cpp
+    core/handler_concepts.cpp
+    core/placeholders.cpp
+    core/prepare_buffers.cpp
+    core/static_streambuf.cpp
+    core/static_string.cpp
+    core/stream_concepts.cpp
+    core/streambuf.cpp
+    core/to_string.cpp
+    core/write_dynabuf.cpp
+    core/base64.cpp
+    core/empty_base_optimization.cpp
+    core/get_lowest_layer.cpp
+    core/sha1.cpp
+    ;
 
 #unit-test http-tests :
 #    ../extras/beast/unit_test/main.cpp
