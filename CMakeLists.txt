@@ -93,7 +93,7 @@ file(GLOB_RECURSE EXTRAS_INCLUDES
 )
 
 set (ZLIB_SOURCES
-    ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/adler32.c
+    ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/adler32.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/compress.c
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/crc32.c
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/deflate.cpp
