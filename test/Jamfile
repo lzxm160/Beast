@@ -9,7 +9,6 @@ import os ;
 
 zlib_sources =
     ../include/beast/core/detail/zlib/adler32.cpp
-    ../include/beast/core/detail/zlib/crc32.cpp
     ../include/beast/core/detail/zlib/deflate.cpp
     ../include/beast/core/detail/zlib/infback.cpp
     ../include/beast/core/detail/zlib/inffast.cpp
@@ -17,7 +16,6 @@ zlib_sources =
     ../include/beast/core/detail/zlib/inftrees.cpp
     ../include/beast/core/detail/zlib/trees.cpp
     ../include/beast/core/detail/zlib/zutil.cpp
-    ../include/beast/core/detail/zlib/crc32.h
     ../include/beast/core/detail/zlib/deflate.h
     ../include/beast/core/detail/zlib/gzguts.h
     ../include/beast/core/detail/zlib/inffast.h
