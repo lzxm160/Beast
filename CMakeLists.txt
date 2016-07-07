@@ -94,7 +94,6 @@ file(GLOB_RECURSE EXTRAS_INCLUDES
 
 set (ZLIB_SOURCES
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/adler32.cpp
-    ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/crc32.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/deflate.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/infback.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/inffast.cpp
@@ -102,7 +101,6 @@ set (ZLIB_SOURCES
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/inftrees.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/trees.cpp
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/zutil.cpp
-    ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/crc32.h
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/deflate.h
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/gzguts.h
     ${PROJECT_SOURCE_DIR}/include/beast/core/detail/zlib/inffast.h
