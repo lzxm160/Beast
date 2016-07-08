@@ -8,7 +8,6 @@
 import os ;
 
 zlib_sources =
-    ../include/beast/core/detail/zlib/adler32.cpp
     ../include/beast/core/detail/zlib/deflate.cpp
     ../include/beast/core/detail/zlib/inffast.cpp
     ../include/beast/core/detail/zlib/inflate.cpp
