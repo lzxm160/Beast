@@ -11,7 +11,6 @@ zlib_sources =
     ../include/beast/core/detail/zlib/deflate.cpp
     ../include/beast/core/detail/zlib/inffast.cpp
     ../include/beast/core/detail/zlib/inflate.cpp
-    ../include/beast/core/detail/zlib/zutil.cpp
     ;
 
 #compile core.cpp : : ;
