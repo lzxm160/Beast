@@ -8,9 +8,9 @@
 import os ;
 
 zlib_sources =
-    ../include/beast/core/detail/zlib/deflate.cpp
-    ../include/beast/core/detail/zlib/inffast.cpp
-    ../include/beast/core/detail/zlib/inflate.cpp
+    ../include/beast/detail/zlib/deflate.cpp
+    ../include/beast/detail/zlib/inffast.cpp
+    ../include/beast/detail/zlib/inflate.cpp
     ;
 
 #compile core.cpp : : ;
@@ -18,9 +18,9 @@ zlib_sources =
 #compile version.cpp : : ;
 #compile websocket.cpp : : ;
 
-unit-test core-tests :
-    $(zlib_sources)
-    ../extras/beast/unit_test/main.cpp
+#unit-test core-tests :
+#    $(zlib_sources)
+#    ../extras/beast/unit_test/main.cpp
 #    core/async_completion.cpp
 #    core/basic_streambuf.cpp
 #    core/bind_handler.cpp
@@ -44,7 +44,12 @@ unit-test core-tests :
 #    core/empty_base_optimization.cpp
 #    core/get_lowest_layer.cpp
 #    core/sha1.cpp
-    core/zlib.cpp
+#    ;
+
+unit-test detail-tests :
+    $(zlib_sources)
+    ../extras/beast/unit_test/main.cpp
+    detail/zlib.cpp
     ;
 
 #unit-test http-tests :
