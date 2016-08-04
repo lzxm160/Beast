@@ -8,6 +8,8 @@ add_executable (detail-tests
     ${BEAST_INCLUDES}
     ${EXTRAS_INCLUDES}
     ../../extras/beast/unit_test/main.cpp
+    deflate_stream.cpp
+    inflate_stream.cpp
     zlib.cpp
 )
 
