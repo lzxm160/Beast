@@ -50,7 +50,7 @@ namespace zlib {
     This is a port of zlib's "inflate" functionality to C++.
 */
 template<class Allocator>
-class basic_inflate_stream : public z_stream
+class basic_inflate_stream : public z_params
 {
 public:
     struct params
@@ -152,7 +152,7 @@ private:
 
     // for table and code decoding
     unsigned extra;             // extra bits needed
-    
+
     // fixed and dynamic code tables
     code const *lencode;        // starting table for length/literal codes
     code const *distcode;       // starting table for distance codes

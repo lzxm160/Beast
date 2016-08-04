@@ -9,11 +9,45 @@
 #define BEAST_ZTEST_HPP
 
 #include "zlib-1.2.8/zlib.h"
+#include <cstdlib>
+#include <random>
 #include <string>
 
 class z_deflator
 {
+    int level_      = Z_DEFAULT_COMPRESSION;
+    int windowBits_ = 15;
+    int memLevel_   = 4;
+    int strategy_   = Z_DEFAULT_STRATEGY;
+
 public:
+    // -1    = default
+    //  0    = none
+    //  1..9 = faster<-->better
+    void
+    level(int n)
+    {
+        level_ = n;
+    }
+
+    void
+    windowBits(int n)
+    {
+        windowBits_ = n;
+    }
+
+    void
+    memLevel(int n)
+    {
+        memLevel_ = n;
+    }
+
+    void
+    strategy(int n)
+    {
+        strategy_ = n;
+    }
+
     std::string
     operator()(std::string const& in)
     {
@@ -22,12 +56,14 @@ public:
         memset(&zs, 0, sizeof(zs));
         result = deflateInit2(
             &zs,
-            Z_DEFAULT_COMPRESSION,
+            level_,
             Z_DEFLATED,
-            -15,
-            4,
-            Z_DEFAULT_STRATEGY
+            -windowBits_,
+            memLevel_,
+            strategy_
         );
+        if(result != Z_OK)
+            throw std::logic_error("deflateInit2 failed");
         std::string out;
         out.resize(deflateBound(&zs, in.size()));
         zs.next_in = (Bytef*)in.data();
@@ -35,6 +71,8 @@ public:
         zs.next_out = (Bytef*)&out[0];
         zs.avail_out = out.size();
         result = deflate(&zs, Z_FULL_FLUSH);
+        if(result != Z_OK)
+            throw std::logic_error("deflate failed");
         out.resize(zs.total_out);
         deflateEnd(&zs);
         return out;
@@ -84,5 +122,23 @@ public:
         return out;
     }
 };
+
+inline
+std::string
+corpus1(std::size_t n)
+{
+    static std::string const alphabet =
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    std::mt19937 g;
+    std::uniform_int_distribution<std::size_t> d0{
+        0, alphabet.size() - 1};
+    std::uniform_int_distribution<std::size_t> d1{
+        1, 5};
+    std::string s;
+    s.reserve(n * 5);
+    while(n--)
+        s.insert(s.end(), d1(g), alphabet[d0(g)]);
+    return s;
+}
 
 #endif

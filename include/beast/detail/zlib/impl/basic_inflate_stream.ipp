@@ -36,6 +36,7 @@
 #define BEAST_ZLIB_IMPL_BASIC_INFLATE_STREAM_IPP
 
 #include <beast/detail/zlib/inflate_stream.hpp>
+#include <array>
 #include <cassert>
 #include <cstring>
 

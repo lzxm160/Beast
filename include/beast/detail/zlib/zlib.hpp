@@ -74,7 +74,7 @@ typedef unsigned long  uLong; /* 32 bits or more */
    uncompressed data and may be saved for use in the decompressor (particularly
    if the decompressor wants to decompress everything in a single step).
 */
-struct z_stream
+struct z_params
 {
     Byte const*     next_in;    // next input byte
     std::size_t     avail_in;   // number of bytes available at next_in
