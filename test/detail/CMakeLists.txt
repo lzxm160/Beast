@@ -7,7 +7,6 @@ GroupSources(test/detail "/")
 add_executable (detail-tests
     ${BEAST_INCLUDES}
     ${EXTRAS_INCLUDES}
-    ${ZLIB_SOURCES}
     ../../extras/beast/unit_test/main.cpp
     zlib.cpp
 )
