@@ -92,10 +92,6 @@ file(GLOB_RECURSE EXTRAS_INCLUDES
     ${PROJECT_SOURCE_DIR}/extras/beast/*.ipp
 )
 
-set (ZLIB_SOURCES
-    ${PROJECT_SOURCE_DIR}/include/beast/detail/zlib/impl/deflate.cpp
-    )
-
 #add_subdirectory (examples)
 if (NOT OPENSSL_FOUND)
     message("OpenSSL not found. Not building examples/ssl")
