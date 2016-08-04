@@ -37,5 +37,5 @@ add_executable (zlib-tests
 )
 
 if (NOT WIN32)
-    target_link_libraries(detail-tests ${Boost_LIBRARIES} Threads::Threads)
+    target_link_libraries(zlib-tests ${Boost_LIBRARIES} Threads::Threads)
 endif()
