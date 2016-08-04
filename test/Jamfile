@@ -17,9 +17,9 @@ zlib_sources =
 #compile http.cpp : : ;
 #compile version.cpp : : ;
 #compile websocket.cpp : : ;
+compile zlib.cpp : : ;
 
 #unit-test core-tests :
-#    $(zlib_sources)
 #    ../extras/beast/unit_test/main.cpp
 #    core/async_completion.cpp
 #    core/basic_streambuf.cpp
