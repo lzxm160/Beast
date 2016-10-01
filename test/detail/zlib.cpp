@@ -81,7 +81,7 @@ public:
         void
         resize(std::size_t size)
         {
-            assert(size <= capacity_);
+            BOOST_ASSERT(size <= capacity_);
             size_ = size;
         }
     };

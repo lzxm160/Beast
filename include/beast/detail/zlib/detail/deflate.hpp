@@ -35,6 +35,7 @@
 #ifndef BEAST_ZLIB_DETAIL_DEFLATE_HPP
 #define BEAST_ZLIB_DETAIL_DEFLATE_HPP
 
+#include <boost/assert.hpp>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
@@ -225,7 +226,7 @@ gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count)
     }
     // Check that the bit counts in bl_count are consistent.
     // The last code must be all ones.
-    assert(code + bl_count[limits::maxBits]-1 == (1<<limits::maxBits)-1);
+    BOOST_ASSERT(code + bl_count[limits::maxBits]-1 == (1<<limits::maxBits)-1);
     for(n = 0; n <= max_code; n++)
     {
         int len = tree[n].dl;
@@ -256,7 +257,7 @@ get_deflate_tables()
                 for(std::size_t n = 0; n < (1U<<tables.extra_lbits[code]); ++n)
                     tables.length_code[length++] = code;
             }
-            assert(length == 0);
+            BOOST_ASSERT(length == 0);
             // Note that the length 255 (match length 258) can be represented
             // in two different ways: code 284 + 5 bits or code 285, so we
             // overwrite length_code[255] to use the best encoding:
@@ -272,7 +273,7 @@ get_deflate_tables()
                     for(std::size_t n = 0; n < (1U<<tables.extra_dbits[code]); ++n)
                         tables.dist_code[dist++] = code;
                 }
-                assert(dist == 256);
+                BOOST_ASSERT(dist == 256);
                 // from now on, all distances are divided by 128
                 dist >>= 7;
                 for(; code < limits::dCodes; ++code)
@@ -281,7 +282,7 @@ get_deflate_tables()
                     for(std::size_t n = 0; n < (1U<<(tables.extra_dbits[code]-7)); ++n)
                         tables.dist_code[256 + dist++] = code;
                 }
-                assert(dist == 256);
+                BOOST_ASSERT(dist == 256);
             }
 
             // Construct the codes of the static literal tree
