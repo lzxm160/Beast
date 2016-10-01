@@ -35,6 +35,7 @@
 #ifndef BEAST_ZLIB_DETAIL_BITSTREAM_HPP
 #define BEAST_ZLIB_DETAIL_BITSTREAM_HPP
 
+#include <boost/assert.hpp>
 #include <cassert>
 
 namespace beast {
@@ -53,7 +54,7 @@ public:
     void
     drop(std::uint8_t n)
     {
-        assert(n_ >= n);
+        BOOST_ASSERT(n_ >= n);
         n_ -= n;
         v_ >>= n;
     }
@@ -109,7 +110,7 @@ bool
 bitstream::
 peek(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
 {
-    assert(n <= sizeof(value)*8);
+    BOOST_ASSERT(n <= sizeof(value)*8);
     if(! fill(n, first, last))
         return false;
     value = v_ & ((1ULL << n) - 1);
@@ -121,7 +122,7 @@ bool
 bitstream::
 read(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
 {
-    assert(n < sizeof(v_)*8);
+    BOOST_ASSERT(n < sizeof(v_)*8);
     if(! peek(value, n, first, last))
         return false;
     v_ >>= n;
