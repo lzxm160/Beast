@@ -496,7 +496,7 @@ write(z_stream& zs, int flush)
         case LEN:
             if(avail_in >= 6 && avail_out >= 258)
             {
-                inflate_fast(this, out);
+                inflate_fast(zs, out);
                 if(mode_ == TYPE)
                     back_ = -1;
                 break;
@@ -771,7 +771,7 @@ template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
 inflate_fast(
-    basic_inflate_stream* strm,
+    z_stream& zs,
     unsigned start)             // inflate()'s starting value for strm->avail_out
 {
     const unsigned char *in;    // local strm->next_in
@@ -799,25 +799,24 @@ inflate_fast(
     unsigned char *from;        // where to copy match from
 
     /* copy state to local variables */
-    auto state = strm;
-    in = strm->next_in - OFF;
-    last = in + (strm->avail_in - 5);
-    out = strm->next_out - OFF;
-    beg = out - (start - strm->avail_out);
-    end = out + (strm->avail_out - 257);
+    in = zs.next_in - OFF;
+    last = in + (zs.avail_in - 5);
+    out = zs.next_out - OFF;
+    beg = out - (start - zs.avail_out);
+    end = out + (zs.avail_out - 257);
 #ifdef INFLATE_STRICT
-    dmax = state->dmax_;
+    dmax = dmax_;
 #endif
-    wsize = state->wsize_;
-    whave = state->whave_;
-    wnext = state->wnext_;
-    window = state->window_;
-    hold = state->hold_;
-    bits = state->bits_;
-    lcode = state->lencode_;
-    dcode = state->distcode_;
-    lmask = (1U << state->lenbits_) - 1;
-    dmask = (1U << state->distbits_) - 1;
+    wsize = wsize_;
+    whave = whave_;
+    wnext = wnext_;
+    window = window_;
+    hold = hold_;
+    bits = bits_;
+    lcode = lencode_;
+    dcode = distcode_;
+    lmask = (1U << lenbits_) - 1;
+    dmask = (1U << distbits_) - 1;
 
     /* decode literals and length/distances until end-of-block or not enough
        input data or output space */
@@ -889,8 +888,8 @@ inflate_fast(
 #ifdef INFLATE_STRICT
                 if(dist > dmax)
                 {
-                    strm->msg = (char *)"invalid distance too far back";
-                    state->mode_ = BAD;
+                    zs.msg = (char *)"invalid distance too far back";
+                    mode_ = BAD;
                     break;
                 }
 #endif
@@ -903,11 +902,11 @@ inflate_fast(
                     op = dist - op; // distance back in window
                     if(op > whave)
                     {
-                        if(state->sane_)
+                        if(sane_)
                         {
-                            strm->msg =
+                            zs.msg =
                                 (char *)"invalid distance too far back";
-                            state->mode_ = BAD;
+                            mode_ = BAD;
                             break;
                         }
                     }
@@ -1015,8 +1014,8 @@ inflate_fast(
             }
             else
             {
-                strm->msg = (char *)"invalid distance code";
-                state->mode_ = BAD;
+                zs.msg = (char *)"invalid distance code";
+                mode_ = BAD;
                 break;
             }
         }
@@ -1029,13 +1028,13 @@ inflate_fast(
         else if(op & 32)
         {
             // end-of-block
-            state->mode_ = TYPE;
+            mode_ = TYPE;
             break;
         }
         else
         {
-            strm->msg = (char *)"invalid literal/length code";
-            state->mode_ = BAD;
+            zs.msg = (char *)"invalid literal/length code";
+            mode_ = BAD;
             break;
         }
     }
@@ -1048,13 +1047,13 @@ inflate_fast(
     hold &= (1U << bits) - 1;
 
     // update state and return
-    strm->next_in = in + OFF;
-    strm->next_out = out + OFF;
-    strm->avail_in = (unsigned)(in < last ? 5 + (last - in) : 5 - (in - last));
-    strm->avail_out = (unsigned)(out < end ?
+    zs.next_in = in + OFF;
+    zs.next_out = out + OFF;
+    zs.avail_in = (unsigned)(in < last ? 5 + (last - in) : 5 - (in - last));
+    zs.avail_out = (unsigned)(out < end ?
                                  257 + (end - out) : 257 - (out - end));
-    state->hold_ = hold;
-    state->bits_ = bits;
+    hold_ = hold;
+    bits_ = bits;
 }
 
 /*
