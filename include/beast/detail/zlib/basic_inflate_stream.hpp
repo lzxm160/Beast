@@ -130,9 +130,8 @@ private:
         SYNC        // looking for synchronization bytes to restart inflate()
     };
 
-    static
     void
-    inflate_fast(basic_inflate_stream* strm, unsigned start);
+    inflate_fast(z_stream& zs, unsigned start);
 
     int
     write(z_stream& zs, int flush);
