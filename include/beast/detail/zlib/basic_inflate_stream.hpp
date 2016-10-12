@@ -134,9 +134,8 @@ private:
     void
     inflate_fast(basic_inflate_stream* strm, unsigned start);
 
-    static
     int
-    write(basic_inflate_stream* strm, int flush);
+    write(z_stream& zs, int flush);
 
     void
     resetKeep(z_params& zs);
