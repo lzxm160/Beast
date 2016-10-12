@@ -76,7 +76,7 @@ reset(std::uint8_t windowBits)
     whave_ = 0;
     wnext_ = 0;
 
-    resetKeep();
+    resetKeep(*this);
 }
 
 template<class Allocator>
@@ -90,19 +90,22 @@ write(int flush)
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-resetKeep()
+resetKeep(z_stream& zs)
 {
-auto strm = this;
-    strm->total_in = strm->total_out = strm->total_ = 0;
-    strm->msg = 0;
-    strm->mode_ = HEAD;
-    strm->last_ = 0;
-    strm->dmax_ = 32768U;
-    strm->hold_ = 0;
-    strm->bits_ = 0;
-    strm->lencode_ = strm->distcode_ = strm->next_ = strm->codes_;
-    strm->sane_ = 1;
-    strm->back_ = -1;
+    zs.total_in = 0;
+    zs.total_out = 0;
+    zs.msg = 0;
+    total_ = 0;
+    mode_ = HEAD;
+    last_ = 0;
+    dmax_ = 32768U;
+    hold_ = 0;
+    bits_ = 0;
+    lencode_ = codes_;
+    distcode_ = codes_;
+    next_ = codes_;
+    sane_ = 1;
+    back_ = -1;
 }
 
 template<class Allocator>

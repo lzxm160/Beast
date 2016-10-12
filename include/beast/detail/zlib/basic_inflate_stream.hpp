@@ -139,7 +139,7 @@ private:
     write(basic_inflate_stream* strm, int flush);
 
     void
-    resetKeep();
+    resetKeep(z_stream& zs);
 
     void
     fixedTables();
