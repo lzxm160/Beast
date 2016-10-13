@@ -16,7 +16,7 @@
 #include <random>
 
 namespace beast {
-namespace detail {
+namespace zlib {
 
 class zlib_test : public beast::unit_test::suite
 {
@@ -200,7 +200,6 @@ public:
                         zs.next_in = 0;
                         expect(deflate_stream::deflateInit2(&zs,
                             level,
-                            Z_DEFLATED,
                             wbits,
                             4,
                             strategy) == Z_OK);
@@ -228,6 +227,6 @@ public:
 
 BEAST_DEFINE_TESTSUITE(zlib,core,beast);
 
-} // detail
+} // zlib
 } // beast
 

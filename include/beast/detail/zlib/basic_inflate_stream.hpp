@@ -35,6 +35,7 @@
 #ifndef BEAST_ZLIB_BASIC_INFLATE_STREAM_HPP
 #define BEAST_ZLIB_BASIC_INFLATE_STREAM_HPP
 
+#include <beast/detail/zlib/error.hpp>
 #include <beast/detail/zlib/zlib.hpp>
 #include <beast/detail/zlib/detail/bitstream.hpp>
 #include <beast/detail/zlib/detail/inflate_tables.hpp>
