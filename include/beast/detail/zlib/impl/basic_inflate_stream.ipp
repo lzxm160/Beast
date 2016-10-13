@@ -123,7 +123,7 @@ reset(std::uint8_t windowBits)
     whave_ = 0;
     wnext_ = 0;
 
-    w_.reset(1 << windowBits);
+    w_.reset(windowBits);
 
     resetKeep(*this);
 }
@@ -155,6 +155,8 @@ resetKeep(z_params& zs)
     next_ = codes_;
     sane_ = 1;
     back_ = -1;
+    
+    bi_.flush();
 }
 
 template<class Allocator>

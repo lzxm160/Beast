@@ -49,9 +49,16 @@ class window
     std::uint16_t i_ = 0;
     std::uint16_t size_ = 0;
     std::uint16_t capacity_ = 0;
+    std::uint8_t bits_ = 0;
     std::unique_ptr<std::uint8_t[]> p_;
 
 public:
+    std::uint8_t
+    bits() const
+    {
+        return bits_;
+    }
+
     std::uint16_t
     capacity() const
     {
@@ -79,12 +86,13 @@ public:
 inline
 void
 window::
-reset(std::uint16_t capacity)
+reset(std::uint16_t bits)
 {
-    if(capacity_ != capacity)
+    if(bits_ != bits)
     {
         p_.reset();
-        capacity_ = capacity;
+        bits_ = bits;
+        capacity_ = 1 << bits_;
     }
     i_ = 0;
     size_ = 0;
