@@ -123,6 +123,8 @@ reset(std::uint8_t windowBits)
     whave_ = 0;
     wnext_ = 0;
 
+    w_.reset(1 << windowBits);
+
     resetKeep(*this);
 }
 
@@ -243,10 +245,12 @@ int
 basic_inflate_stream<Allocator>::
 write(z_stream& zs, int flush)
 {
+#if 0
     auto put = zs.next_out;
     auto next = zs.next_in;
     auto const outend = put + zs.avail_out;
     auto const end = next + zs.avail_in;
+#endif
 
     unsigned in, out;       // save starting available input and output
     unsigned copy;          // number of stored or match bytes to copy

@@ -38,6 +38,7 @@
 #include <beast/detail/zlib/zlib.hpp>
 #include <beast/detail/zlib/detail/bitstream.hpp>
 #include <beast/detail/zlib/detail/inflate_tables.hpp>
+#include <beast/detail/zlib/detail/window.hpp>
 #include <beast/core/error.hpp>
 #include <cstdint>
 #include <cstdlib>
@@ -154,6 +155,7 @@ private:
     unsigned long total_;           // protected copy of output count
 
     // sliding window
+    detail::window w_;
     unsigned wbits_;                // log base 2 of requested window size
     unsigned wsize_;                // window size or zero if not using window
     unsigned whave_;                // valid bytes in the window
