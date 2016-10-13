@@ -80,7 +80,7 @@ public:
 
     template<class = void>
     void
-    write(std::uint8_t const* in, std::uint16_t n);
+    write(std::uint8_t const* in, std::size_t n);
 };
 
 inline
@@ -114,7 +114,7 @@ read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
 template<class>
 void
 window::
-write(std::uint8_t const* in, std::uint16_t n)
+write(std::uint8_t const* in, std::size_t n)
 {
     if(! p_)
         p_.reset(new std::uint8_t[capacity_]);
@@ -125,11 +125,17 @@ write(std::uint8_t const* in, std::uint16_t n)
         std::memcpy(&p_[0], in + n - capacity_, capacity_);
         return;
     }
-    if(n < capacity_ - size_)
+    std::uint16_t m;
+    if(capacity_ > size_ + n)
+    {
+        m = n;
         size_ += n;
+    }
     else
+    {
+        m = capacity_ - i_;
         size_ = capacity_;
-    auto m = std::min<std::uint16_t>(n, capacity_ - i_);
+    }
     std::memcpy(&p_[i_], in, m);
     if(m == n)
     {
