@@ -32,102 +32,106 @@
     (zlib format), rfc1951 (deflate format) and rfc1952 (gzip format).
 */
 
-#ifndef BEAST_ZLIB_DETAIL_BITSTREAM_HPP
-#define BEAST_ZLIB_DETAIL_BITSTREAM_HPP
+#ifndef BEAST_ZLIB_DETAIL_WINDOW_HPP
+#define BEAST_ZLIB_DETAIL_WINDOW_HPP
 
 #include <boost/assert.hpp>
 #include <cstdint>
+#include <cstring>
+#include <memory>
 
 namespace beast {
 namespace zlib {
 namespace detail {
 
-class bitstream
+class window
 {
-    using value_type = std::uint32_t;
-
-    value_type v_ = 0;
-    std::uint8_t n_ = 0;
+    std::uint16_t i_ = 0;
+    std::uint16_t size_ = 0;
+    std::uint16_t capacity_ = 0;
+    std::unique_ptr<std::uint8_t[]> p_;
 
 public:
-    // discard n bits
-    void
-    drop(std::uint8_t n)
+    std::uint16_t
+    capacity() const
     {
-        BOOST_ASSERT(n_ >= n);
-        n_ -= n;
-        v_ >>= n;
+        return capacity_;
     }
 
-    // flush everything
-    void
-    flush()
+    std::uint16_t
+    size() const
     {
-        n_ = 0;
-        v_ = 0;
+        return size_;
     }
 
-    // flush to the next byte boundary
     void
-    flush_byte()
-    {
-        drop(n_ % 8);
-    }
+    reset(std::uint16_t capacity);
 
-    // ensure at least n bits
-    template<class FwdIt>
-    bool
-    fill(std::uint8_t n, FwdIt& first, FwdIt const& last);
+    void
+    read(std::uint8_t* out,
+        std::uint16_t pos, std::uint16_t n);
 
-    // return n bits
-    template<class Unsigned, class FwdIt>
-    bool
-    peek(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last);
-
-    // return n bits, and consume
-    template<class Unsigned, class FwdIt>
-    bool
-    read(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last);
+    template<class = void>
+    void
+    write(std::uint8_t const* in, std::uint16_t n);
 };
 
-template<class FwdIt>
-bool
-bitstream::
-fill(std::uint8_t n, FwdIt& first, FwdIt const& last)
+inline
+void
+window::
+reset(std::uint16_t capacity)
 {
-    while(n_ < n)
+    if(capacity_ != capacity)
     {
-        if(first == last)
-            return false;
-        v_ += static_cast<value_type>(*first++) << n_;
-        n_ += 8;
+        p_.reset();
+        capacity_ = capacity;
     }
-    return true;
+    i_ = 0;
+    size_ = 0;
 }
 
-template<class Unsigned, class FwdIt>
-bool
-bitstream::
-peek(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
+inline
+void
+window::
+read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
 {
-    BOOST_ASSERT(n <= sizeof(value)*8);
-    if(! fill(n, first, last))
-        return false;
-    value = v_ & ((1ULL << n) - 1);
-    return true;
+    std::uint16_t i = (i_ - pos + capacity_) % capacity_;
+    while(n--)
+    {
+        *out++ = p_[i];
+        i = (i + 1) % capacity_;
+    }
 }
 
-template<class Unsigned, class FwdIt>
-bool
-bitstream::
-read(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
+template<class>
+void
+window::
+write(std::uint8_t const* in, std::uint16_t n)
 {
-    BOOST_ASSERT(n < sizeof(v_)*8);
-    if(! peek(value, n, first, last))
-        return false;
-    v_ >>= n;
-    n_ -= n;
-    return true;
+    if(! p_)
+        p_.reset(new std::uint8_t[capacity_]);
+    if(n >= capacity_)
+    {
+        i_ = 0;
+        size_ = capacity_;
+        std::memcpy(&p_[0], in + n - capacity_, capacity_);
+        return;
+    }
+    if(n < capacity_ - size_)
+        size_ += n;
+    else
+        size_ = capacity_;
+    auto m = std::min<std::uint16_t>(n, capacity_ - i_);
+    std::memcpy(&p_[i_], in, m);
+    if(m == n)
+    {
+        i_ = (i_ + m) % capacity_;
+        return;
+    }
+    in += m;
+    m = n - m;
+    std::memcpy(&p_[0], in, m);
+    i_ = m;
 }
 
 } // detail
