@@ -131,6 +131,16 @@ private:
         SYNC        // looking for synchronization bytes to restart inflate()
     };
 
+    template<class U1, class U2>
+    static
+    U1
+    clamp(U1 u1, U2 u2)
+    {
+        if(u1 > u2)
+            u1 = static_cast<U1>(u2);
+        return u1;
+    }
+
     void
     inflate_fast(z_stream& zs, unsigned start);
 
