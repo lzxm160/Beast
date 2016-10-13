@@ -245,12 +245,29 @@ int
 basic_inflate_stream<Allocator>::
 write(z_stream& zs, int flush)
 {
-#if 0
     auto put = zs.next_out;
     auto next = zs.next_in;
     auto const outend = put + zs.avail_out;
     auto const end = next + zs.avail_in;
-#endif
+    auto const more =
+        [&]
+        {
+            auto const nwritten = put - zs.next_out;
+            // VFALCO TODO Don't update the window unless necessary
+            {
+                if(nwritten >= 32768)
+                    w_.write(put - 32768, 32768);
+                else
+                    w_.write(zs.next_out,
+                        static_cast<std::uint16_t>(nwritten));
+            }
+            zs.total_in += next - zs.next_in;
+            zs.total_out += nwritten;
+            zs.next_out = put;
+            zs.avail_out = outend - put;
+            zs.next_in = next;
+            zs.avail_in = end - next;
+        };
 
     unsigned in, out;       // save starting available input and output
     unsigned copy;          // number of stored or match bytes to copy
