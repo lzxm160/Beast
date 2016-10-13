@@ -58,9 +58,9 @@ namespace zlib {
     do { \
         if(zs.avail_in == 0) goto inf_leave; \
         zs.avail_in--; \
-        auto next = reinterpret_cast<std::uint8_t const*>(zs.next_in); \
-        hold_ += (unsigned long)(*next++) << bits_; \
-        next_in = next; \
+        auto nn = reinterpret_cast<std::uint8_t const*>(zs.next_in); \
+        hold_ += (unsigned long)(*nn++) << bits_; \
+        next_in = nn; \
         bits_ += 8; \
     } while(0)
 
@@ -243,6 +243,11 @@ int
 basic_inflate_stream<Allocator>::
 write(z_stream& zs, int flush)
 {
+    auto put = zs.next_out;
+    auto next = zs.next_in;
+    auto const outend = put + zs.avail_out;
+    auto const end = next + zs.avail_in;
+
     unsigned in, out;       // save starting available input and output
     unsigned copy;          // number of stored or match bytes to copy
     unsigned char *from;    // where to copy match bytes from
@@ -760,9 +765,6 @@ inflate_fast(
     unsigned char *out;         // local strm->next_out
     unsigned char *beg;         // inflate()'s initial strm->next_out
     unsigned char *end;         // while out < end, enough space available
-#ifdef INFLATE_STRICT
-    unsigned dmax;              /* maximum distance from zlib header */
-#endif
     detail::code here;          // retrieved table entry
     unsigned op;                // code bits, operation, extra bits, or window position, window bytes to copy
     unsigned len;               // match length, unused bytes
@@ -778,9 +780,6 @@ inflate_fast(
     out = zs.next_out;
     beg = out - (start - zs.avail_out);
     end = out + (zs.avail_out - 257);
-#ifdef INFLATE_STRICT
-    dmax = dmax_;
-#endif
 
     /* decode literals and length/distances until end-of-block or not enough
        input data or output space */
@@ -850,7 +849,7 @@ inflate_fast(
                 }
                 dist += (unsigned)hold_ & ((1U << op) - 1);
 #ifdef INFLATE_STRICT
-                if(dist > dmax)
+                if(dist > dmax_)
                 {
                     zs.msg = (char *)"invalid distance too far back";
                     mode_ = BAD;
