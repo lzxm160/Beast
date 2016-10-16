@@ -9,6 +9,7 @@
 #include <beast/http/parser_v1.hpp>
 
 #include <beast/http/headers.hpp>
+#include <beast/http/headers_parser_v1.hpp>
 #include <beast/http/string_body.hpp>
 #include <beast/unit_test/suite.hpp>
 
@@ -44,6 +45,13 @@ public:
             BEAST_EXPECT(msg.headers.exists("X3"));
             BEAST_EXPECT(msg.headers["X3"] == "x");
         }
+    }
+
+    void testWithBody()
+    {
+        headers_parser_v1<true, headers> p0;
+        auto p = with_body<string_body>(std::move(p0));
+        p.release();
     }
 
     void run() override
@@ -104,6 +112,7 @@ public:
         }
 
         testRegressions();
+        testWithBody();
     }
 };
 
