@@ -296,11 +296,9 @@ private:
     associate with the message. And finally, complete the parse
     in a second call.
 
-    @note  Ownership of the message headers in the headers parser
-    is transferred by move construction.
-
-    @param parser The headers parser to construct from. The
-    message headers in this object will be moved from.
+    @param parser The headers parser to construct from. Ownership
+    of the message headers in the headers parser is transferred
+    as if by call to @ref headers_parser_v1::release.
 
     @param args Forwarded to the body constructor of the message
     in the new parser.
@@ -318,7 +316,7 @@ private:
 */
 template<class Body, bool isRequest, class Headers, class... Args>
 parser_v1<isRequest, Body, Headers>
-with_body(headers_parser_v1<isRequest, Headers>&& parser,
+with_body(headers_parser_v1<isRequest, Headers>& parser,
     Args&&... args)
 {
     return parser_v1<isRequest, Body, Headers>(

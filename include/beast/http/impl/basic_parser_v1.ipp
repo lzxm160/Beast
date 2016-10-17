@@ -991,6 +991,7 @@ write(boost::asio::const_buffer const& buffer, error_code& ec)
             case body_what::pause:
                 return used();
             }
+            --p;
             s_ = s_headers_done;
             // fall through
         }
