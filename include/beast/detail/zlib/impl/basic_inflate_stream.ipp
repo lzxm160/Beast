@@ -45,51 +45,6 @@ namespace zlib {
 
 /* Macros for inflate(): */
 
-/* Clear the input bit accumulator */
-#define INITBITS() \
-    do { \
-        hold_ = 0; \
-        bits_ = 0; \
-    } while(0)
-
-/* Get a byte of input into the bit accumulator, or return from inflate()
-   if there is no input available. */
-#define PULLBYTE() \
-    do { \
-        if(zs.avail_in == 0) goto inf_leave; \
-        zs.avail_in--; \
-        auto nn = reinterpret_cast<std::uint8_t const*>(zs.next_in); \
-        hold_ += (unsigned long)(*nn++) << bits_; \
-        next_in = nn; \
-        bits_ += 8; \
-    } while(0)
-
-/* Assure that there are at least n bits in the bit accumulator.  If there is
-   not enough available input to do that, then return from inflate(). */
-#define NEEDBITS(n) \
-    do { \
-        while(bits_ < (unsigned)(n)) \
-            PULLBYTE(); \
-    } while(0)
-
-/* Return the low n bits of the bit accumulator (n < 16) */
-#define BITS(n) \
-    ((unsigned)hold_ & ((1U << (n)) - 1))
-
-/* Remove n bits from the bit accumulator */
-#define DROPBITS(n) \
-    do { \
-        hold_ >>= (n); \
-        bits_ -= (unsigned)(n); \
-    } while(0)
-
-/* Remove zero to seven bits as needed to go to a byte boundary */
-#define BYTEBITS() \
-    do { \
-        hold_ >>= bits_ & 7; \
-        bits_ -= bits_ & 7; \
-    } while(0)
-
 template<class Allocator>
 basic_inflate_stream<Allocator>::
 basic_inflate_stream()
