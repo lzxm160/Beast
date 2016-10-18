@@ -7,22 +7,18 @@
 
 import os ;
 
+<<<<<<< 9b78430f36a3e5c330cb753b7147a8b99c95a7b1
 zlib_sources =
     ../include/beast/detail/zlib/impl/deflate.cpp
     ;
 
+=======
+>>>>>>> [FOLD] reorganize zlib sources
 #compile core.cpp : : ;
 #compile http.cpp : : ;
 #compile version.cpp : : ;
 #compile websocket.cpp : : ;
 compile zlib.cpp : : ;
-
-unit-test detail-tests :
-    ../extras/beast/unit_test/main.cpp
-    detail/deflate_stream.cpp
-    detail/inflate_stream.cpp
-    detail/zlib.cpp
-    ;
 
 #unit-test core-tests :
 #    ../extras/beast/unit_test/main.cpp
@@ -100,6 +96,7 @@ unit-test detail-tests :
 
 unit-test zlib-tests :
     ../extras/beast/unit_test/main.cpp
+<<<<<<< 9b78430f36a3e5c330cb753b7147a8b99c95a7b1
     zlib/zlib-1.2.8/adler32.c
     zlib/zlib-1.2.8/compress.c
     zlib/zlib-1.2.8/crc32.c
@@ -112,4 +109,9 @@ unit-test zlib-tests :
     zlib/zlib-1.2.8/uncompr.c
     zlib/zlib-1.2.8/zutil.c
     zlib/inflate_stream.cpp
+=======
+    zlib/deflate_stream.cpp
+    zlib/inflate_stream.cpp
+    zlib/zlib.cpp
+>>>>>>> [FOLD] reorganize zlib sources
     ;

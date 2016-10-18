@@ -103,17 +103,13 @@ WARN_LOGFILE           =
 # Configuration options related to the input files
 #---------------------------------------------------------------------------
 INPUT = \
-        ../include/beast/detail/zlib/basic_deflate_stream.hpp \
-        ../include/beast/detail/zlib/basic_inflate_stream.hpp \
-        ../include/beast/detail/zlib/deflate_stream.hpp \
-        ../include/beast/detail/zlib/inflate_stream.hpp \
-        ../include/beast/detail/zlib/zlib.hpp \
+        ../include/beast/zlib
 
         ../include/beast/ \
         ../include/beast/core \
-        ../include/beast/core/detail/zlib \
         ../include/beast/http \
         ../include/beast/websocket \
+        ../include/beast/zlib \
         ../extras/beast/doc_debug.hpp
 
 INPUT_ENCODING         = UTF-8

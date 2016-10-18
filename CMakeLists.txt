@@ -102,7 +102,6 @@ endif()
 
 #add_subdirectory (test)
 #add_subdirectory (test/core)
-add_subdirectory (test/detail)
 #add_subdirectory (test/http)
 #add_subdirectory (test/websocket)
 add_subdirectory (test/zlib)

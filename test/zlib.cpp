@@ -6,4 +6,4 @@
 //
 
 // Test that header file is self-contained.
-#include <beast/detail/zlib.hpp>
+#include <beast/zlib.hpp>

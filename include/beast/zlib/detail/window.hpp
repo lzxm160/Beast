@@ -103,12 +103,24 @@ void
 window::
 read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
 {
-    std::uint16_t i = (i_ - pos + capacity_) % capacity_;
-    while(n--)
+    if(i_ >= size_)
     {
-        *out++ = p_[i];
-        i = (i + 1) % capacity_;
+        // window is contiguous
+        std::memcpy(out, &p_[i_ - pos], n);
+        return;
     }
+
+    std::uint16_t i = ((((std::int32_t)i_) - pos) + capacity_) % capacity_;
+    std::uint16_t m = capacity_ - i;
+    if(n <= m)
+    {
+        std::memcpy(out, &p_[i], n);
+        return;
+    }
+    std::memcpy(out, &p_[i], m);
+    out += m;
+    m = n - m;
+    std::memcpy(out, &p_[0], m);
 }
 
 template<class>
@@ -122,30 +134,24 @@ write(std::uint8_t const* in, std::size_t n)
     {
         i_ = 0;
         size_ = capacity_;
-        std::memcpy(&p_[0], in + n - capacity_, capacity_);
+        std::memcpy(&p_[0], in + n - size_, size_);
         return;
     }
-    std::uint16_t m;
-    if(capacity_ > size_ + n)
+    if(n + i_ <= capacity_)
     {
-        m = n;
+        std::memcpy(&p_[i_], in, n);
         size_ += n;
-    }
-    else
-    {
-        m = capacity_ - i_;
-        size_ = capacity_;
-    }
-    std::memcpy(&p_[i_], in, m);
-    if(m == n)
-    {
-        i_ = (i_ + m) % capacity_;
+        i_ = (i_ + n) % capacity_;
         return;
     }
+
+    std::uint16_t m = capacity_ - i_;
+    std::memcpy(&p_[i_], in, m);
     in += m;
     m = n - m;
     std::memcpy(&p_[0], in, m);
     i_ = m;
+    size_ = capacity_;
 }
 
 } // detail
