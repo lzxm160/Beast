@@ -33,7 +33,9 @@ add_executable (zlib-tests
     ${ZLIB_SOURCES}
     ../../extras/beast/unit_test/main.cpp
     ztest.hpp
+    deflate_stream.cpp
     inflate_stream.cpp
+    zlib.cpp
 )
 
 if (NOT WIN32)

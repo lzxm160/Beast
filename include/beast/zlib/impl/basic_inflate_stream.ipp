@@ -35,7 +35,7 @@
 #ifndef BEAST_ZLIB_IMPL_BASIC_INFLATE_STREAM_IPP
 #define BEAST_ZLIB_IMPL_BASIC_INFLATE_STREAM_IPP
 
-#include <beast/detail/zlib/inflate_stream.hpp>
+#include <beast/zlib/error.hpp>
 #include <array>
 #include <cassert>
 #include <cstring>
@@ -202,10 +202,6 @@ int
 basic_inflate_stream<Allocator>::
 write(z_params& zs, int flush)
 {
-    unsigned in;
-    unsigned out; // save starting available input and output
-    int result = Z_OK;
-
     auto put = zs.next_out;
     auto next = zs.next_in;
     auto const outend = put + zs.avail_out;
@@ -218,18 +214,17 @@ write(z_params& zs, int flush)
             if(/*w_.did_alloc() || */ mode_ < BAD &&
                     (mode_ < CHECK || flush != Z_FINISH))
                 w_.write(zs.next_out, put - zs.next_out);
+            zs.total_in += next - zs.next_in;
+            zs.total_out += nwritten;
             zs.next_out = put;
             zs.avail_out = outend - put;
             zs.next_in = next;
             zs.avail_in = end - next;
-            in -= zs.avail_in;
-            out -= zs.avail_out;
-            zs.total_in += next - zs.next_in;
-            zs.total_out += nwritten;
-            if (((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
-                result = Z_BUF_ERROR;
-            return result;
+            return Z_OK;
         };
+
+    unsigned in, out;       // save starting available input and output
+    int ret = Z_OK;
 
     if(zs.next_out == 0 ||
             (zs.next_in == 0 && zs.avail_in != 0))
@@ -378,9 +373,9 @@ write(z_params& zs, int flush)
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 7;
-            result = inflate_table(detail::CODES, &lens_[0],
+            ret = inflate_table(detail::CODES, &lens_[0],
                 order.size(), &next_, &lenbits_, work_);
-            if(result)
+            if(ret)
             {
                 zs.msg = (char *)"invalid code lengths set";
                 mode_ = BAD;
@@ -468,9 +463,9 @@ write(z_params& zs, int flush)
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 9;
-            result = inflate_table(detail::LENS,
+            ret = inflate_table(detail::LENS,
                 &lens_[0], nlen_, &next_, &lenbits_, work_);
-            if(result)
+            if(ret)
             {
                 zs.msg = (char *)"invalid literal/lengths set";
                 mode_ = BAD;
@@ -478,9 +473,9 @@ write(z_params& zs, int flush)
             }
             distcode_ = next_;
             distbits_ = 6;
-            result = inflate_table(detail::DISTS,
+            ret = inflate_table(detail::DISTS,
                 lens_ + nlen_, ndist_, &next_, &distbits_, work_);
-            if(result)
+            if(ret)
             {
                 zs.msg = (char *)"invalid distances set";
                 mode_ = BAD;
@@ -498,7 +493,7 @@ write(z_params& zs, int flush)
 
         case LEN:
         {
-#if 1
+#if 0
             if(avail_in >= 6 && avail_out >= 258)
             {
                 auto const nwritten = put - zs.next_out;
@@ -682,11 +677,11 @@ write(z_params& zs, int flush)
             // fall through
 
         case DONE:
-            result = Z_STREAM_END;
+            ret = Z_STREAM_END;
             goto inf_leave;
 
         case BAD:
-            result = Z_DATA_ERROR;
+            ret = Z_DATA_ERROR;
             goto inf_leave;
 
         case MEM:
@@ -721,9 +716,9 @@ write(z_params& zs, int flush)
     zs.data_type = bits_ + (last_ ? 64 : 0) +
                       (mode_ == TYPE ? 128 : 0) +
                       (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-    if(((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
-        result = Z_BUF_ERROR;
-    return result;
+    if(((in == 0 && out == 0) || flush == Z_FINISH) && ret == Z_OK)
+        ret = Z_BUF_ERROR;
+    return ret;
 }
 
 /*

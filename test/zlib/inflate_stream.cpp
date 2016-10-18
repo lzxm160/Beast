@@ -6,7 +6,7 @@
 //
 
 // Test that header file is self-contained.
-#include <beast/detail/zlib/inflate_stream.hpp>
+#include <beast/zlib/inflate_stream.hpp>
 
 #include "ztest.hpp"
 #include <beast/unit_test/suite.hpp>
