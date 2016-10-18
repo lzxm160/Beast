@@ -9,7 +9,7 @@
 #define BEAST_ZTEST_HPP
 
 #include "zlib-1.2.8/zlib.h"
-#include <cstdlib>
+#include <cstdint>
 #include <random>
 #include <string>
 
@@ -127,15 +127,16 @@ inline
 std::string
 corpus1(std::size_t n)
 {
-    static std::string const alphabet =
-        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+    static std::string const alphabet{
+        "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+    };
+    std::string s;
+    s.reserve(n * 5);
     std::mt19937 g;
     std::uniform_int_distribution<std::size_t> d0{
         0, alphabet.size() - 1};
     std::uniform_int_distribution<std::size_t> d1{
         1, 5};
-    std::string s;
-    s.reserve(n * 5);
     while(n--)
         s.insert(s.end(), d1(g), alphabet[d0(g)]);
     return s;

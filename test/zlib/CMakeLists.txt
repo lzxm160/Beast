@@ -39,6 +39,7 @@ add_executable (zlib-tests
     error.cpp
     inflate_stream.cpp
     zlib.cpp
+  
 )
 
 if (NOT WIN32)

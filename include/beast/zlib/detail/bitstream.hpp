@@ -37,6 +37,7 @@
 
 #include <boost/assert.hpp>
 #include <cstdint>
+#include <iterator>
 
 namespace beast {
 namespace zlib {

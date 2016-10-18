@@ -224,7 +224,7 @@ public:
     }
 };
 
-BEAST_DEFINE_TESTSUITE(zlib,core,beast);
+//BEAST_DEFINE_TESTSUITE(zlib,core,beast);
 
 } // zlib
 } // beast
