@@ -2,6 +2,7 @@
 
 * Check invariants in parse_op:
 * Increase optimization settings for MSVC builds
+* Clean up message docs
 
 --------------------------------------------------------------------------------
 
