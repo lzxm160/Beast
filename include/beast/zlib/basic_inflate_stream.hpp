@@ -79,7 +79,7 @@ public:
         created structures.
     */
     void
-    reset(std::uint8_t windowBits);
+    reset(int windowBits);
 
     /** Decompressed data.
     */

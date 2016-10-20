@@ -48,11 +48,11 @@ class bitstream
     using value_type = std::uint32_t;
 
     value_type v_ = 0;
-    std::uint8_t n_ = 0;
+    unsigned n_ = 0;
 
 public:
     // returns the number of bits in the reservoir
-    std::size_t
+    unsigned
     size() const
     {
         return n_;
@@ -60,9 +60,9 @@ public:
 
     // discard n bits
     void
-    drop(std::uint8_t n)
+    drop(unsigned n)
     {
-        BOOST_ASSERT(n_ >= n);
+        BOOST_ASSERT(n <= n_);
         n_ -= n;
         v_ >>= n;
     }
@@ -85,7 +85,7 @@ public:
     // ensure at least n bits
     template<class FwdIt>
     bool
-    fill(std::uint8_t n, FwdIt& first, FwdIt const& last);
+    fill(unsigned n, FwdIt& first, FwdIt const& last);
 
     // fill 8 bits, unchecked
     template<class FwdIt>
@@ -100,7 +100,7 @@ public:
     // return n bits
     template<class Unsigned, class FwdIt>
     bool
-    peek(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last);
+    peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last);
 
     // return everything in the reservoir
     value_type
@@ -112,7 +112,7 @@ public:
     // return n bits, and consume
     template<class Unsigned, class FwdIt>
     bool
-    read(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last);
+    read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last);
 
     // rewind by the number of whole bytes stored (unchecked)
     template<class BidirIt>
@@ -123,7 +123,7 @@ public:
 template<class FwdIt>
 bool
 bitstream::
-fill(std::uint8_t n, FwdIt& first, FwdIt const& last)
+fill(unsigned n, FwdIt& first, FwdIt const& last)
 {
     while(n_ < n)
     {
@@ -160,19 +160,20 @@ fill_16(FwdIt& it)
 template<class Unsigned, class FwdIt>
 bool
 bitstream::
-peek(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
+peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
 {
     BOOST_ASSERT(n <= sizeof(value)*8);
     if(! fill(n, first, last))
         return false;
-    value = v_ & ((1ULL << n) - 1);
+    value = static_cast<Unsigned>(
+        v_ & ((1ULL << n) - 1));
     return true;
 }
 
 template<class Unsigned, class FwdIt>
 bool
 bitstream::
-read(Unsigned& value, std::uint8_t n, FwdIt& first, FwdIt const& last)
+read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
 {
     BOOST_ASSERT(n < sizeof(v_)*8);
     if(! peek(value, n, first, last))

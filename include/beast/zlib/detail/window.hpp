@@ -46,53 +46,52 @@ namespace detail {
 
 class window
 {
+    std::unique_ptr<std::uint8_t[]> p_;
     std::uint16_t i_ = 0;
     std::uint16_t size_ = 0;
     std::uint16_t capacity_ = 0;
     std::uint8_t bits_ = 0;
-    std::unique_ptr<std::uint8_t[]> p_;
 
 public:
-    std::uint8_t
+    int
     bits() const
     {
         return bits_;
     }
 
-    std::uint16_t
+    unsigned
     capacity() const
     {
         return capacity_;
     }
 
-    std::uint16_t
+    unsigned
     size() const
     {
         return size_;
     }
 
     void
-    reset(std::uint16_t capacity);
+    reset(int bits);
 
     void
-    read(std::uint8_t* out,
-        std::uint16_t pos, std::uint16_t n);
+    read(std::uint8_t* out, unsigned pos, unsigned n);
 
     template<class = void>
     void
-    write(std::uint8_t const* in, std::size_t n);
+    write(std::uint8_t const* in, unsigned n);
 };
 
 inline
 void
 window::
-reset(std::uint16_t bits)
+reset(int bits)
 {
     if(bits_ != bits)
     {
         p_.reset();
-        bits_ = bits;
-        capacity_ = 1 << bits_;
+        bits_ = static_cast<std::uint8_t>(bits);
+        capacity_ = 1U << bits_;
     }
     i_ = 0;
     size_ = 0;
@@ -101,7 +100,7 @@ reset(std::uint16_t bits)
 inline
 void
 window::
-read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
+read(std::uint8_t* out, unsigned pos, unsigned n)
 {
     if(i_ >= size_)
     {
@@ -109,9 +108,8 @@ read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
         std::memcpy(out, &p_[i_ - pos], n);
         return;
     }
-
-    std::uint16_t i = ((((std::int32_t)i_) - pos) + capacity_) % capacity_;
-    std::uint16_t m = capacity_ - i;
+    auto i = ((i_ - pos) + capacity_) % capacity_;
+    auto m = capacity_ - i;
     if(n <= m)
     {
         std::memcpy(out, &p_[i], n);
@@ -119,14 +117,13 @@ read(std::uint8_t* out, std::uint16_t pos, std::uint16_t n)
     }
     std::memcpy(out, &p_[i], m);
     out += m;
-    m = n - m;
-    std::memcpy(out, &p_[0], m);
+    std::memcpy(out, &p_[0], n - m);
 }
 
 template<class>
 void
 window::
-write(std::uint8_t const* in, std::size_t n)
+write(std::uint8_t const* in, unsigned n)
 {
     if(! p_)
         p_.reset(new std::uint8_t[capacity_]);
@@ -134,23 +131,22 @@ write(std::uint8_t const* in, std::size_t n)
     {
         i_ = 0;
         size_ = capacity_;
-        std::memcpy(&p_[0], in + n - size_, size_);
+        std::memcpy(&p_[0], in + (n - size_), size_);
         return;
     }
-    if(n + i_ <= capacity_)
+    if(i_ + n <= capacity_)
     {
         std::memcpy(&p_[i_], in, n);
-        size_ += n;
-        i_ = (i_ + n) % capacity_;
+        size_ = static_cast<std::uint16_t>(size_ + n);
+        i_ = static_cast<std::uint16_t>(
+            (i_ + n) % capacity_);
         return;
     }
-
-    std::uint16_t m = capacity_ - i_;
+    auto m = capacity_ - i_;
     std::memcpy(&p_[i_], in, m);
     in += m;
-    m = n - m;
-    std::memcpy(&p_[0], in, m);
-    i_ = m;
+    i_ = static_cast<std::uint16_t>(n - m);
+    std::memcpy(&p_[0], in, i_);
     size_ = capacity_;
 }
 

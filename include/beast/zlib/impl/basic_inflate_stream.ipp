@@ -61,7 +61,7 @@ basic_inflate_stream<Allocator>::
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-reset(std::uint8_t windowBits)
+reset(int windowBits)
 {
     if(windowBits < 8 || windowBits > 15)
         throw std::domain_error("windowBits out of range");
