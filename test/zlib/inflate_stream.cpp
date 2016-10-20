@@ -222,17 +222,7 @@ public:
 
     fin:
         out.resize(zs.total_out);
-        {
-            auto const result = std::mismatch(
-                out.begin(), out.end(), check.begin());
-            std::size_t i;
-            for(i = 0; i < std::min(out.size(), check.size()); ++i)
-            {
-                if(out[i] != check[i])
-                    break;
-            }
-            BEAST_EXPECT(out == check);
-        }
+        BEAST_EXPECT(out == check);
     err:
         ;
     }
