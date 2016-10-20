@@ -209,22 +209,35 @@ write(z_params& zs, int flush)
     auto next = zs.next_in;
     auto const outend = put + zs.avail_out;
     auto const end = next + zs.avail_in;
-    auto const more =
+    auto const done =
         [&]
         {
+            /*
+               Return from inflate(), updating the total counts and the check value.
+               If there was no progress during the inflate() call, return a buffer
+               error.  Call updatewindow() to create and/or update the window state.
+               Note: a memory error from inflate() is non-recoverable.
+             */
             auto const nwritten = put - zs.next_out;
-            // VFALCO TODO Don't allocate update the window unless necessary
-            if(/*w_.did_alloc() || */ mode_ < BAD &&
-                    (mode_ < CHECK || flush != Z_FINISH))
-                w_.write(zs.next_out, put - zs.next_out);
             zs.next_out = put;
             zs.avail_out = outend - put;
             zs.next_in = next;
             zs.avail_in = end - next;
+
+            // VFALCO TODO Don't allocate update the window unless necessary
+            if(/*wsize_ ||*/ (out != zs.avail_out && mode_ < BAD &&
+                    (mode_ < CHECK || flush != Z_FINISH)))
+                w_.write(zs.next_out, put - zs.next_out);
+
             in -= zs.avail_in;
             out -= zs.avail_out;
             zs.total_in += next - zs.next_in;
             zs.total_out += nwritten;
+            /*
+            zs.data_type = bits_ + (last_ ? 64 : 0) +
+                (mode_ == TYPE ? 128 : 0) +
+                (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
+            */
             if (((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
                 result = Z_BUF_ERROR;
             return result;
@@ -249,7 +262,7 @@ write(z_params& zs, int flush)
 
         case TYPE:
             if(flush == Z_BLOCK || flush == Z_TREES)
-                goto inf_leave;
+                return done();
             // fall through
 
         case TYPEDO:
@@ -261,7 +274,7 @@ write(z_params& zs, int flush)
                 break;
             }
             if(! bi_.fill(3, next, end))
-                return more();
+                return done();
             std::uint8_t v;
             bi_.read(v, 1, next, end);
             last_ = v != 0;
@@ -279,7 +292,7 @@ write(z_params& zs, int flush)
                 if(flush == Z_TREES)
                 {
                     bi_.drop(2);
-                    return more();
+                    return done();
                 }
                 break;
             case 2:
@@ -299,7 +312,7 @@ write(z_params& zs, int flush)
             bi_.flush_byte();
             std::uint32_t v;
             if(! bi_.peek(v, 32, next, end))
-                return more();
+                return done();
             length_ = v & 0xffff;
             if(length_ != ((v >> 16) ^ 0xffff))
             {
@@ -312,7 +325,7 @@ write(z_params& zs, int flush)
             bi_.flush();
             mode_ = COPY_;
             if(flush == Z_TREES)
-                return more();
+                return done();
             // fall through
         }
 
@@ -335,7 +348,7 @@ write(z_params& zs, int flush)
                 static_cast<std::size_t>(outend - put);
             copy = clamp(copy, left);
             if(copy == 0)
-                return more();
+                return done();
             std::memcpy(put, next, copy);
             next += copy;
             put += copy;
@@ -345,7 +358,7 @@ write(z_params& zs, int flush)
 
         case TABLE:
             if(! bi_.fill(5 + 5 + 4, next, end))
-                return more();
+                return done();
             bi_.read(nlen_, 5, next, end);
             nlen_ += 257;
             bi_.read(ndist_, 5, next, end);
@@ -369,7 +382,7 @@ write(z_params& zs, int flush)
             while(have_ < ncode_)
             {
                 if(! bi_.read(lens_[order[have_]], 3, next, end))
-                    return more();
+                    return done();
                 ++have_;
             }
             while(have_ < order.size())
@@ -396,7 +409,7 @@ write(z_params& zs, int flush)
             {
                 std::uint16_t v;
                 if(! bi_.peek(v, lenbits_, next, end))
-                    return more();
+                    return done();
                 auto cp = &lencode_[v];
                 if(cp->val < 16)
                 {
@@ -410,7 +423,7 @@ write(z_params& zs, int flush)
                     if(cp->val == 16)
                     {
                         if(! bi_.fill(cp->bits + 2, next, end))
-                            return more();
+                            return done();
                         bi_.drop(cp->bits);
                         if(have_ == 0)
                         {
@@ -426,7 +439,7 @@ write(z_params& zs, int flush)
                     else if(cp->val == 17)
                     {
                         if(! bi_.fill(cp->bits + 3, next, end))
-                            return more();
+                            return done();
                         bi_.drop(cp->bits);
                         bi_.read(copy, 3, next, end);
                         len = 0;
@@ -435,7 +448,7 @@ write(z_params& zs, int flush)
                     else
                     {
                         if(! bi_.fill(cp->bits + 7, next, end))
-                            return more();
+                            return done();
                         bi_.drop(cp->bits);
                         bi_.read(copy, 7, next, end);
                         len = 0;
@@ -487,7 +500,7 @@ write(z_params& zs, int flush)
             }
             mode_ = LEN_;
             if(flush == Z_TREES)
-                return more();
+                return done();
             // fall through
         }
 
@@ -519,13 +532,13 @@ write(z_params& zs, int flush)
             std::uint16_t v;
             back_ = 0;
             if(! bi_.peek(v, lenbits_, next, end))
-                return more();
+                return done();
             auto cp = &lencode_[v];
             if(cp->op && (cp->op & 0xf0) == 0)
             {
                 auto prev = cp;
                 if(! bi_.peek(v, prev->bits + prev->op, next, end))
-                    return more();
+                    return done();
                 cp = &lencode_[prev->val + (v >> prev->bits)];
                 bi_.drop(prev->bits + cp->bits);
                 back_ += prev->bits + cp->bits;
@@ -563,7 +576,7 @@ write(z_params& zs, int flush)
             {
                 std::uint16_t v;
                 if(! bi_.read(v, extra_, next, end))
-                    return more();
+                    return done();
                 length_ += v;
                 back_ += extra_;
             }
@@ -575,13 +588,13 @@ write(z_params& zs, int flush)
         {
             std::uint16_t v;
             if(! bi_.peek(v, distbits_, next, end))
-                return more();
+                return done();
             auto cp = &distcode_[v];
             if((cp->op & 0xf0) == 0)
             {
                 auto prev = cp;
                 if(! bi_.peek(v, prev->bits + prev->op, next, end))
-                    return more();
+                    return done();
                 cp = &distcode_[prev->val + (v >> prev->bits)];
                 bi_.drop(prev->bits + cp->bits);
                 back_ += prev->bits + cp->bits;
@@ -608,7 +621,7 @@ write(z_params& zs, int flush)
             {
                 std::uint16_t v;
                 if(! bi_.read(v, extra_, next, end))
-                    return more();
+                    return done();
                 offset_ += v;
                 back_ += extra_;
             }
@@ -626,7 +639,7 @@ write(z_params& zs, int flush)
         case MATCH:
         {
             if(put == outend)
-                return more();
+                return done();
             auto const copy =
                 static_cast<std::size_t>(put - zs.next_out);
             if(offset_ > copy)
@@ -669,7 +682,7 @@ write(z_params& zs, int flush)
         case LIT:
         {
             if(put == outend)
-                return more();
+                return done();
             auto const v = static_cast<std::uint8_t>(length_);
             *put++ = v;
             mode_ = LEN;
@@ -682,11 +695,11 @@ write(z_params& zs, int flush)
 
         case DONE:
             result = Z_STREAM_END;
-            goto inf_leave;
+            return done();
 
         case BAD:
             result = Z_DATA_ERROR;
-            goto inf_leave;
+            return done();
 
         case MEM:
             return Z_MEM_ERROR;
@@ -696,32 +709,6 @@ write(z_params& zs, int flush)
             return Z_STREAM_ERROR;
         }
     }
-    /*
-       Return from inflate(), updating the total counts and the check value.
-       If there was no progress during the inflate() call, return a buffer
-       error.  Call updatewindow() to create and/or update the window state.
-       Note: a memory error from inflate() is non-recoverable.
-     */
-  inf_leave:
-    if(wsize_ || (out != avail_out && mode_ < BAD &&
-            (mode_ < CHECK || flush != Z_FINISH)))
-    {
-        if(updatewindow(next_out, out - avail_out))
-        {
-            mode_ = MEM;
-            return Z_MEM_ERROR;
-        }
-    }
-    in -= zs.avail_in;
-    out -= zs.avail_out;
-    zs.total_in += in;
-    zs.total_out += out;
-    zs.data_type = bits_ + (last_ ? 64 : 0) +
-                      (mode_ == TYPE ? 128 : 0) +
-                      (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-    if(((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
-        result = Z_BUF_ERROR;
-    return result;
 }
 
 /*
@@ -729,7 +716,7 @@ write(z_params& zs, int flush)
    literal and match bytes until either not enough input or output is
    available, an end-of-block is encountered, or a data error is encountered.
    When large enough input and output buffers are supplied to inflate(), for
-   example, a 16K input buffer and a 64K output buffer, more than 95% of the
+   example, a 16K input buffer and a 64K output buffer, done than 95% of the
    inflate execution time is spent in this routine.
 
    Entry assumptions:

@@ -66,6 +66,7 @@ public:
     {
         switch(static_cast<error>(ev))
         {
+        case error::no_progress: return "no progress";
         case error::invalid_block_type: return "invalid block type";
         case error::invalid_stored_length: return "invalid stored block length";
         case error::too_many_symbols: return "too many symbols";
