@@ -86,7 +86,7 @@ enum class error
     invalid_distance_code,
 
     /// Invalid distance too far back
-    distance_overflow,
+    invalid_distance,
 
 
 

@@ -77,7 +77,7 @@ public:
         case error::missing_eob: return "missing end of block code";
         case error::invalid_literal_length: return "invalid literal/length code";
         case error::invalid_distance_code: return "invalid distance code";
-        case error::distance_overflow: return "invalid distance";
+        case error::invalid_distance: return "invalid distance";
 
         case error::over_subscribed_length: return "over-subscribed length";
         case error::incomplete_length_set: return "incomplete length set";

@@ -186,10 +186,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 fixedTables();
                 mode_ = LEN_;             /* decode codes */
                 if(flush == Flush::trees)
-                {
-                    bi_.drop(2);
                     return done();
-                }
                 break;
             case 2:
                 // dynamic Huffman table
@@ -480,7 +477,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             }
 #ifdef INFLATE_STRICT
             if(offset_ > dmax_)
-                return err(error::distance_overflow);
+                return err(error::invalid_distance);
 #endif
             mode_ = MATCH;
             // fall through
@@ -495,7 +492,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 auto offset = static_cast<std::uint16_t>(
                     offset_ - r.out.used());
                 if(offset > w_.size())
-                    return err(error::distance_overflow);
+                    return err(error::invalid_distance);
                 auto const n = detail::clamp(length_, offset);
                 w_.read(r.out.next, offset, n);
                 r.out.next += n;
@@ -655,7 +652,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
 #ifdef INFLATE_STRICT
                 if(dist > dmax_)
                 {
-                    ec = error::distance_overflow;
+                    ec = error::invalid_distance;
                     mode_ = BAD;
                     break;
                 }
@@ -669,7 +666,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
                     op = dist - op; // distance back in window
                     if(op > w_.size())
                     {
-                        ec = error::distance_overflow;
+                        ec = error::invalid_distance;
                         mode_ = BAD;
                         break;
                     }
