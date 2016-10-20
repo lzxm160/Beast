@@ -104,13 +104,8 @@ public:
                     is.write(zs, Flush::sync, ec);
                     if(ec == error::no_progress) // per zlib FAQ
                         goto fin;
-                #if 0
-                    if(! BEAST_EXPECTS(! ec, ec.message()))
-                        goto err;
-                #else
                     if(! BEAST_EXPECT(! ec))
                         goto err;
-                #endif
                     if(zs.avail_in == 0 && ! bi)
                     {
                         bi = true;
@@ -193,7 +188,6 @@ public:
     fin:
         out.resize(zs.total_out);
         BEAST_EXPECT(out == check);
-        return;
 
     err:
         inflateEnd(&zs);
@@ -220,13 +214,8 @@ public:
                 is.write(zs, Flush::sync, ec);
                 if(ec == error::no_progress) // per zlib FAQ
                     goto fin;
-            #if 0
-                if(! BEAST_EXPECTS(! ec, ec.message()))
+                if(! BEAST_EXPECT(! ec))
                     goto err;
-            #else
-                if(! BEAST_EXPECTS(! ec, ec.message()))
-                    goto err;
-            #endif
                 progress = false;
             }
         }
@@ -244,7 +233,6 @@ public:
             }
             BEAST_EXPECT(out == check);
         }
-
     err:
         ;
     }
