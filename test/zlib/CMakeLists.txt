@@ -27,6 +27,10 @@ set(ZLIB_SOURCES
     zlib-1.2.8/zutil.c
 )
 
+if (MSVC)
+    set_source_files_properties (${ZLIB_SOURCES} PROPERTIES COMPILE_FLAGS "/wd4127 /wd4131 /wd4244")
+endif()
+
 add_executable (zlib-tests
     ${BEAST_INCLUDES}
     ${EXTRAS_INCLUDES}
