@@ -97,7 +97,7 @@ fixedTables()
 template<class Allocator>
 int
 basic_inflate_stream<Allocator>::
-write(z_params& zs, int flush)
+write(z_params& zs, Flush flush)
 {
     unsigned in;
     unsigned out; // save starting available input and output
@@ -124,7 +124,7 @@ write(z_params& zs, int flush)
 
             // VFALCO TODO Don't allocate update the window unless necessary
             if(/*wsize_ ||*/ (out != zs.avail_out && mode_ < BAD &&
-                    (mode_ < CHECK || flush != Z_FINISH)))
+                    (mode_ < CHECK || flush != Flush::finish)))
                 w_.write(zs.next_out, put - zs.next_out);
 
             in -= zs.avail_in;
@@ -134,7 +134,7 @@ write(z_params& zs, int flush)
             zs.data_type = bi_.size() + (last_ ? 64 : 0) +
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-            if (((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
+            if (((in == 0 && out == 0) || flush == Flush::finish) && result == Z_OK)
                 result = Z_BUF_ERROR;
             return result;
         };
@@ -157,7 +157,7 @@ write(z_params& zs, int flush)
             break;
 
         case TYPE:
-            if(flush == Z_BLOCK || flush == Z_TREES)
+            if(flush == Flush::block || flush == Flush::trees)
                 return done();
             // fall through
 
@@ -185,7 +185,7 @@ write(z_params& zs, int flush)
                 // fixed Huffman table
                 fixedTables();
                 mode_ = LEN_;             /* decode codes */
-                if(flush == Z_TREES)
+                if(flush == Flush::trees)
                 {
                     bi_.drop(2);
                     return done();
@@ -220,7 +220,7 @@ write(z_params& zs, int flush)
             // undefined right shift behavior.
             bi_.flush();
             mode_ = COPY_;
-            if(flush == Z_TREES)
+            if(flush == Flush::trees)
                 return done();
             // fall through
         }
@@ -395,7 +395,7 @@ write(z_params& zs, int flush)
                 break;
             }
             mode_ = LEN_;
-            if(flush == Z_TREES)
+            if(flush == Flush::trees)
                 return done();
             // fall through
         }

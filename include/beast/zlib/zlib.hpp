@@ -92,6 +92,17 @@ struct z_params
 /* constants */
 
 /* Allowed flush values; see deflate() and inflate() below for details */
+enum class Flush
+{
+    none,
+    partial,
+    sync,
+    full,
+    finish,
+    block,
+    trees
+};
+
 enum z_Flush
 {
     Z_NO_FLUSH      = 0,

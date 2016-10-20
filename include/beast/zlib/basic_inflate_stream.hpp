@@ -79,7 +79,7 @@ public:
     reset(std::uint8_t windowBits);
 
     int
-    write(z_params& zs, int flush);
+    write(z_params& zs, Flush flush);
 
 private:
     enum inflate_mode

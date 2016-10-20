@@ -101,8 +101,7 @@ public:
                 bool bo = false;
                 for(;;)
                 {
-                    auto const flush = Z_SYNC_FLUSH;
-                    result = is.write(zs, flush);
+                    result = is.write(zs, Flush::sync);
                     if(result == Z_BUF_ERROR) // per zlib FAQ
                         goto fin;
                     if(! BEAST_EXPECT(result == Z_OK))
@@ -213,8 +212,7 @@ public:
             bool progress = true;
             for(;;)
             {
-                auto const flush = Z_SYNC_FLUSH;
-                result = is.write(zs, flush);
+                result = is.write(zs, Flush::sync);
                 if(result == Z_BUF_ERROR) // per zlib FAQ
                     goto fin;
                 if(! BEAST_EXPECT(progress))
