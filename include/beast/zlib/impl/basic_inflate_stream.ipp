@@ -493,7 +493,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             {
                 // copy from window
                 auto offset = static_cast<std::uint16_t>(
-                    offset_ - r.out.avail());
+                    offset_ - r.out.used());
                 if(offset > w_.size())
                     return err(error::distance_overflow);
                 auto const n = detail::clamp(length_, offset);
@@ -517,7 +517,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                     // fill from output
                     auto n = detail::clamp(length_, r.out.avail());
                     std::memset(r.out.next, r.out.next[-1], n);
-                    r.out.next += length_;
+                    r.out.next += n;
                     length_ -= n;
                 }
             }
@@ -662,7 +662,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
 #endif
                 bi_.drop(op);
 
-                op = (unsigned)(r.out.next - r.out.first); // max distance in output
+                op = r.out.used();
                 if(dist > op)
                 {
                     // copy from window
