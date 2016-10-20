@@ -153,9 +153,6 @@ private:
     void
     fixedTables();
 
-    int
-    updatewindow(const Byte *end, unsigned copy);
-
     detail::bitstream bi_;
 
     inflate_mode mode_;             // current inflate mode
@@ -164,12 +161,6 @@ private:
 
     // sliding window
     detail::window w_;
-    unsigned wbits_;                // log base 2 of requested window size
-    unsigned wsize_;                // window size or zero if not using window
-    unsigned whave_;                // valid bytes in the window
-    unsigned wnext_;                // window write index
-    unsigned char *window_ =
-        nullptr;                    // allocated sliding window, if needed
 
     // bit accumulator
     unsigned long hold_;            // input bit accumulator

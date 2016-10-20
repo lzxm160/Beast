@@ -56,7 +56,6 @@ template<class Allocator>
 basic_inflate_stream<Allocator>::
 ~basic_inflate_stream()
 {
-    std::free(this->window_);
 }
 
 template<class Allocator>
@@ -66,20 +65,7 @@ reset(std::uint8_t windowBits)
 {
     if(windowBits < 8 || windowBits > 15)
         throw std::domain_error("windowBits out of range");
-    if(window_ && wbits_ != windowBits)
-    {
-        std::free(window_);
-        window_ = nullptr;
-    }
-
-    // update state and reset the rest of it
-    wbits_ = (unsigned)windowBits;
-    wsize_ = 0;
-    whave_ = 0;
-    wnext_ = 0;
-
     w_.reset(windowBits);
-
     resetKeep(*this);
 }
 
@@ -127,74 +113,6 @@ auto strm = this;
 }
 
 //------------------------------------------------------------------------------
-
-/*
-   Update the window with the last wsize (normally 32K) bytes written before
-   returning.  If window does not exist yet, create it.  This is only called
-   when a window is already in use, or when output has been written during this
-   inflate call, but the end of the deflate stream has not been reached yet.
-   It is also called to create a window for dictionary data when a dictionary
-   is loaded.
-
-   Providing output buffers larger than 32K to inflate() should provide a speed
-   advantage, since only the last 32K of output is copied to the sliding window
-   upon return from inflate(), and since all distances after the first 32K of
-   output will fall in the output data, making match copies simpler and faster.
-   The advantage may be dependent on the size of the processor's data caches.
- */
-template<class Allocator>
-int
-basic_inflate_stream<Allocator>::
-updatewindow(const Byte *end, unsigned copy)
-{
-    auto strm = this;
-    unsigned dist;
-
-    // if it hasn't been done already, allocate space for the window
-    if(strm->window_ == 0)
-    {
-        strm->window_ = (unsigned char *) std::malloc(1U << strm->wbits_);
-        if(strm->window_ == 0)
-            return 1;
-    }
-
-    // if window not in use yet, initialize
-    if(strm->wsize_ == 0)
-    {
-        strm->wsize_ = 1U << strm->wbits_;
-        strm->wnext_ = 0;
-        strm->whave_ = 0;
-    }
-
-    // copy wsize or less output bytes into the circular window
-    if(copy >= strm->wsize_)
-    {
-        std::memcpy(strm->window_, end - strm->wsize_, strm->wsize_);
-        strm->wnext_ = 0;
-        strm->whave_ = strm->wsize_;
-    }
-    else
-    {
-        dist = std::min(strm->wsize_ - strm->wnext_, copy);
-        std::memcpy(strm->window_ + strm->wnext_, end - copy, dist);
-        copy -= dist;
-        if(copy)
-        {
-            std::memcpy(strm->window_, end - copy, copy);
-            strm->wnext_ = copy;
-            strm->whave_ = strm->wsize_;
-        }
-        else
-        {
-            strm->wnext_ += dist;
-            if(strm->wnext_ == strm->wsize_)
-                strm->wnext_ = 0;
-            if(strm->whave_ < strm->wsize_)
-                strm->whave_ += dist;
-        }
-    }
-    return 0;
-}
 
 template<class Allocator>
 int
