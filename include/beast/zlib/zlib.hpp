@@ -88,10 +88,6 @@ struct z_params
     int     data_type;          // best guess about the data type: binary or text
 };
 
-
-/* constants */
-
-/* Allowed flush values; see deflate() and inflate() below for details */
 enum class Flush
 {
     none,

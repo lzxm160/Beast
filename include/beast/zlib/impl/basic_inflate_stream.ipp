@@ -232,8 +232,8 @@ write(z_params& zs, Flush flush, error_code& ec)
                 mode_ = TYPE;
                 break;
             }
-            copy = clamp(copy, r.in.avail());
-            copy = clamp(copy, r.out.avail());
+            copy = detail::clamp(copy, r.in.avail());
+            copy = detail::clamp(copy, r.out.avail());
             if(copy == 0)
                 return done();
             std::memcpy(r.out.next, r.in.next, copy);
@@ -496,7 +496,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                     offset_ - r.out.avail());
                 if(offset > w_.size())
                     return err(error::distance_overflow);
-                auto const n = clamp(length_, offset);
+                auto const n = detail::clamp(length_, offset);
                 w_.read(r.out.next, offset, n);
                 r.out.next += n;
                 length_ -= n;
@@ -506,7 +506,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 if(offset_ > 1)
                 {
                     // copy from output
-                    auto n = clamp(length_, offset_);
+                    auto n = detail::clamp(length_, offset_);
                     std::memcpy(
                         r.out.next, r.out.next - offset_, n);
                     r.out.next += n;
@@ -515,7 +515,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 if(length_ > 0)
                 {
                     // fill from output
-                    auto n = clamp(length_, r.out.avail());
+                    auto n = detail::clamp(length_, r.out.avail());
                     std::memset(r.out.next, r.out.next[-1], n);
                     r.out.next += length_;
                     length_ -= n;
@@ -673,7 +673,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
                         mode_ = BAD;
                         break;
                     }
-                    auto const n = clamp(len, op);
+                    auto const n = detail::clamp(len, op);
                     w_.read(r.out.next, op, n);
                     r.out.next += n;
                     len -= n;
@@ -684,7 +684,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
                     if(dist > 1)
                     {
                         // copy from output
-                        auto n = clamp(len, dist);
+                        auto n = detail::clamp(len, dist);
                         std::memcpy(r.out.next, r.out.next - dist, n);
                         r.out.next += n;
                         len -= n;

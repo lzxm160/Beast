@@ -82,6 +82,17 @@ struct ranges
     range<false> out;
 };
 
+// Clamp u to v where u and v are different types
+template<class U, class V>
+inline
+U
+clamp(U u, V v)
+{
+    if(u > v)
+        u = static_cast<U>(v);
+    return u;
+}
+
 } // detail
 } // zlib
 } // beast

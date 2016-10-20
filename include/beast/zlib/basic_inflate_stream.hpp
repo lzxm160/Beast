@@ -50,7 +50,7 @@ namespace zlib {
 
 /** Raw deflate decompressor.
 
-    This is a port of zlib's "inflate" functionality to C++.
+    This is a port of ZLib's "inflate" functionality to C++.
 */
 template<class Allocator>
 class basic_inflate_stream
@@ -65,10 +65,12 @@ public:
     /// Destructor.
     ~basic_inflate_stream();
 
-    /** Clear the stream.
+    /** Put the stream in a newly constructed state.
+
+        All dynamically allocated memory is de-allocated.
     */
     void
-    clear(z_params& zs, std::uint8_t windowBitss);
+    clear();
 
     /** Reset the stream.
 
@@ -85,7 +87,7 @@ public:
     write(z_params& zs, Flush flush, error_code& ec);
 
 private:
-    enum inflate_mode
+    enum Mode
     {
         HEAD,       // i: waiting for magic header
         FLAGS,      // i: waiting for method and flags (gzip)
@@ -118,16 +120,6 @@ private:
         SYNC        // looking for synchronization bytes to restart inflate()
     };
 
-    template<class U1, class U2>
-    static
-    U1
-    clamp(U1 u1, U2 u2)
-    {
-        if(u1 > u2)
-            u1 = static_cast<U1>(u2);
-        return u1;
-    }
-
     void
     inflate_fast(detail::ranges& r, error_code& ec);
 
@@ -136,7 +128,7 @@ private:
 
     detail::bitstream bi_;
 
-    inflate_mode mode_ = HEAD;      // current inflate mode
+    Mode mode_ = HEAD;              // current inflate mode
     int last_ = 0;                  // true if processing last block
     unsigned dmax_ = 32768U;        // zlib header max distance (INFLATE_STRICT)
 
