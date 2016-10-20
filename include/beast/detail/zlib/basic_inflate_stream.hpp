@@ -142,10 +142,10 @@ private:
     }
 
     void
-    inflate_fast(z_stream& zs, unsigned start);
+    inflate_fast(z_params& zs, unsigned start);
 
     int
-    write(z_stream& zs, int flush);
+    write(z_params& zs, int flush);
 
     void
     resetKeep(z_params& zs);

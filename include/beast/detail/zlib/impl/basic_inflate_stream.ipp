@@ -155,7 +155,7 @@ resetKeep(z_params& zs)
     next_ = codes_;
     sane_ = 1;
     back_ = -1;
-    
+
     bi_.flush();
 }
 
@@ -245,7 +245,7 @@ updatewindow(const Byte *end, unsigned copy)
 template<class Allocator>
 int
 basic_inflate_stream<Allocator>::
-write(z_stream& zs, int flush)
+write(z_params& zs, int flush)
 {
     auto put = zs.next_out;
     auto next = zs.next_in;
@@ -780,7 +780,7 @@ template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
 inflate_fast(
-    z_stream& zs,
+    z_params& zs,
     unsigned start)             // inflate()'s starting value for strm->avail_out
 {
     const unsigned char *in;    // local strm->next_in
@@ -974,7 +974,7 @@ inflate_fast(
                 else
                 {
                     // copy direct from output
-                    auto from = out - dist;          
+                    auto from = out - dist;
                     do
                     {
                         // minimum length is three
