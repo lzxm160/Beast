@@ -87,7 +87,6 @@ public:
         {
             for(std::size_t j = 1; j < check.size(); ++j)
             {
-                int result;
                 std::string out;
                 out.resize(check.size() + 1);
                 z_params zs;
@@ -101,10 +100,11 @@ public:
                 bool bo = false;
                 for(;;)
                 {
-                    result = is.write(zs, Flush::sync);
-                    if(result == Z_BUF_ERROR) // per zlib FAQ
+                    error_code ec;
+                    is.write(zs, Flush::sync, ec);
+                    if(ec == error::no_progress) // per zlib FAQ
                         goto fin;
-                    if(! BEAST_EXPECT(result == Z_OK))
+                    if(! BEAST_EXPECTS(! ec, ec.message()))
                         goto err;
                     if(zs.avail_in == 0 && ! bi)
                     {
@@ -198,7 +198,6 @@ public:
     doInflate2_beast(int windowBits,
         std::string const& in, std::string const& check)
     {
-        int result;
         std::string out;
         out.resize(check.size() + 1);
         z_params zs;
@@ -212,10 +211,11 @@ public:
             bool progress = true;
             for(;;)
             {
-                result = is.write(zs, Flush::sync);
-                if(result == Z_BUF_ERROR) // per zlib FAQ
+                error_code ec;
+                is.write(zs, Flush::sync, ec);
+                if(ec == error::no_progress) // per zlib FAQ
                     goto fin;
-                if(! BEAST_EXPECT(progress))
+                if(! BEAST_EXPECTS(! ec, ec.message()))
                     goto err;
                 progress = false;
             }

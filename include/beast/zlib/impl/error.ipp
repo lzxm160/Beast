@@ -67,17 +67,21 @@ public:
         switch(static_cast<error>(ev))
         {
         case error::no_progress: return "no progress";
+
+        case error::end_of_stream: return "end of stream";
         case error::invalid_block_type: return "invalid block type";
         case error::invalid_stored_length: return "invalid stored block length";
         case error::too_many_symbols: return "too many symbols";
         case error::invalid_code_lenths: return "invalid code lengths";
         case error::invalid_bit_length_repeat: return "invalid bit length repeat";
         case error::missing_eob: return "missing end of block code";
-        case error::invalid_literal_lengths: return "invalid literal/lengths set";
-        case error::invalid_distances: return "invalid distances set";
         case error::invalid_literal_length: return "invalid literal/length code";
         case error::invalid_distance_code: return "invalid distance code";
         case error::distance_overflow: return "invalid distance";
+
+        case error::over_subscribed_length: return "over-subscribed length";
+        case error::incomplete_length_set: return "incomplete length set";
+
         default:
             return "zlib error";
         }

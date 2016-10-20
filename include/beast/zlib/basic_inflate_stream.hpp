@@ -78,8 +78,10 @@ public:
     void
     reset(std::uint8_t windowBits);
 
-    int
-    write(z_params& zs, Flush flush);
+    /** Decompressed data.
+    */
+    void
+    write(z_params& zs, Flush flush, error_code& ec);
 
 private:
     enum inflate_mode
@@ -112,7 +114,6 @@ private:
         LENGTH,     // i: waiting for 32-bit length (gzip)
         DONE,       // finished check, done -- remain here until reset
         BAD,        // got a data error -- remain here until reset
-        MEM,        // got an inflate() memory error -- remain here until reset
         SYNC        // looking for synchronization bytes to restart inflate()
     };
 
@@ -127,7 +128,7 @@ private:
     }
 
     void
-    inflate_fast(z_params& zs, unsigned start);
+    inflate_fast(z_params& zs, unsigned start, error_code& ec);
 
     void
     fixedTables();

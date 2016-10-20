@@ -95,13 +95,12 @@ fixedTables()
 //------------------------------------------------------------------------------
 
 template<class Allocator>
-int
+void
 basic_inflate_stream<Allocator>::
-write(z_params& zs, Flush flush)
+write(z_params& zs, Flush flush, error_code& ec)
 {
     unsigned in;
     unsigned out; // save starting available input and output
-    int result = Z_OK;
 
     auto put = zs.next_out;
     auto next = zs.next_in;
@@ -134,14 +133,15 @@ write(z_params& zs, Flush flush)
             zs.data_type = bi_.size() + (last_ ? 64 : 0) +
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-            if (((in == 0 && out == 0) || flush == Flush::finish) && result == Z_OK)
-                result = Z_BUF_ERROR;
-            return result;
+            if (((in == 0 && out == 0) || flush == Flush::finish) && ! ec)
+                ec = error::no_progress;
         };
-
-    if(zs.next_out == 0 ||
-            (zs.next_in == 0 && zs.avail_in != 0))
-        return Z_STREAM_ERROR;
+    auto const err =
+        [&](error e)
+        {
+            ec = e;
+            mode_ = BAD;
+        };
 
     if(mode_ == TYPE)
         mode_ = TYPEDO;
@@ -197,8 +197,7 @@ write(z_params& zs, Flush flush)
                 break;
 
             default:
-                zs.msg = (char *)"invalid block type";
-                mode_ = BAD;
+                return err(error::invalid_block_type);
             }
             break;
         }
@@ -211,11 +210,7 @@ write(z_params& zs, Flush flush)
                 return done();
             length_ = v & 0xffff;
             if(length_ != ((v >> 16) ^ 0xffff))
-            {
-                zs.msg = (char *)"invalid stored block lengths";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::invalid_stored_length);
             // flush instead of read, otherwise
             // undefined right shift behavior.
             bi_.flush();
@@ -262,11 +257,7 @@ write(z_params& zs, Flush flush)
             bi_.read(ncode_, 4, next, end);
             ncode_ += 4;
             if(nlen_ > 286 || ndist_ > 30)
-            {
-                zs.msg = (char *)"too many length or distance symbols";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::too_many_symbols);
             have_ = 0;
             mode_ = LENLENS;
             // fall through
@@ -286,11 +277,10 @@ write(z_params& zs, Flush flush)
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 7;
-            result = inflate_table(detail::CODES, &lens_[0],
-                order.size(), &next_, &lenbits_, work_);
-            if(result)
+            inflate_table(detail::CODES, &lens_[0],
+                order.size(), &next_, &lenbits_, work_, ec);
+            if(ec)
             {
-                zs.msg = (char *)"invalid code lengths set";
                 mode_ = BAD;
                 break;
             }
@@ -322,11 +312,7 @@ write(z_params& zs, Flush flush)
                             return done();
                         bi_.drop(cp->bits);
                         if(have_ == 0)
-                        {
-                            zs.msg = (char *)"invalid bit length repeat";
-                            mode_ = BAD;
-                            break;
-                        }
+                            return err(error::invalid_bit_length_repeat);
                         bi_.read(copy, 2, next, end);
                         len = lens_[have_ - 1];
                         copy += 3;
@@ -351,11 +337,7 @@ write(z_params& zs, Flush flush)
                         copy += 11;
                     }
                     if(have_ + copy > nlen_ + ndist_)
-                    {
-                        zs.msg = (char *)"invalid bit length repeat";
-                        mode_ = BAD;
-                        break;
-                    }
+                        return err(error::invalid_bit_length_repeat);
                     while(copy--)
                         lens_[have_++] = len;
                 }
@@ -365,34 +347,28 @@ write(z_params& zs, Flush flush)
                 break;
             // check for end-of-block code (better have one)
             if(lens_[256] == 0)
-            {
-                zs.msg = (char *)"invalid code -- missing end-of-block";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::missing_eob);
             /* build code tables -- note: do not change the lenbits or distbits
                values here (9 and 6) without reading the comments in inftrees.hpp
                concerning the ENOUGH constants, which depend on those values */
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 9;
-            result = inflate_table(detail::LENS,
-                &lens_[0], nlen_, &next_, &lenbits_, work_);
-            if(result)
+            inflate_table(detail::LENS, &lens_[0],
+                nlen_, &next_, &lenbits_, work_, ec);
+            if(ec)
             {
-                zs.msg = (char *)"invalid literal/lengths set";
                 mode_ = BAD;
-                break;
+                return;
             }
             distcode_ = next_;
             distbits_ = 6;
-            result = inflate_table(detail::DISTS,
-                lens_ + nlen_, ndist_, &next_, &distbits_, work_);
-            if(result)
+            inflate_table(detail::DISTS, lens_ + nlen_,
+                ndist_, &next_, &distbits_, work_, ec);
+            if(ec)
             {
-                zs.msg = (char *)"invalid distances set";
                 mode_ = BAD;
-                break;
+                return;
             }
             mode_ = LEN_;
             if(flush == Flush::trees)
@@ -457,11 +433,7 @@ write(z_params& zs, Flush flush)
                 break;
             }
             if(cp->op & 64)
-            {
-                zs.msg = (char *)"invalid literal/length code";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::invalid_literal_length);
             extra_ = cp->op & 15;
             mode_ = LENEXT;
             // fall through
@@ -501,11 +473,7 @@ write(z_params& zs, Flush flush)
                 back_ += cp->bits;
             }
             if(cp->op & 64)
-            {
-                zs.msg = (char *)"invalid distance code";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::invalid_distance_code);
             offset_ = cp->val;
             extra_ = cp->op & 15;
             mode_ = DISTEXT;
@@ -523,11 +491,7 @@ write(z_params& zs, Flush flush)
             }
 #ifdef INFLATE_STRICT
             if(offset_ > dmax_)
-            {
-                zs.msg = (char *)"invalid distance too far back";
-                mode_ = BAD;
-                break;
-            }
+                return err(error::distance_overflow);
 #endif
             mode_ = MATCH;
             // fall through
@@ -546,11 +510,7 @@ write(z_params& zs, Flush flush)
                 if(offset > w_.size())
                 {
                     if(sane_)
-                    {
-                        zs.msg = (char *)"invalid distance too far back";
-                        mode_ = BAD;
-                        break;
-                    }
+                        return err(error::distance_overflow);
                 }
                 auto const n = clamp(length_, offset);
                 w_.read(put, offset, n);
@@ -590,19 +550,15 @@ write(z_params& zs, Flush flush)
             // fall through
 
         case DONE:
-            result = Z_STREAM_END;
+            ec = error::end_of_stream;
             return done();
 
         case BAD:
-            result = Z_DATA_ERROR;
             return done();
-
-        case MEM:
-            return Z_MEM_ERROR;
 
         case SYNC:
         default:
-            return Z_STREAM_ERROR;
+            throw std::logic_error("stream error");
         }
     }
 }
@@ -618,9 +574,9 @@ write(z_params& zs, Flush flush)
    Entry assumptions:
 
         state->mode_ == LEN
-        strm->avail_in >= 6
-        strm->avail_out >= 258
-        start >= strm->avail_out
+        zs.avail_in >= 6
+        zs.avail_out >= 258
+        start >= zs.avail_out
         state->bits_ < 8
 
    On return, state->mode_ is one of:
@@ -634,12 +590,12 @@ write(z_params& zs, Flush flush)
     - The maximum input bits used by a length/distance pair is 15 bits for the
       length code, 5 bits for the length extra, 15 bits for the distance code,
       and 13 bits for the distance extra.  This totals 48 bits, or six bytes.
-      Therefore if strm->avail_in >= 6, then there is enough input to avoid
+      Therefore if zs.avail_in >= 6, then there is enough input to avoid
       checking for available input while decoding.
 
     - The maximum bytes that a single length/distance pair can output is 258
       bytes, which is the maximum length that can be coded.  inflate_fast()
-      requires strm->avail_out >= 258 for each loop to avoid checking for
+      requires zs.avail_out >= 258 for each loop to avoid checking for
       output space.
  */
 template<class Allocator>
@@ -647,12 +603,13 @@ void
 basic_inflate_stream<Allocator>::
 inflate_fast(
     z_params& zs,
-    unsigned start)             // inflate()'s starting value for strm->avail_out
+    unsigned start,             // inflate()'s starting value for zs.avail_out
+    error_code& ec)
 {
-    unsigned char const* in;    // local strm->next_in
+    unsigned char const* in;    // local zs.next_in
     unsigned char const* last;  // have enough input while in < last
-    unsigned char *out;         // local strm->next_out
-    unsigned char *beg;         // inflate()'s initial strm->next_out
+    unsigned char *out;         // local zs.next_out
+    unsigned char *beg;         // inflate()'s initial zs.next_out
     unsigned char *end;         // while out < end, enough space available
     unsigned op;                // code bits, operation, extra bits, or window position, window bytes to copy
     unsigned len;               // match length, unused bytes

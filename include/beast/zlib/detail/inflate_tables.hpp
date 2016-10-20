@@ -35,6 +35,7 @@
 #ifndef BEAST_ZLIB_DETAIL_INFLATE_TABLES_HPP
 #define BEAST_ZLIB_DETAIL_INFLATE_TABLES_HPP
 
+#include <beast/zlib/error.hpp>
 #include <cstdint>
 
 namespace beast {
@@ -120,14 +121,15 @@ enum codetype
    longest code or if it is less than the shortest code.
  */
 template<class = void>
-int
+void
 inflate_table(
     codetype type,
     std::uint16_t *lens,
     unsigned codes,
     code * *table,
     unsigned *bits,
-    std::uint16_t *work)
+    std::uint16_t* work,
+    error_code& ec)
 {
     unsigned len;                   // a code's length in bits
     unsigned sym;                   // index of code symbols
@@ -220,7 +222,7 @@ inflate_table(
         *(*table)++ = here;             /* make a table to force an error */
         *(*table)++ = here;
         *bits = 1;
-        return 0;     /* no symbols, but wait for decoding to report error */
+        return;       /* no symbols, but wait for decoding to report error */
     }
     for (min = 1; min < max; min++)
         if (count[min] != 0)
@@ -235,10 +237,16 @@ inflate_table(
         left <<= 1;
         left -= count[len];
         if (left < 0)
-            return -1;        /* over-subscribed */
+        {
+            ec = error::over_subscribed_length;
+            return;
+        }
     }
     if (left > 0 && (type == CODES || max != 1))
-        return -1;                      /* incomplete set */
+    {
+        ec = error::incomplete_length_set;
+        return;
+    }
 
     /* generate offsets into symbol table for each length for sorting */
     offs[1] = 0;
@@ -312,10 +320,16 @@ inflate_table(
     used = 1U << root;          /* use root table entries */
     mask = used - 1;            /* mask for comparing low */
 
+    auto const not_enough = []
+    {
+        throw std::logic_error(
+            "insufficient output size when inflating tables");
+    };
+
     /* check available table space */
     if ((type == LENS && used > ENOUGH_LENS) ||
             (type == DISTS && used > ENOUGH_DISTS))
-        return 1;
+        return not_enough();
 
     /* process all codes and make table entries */
     for (;;)
@@ -392,8 +406,8 @@ inflate_table(
             /* check for enough space */
             used += 1U << curr;
             if ((type == LENS && used > ENOUGH_LENS) ||
-                (type == DISTS && used > ENOUGH_DISTS))
-                return 1;
+                    (type == DISTS && used > ENOUGH_DISTS))
+                return not_enough();
 
             /* point entry in root table to sub-table */
             low = huff & mask;
@@ -417,7 +431,6 @@ inflate_table(
     /* set return parameters */
     *table += used;
     *bits = root;
-    return 0;
 }
 
 template<class = void>
@@ -451,13 +464,17 @@ get_fixed_tables()
             while(sym < 288)
                 lens[sym++] = 8;
             next = &len[0];
-            inflate_table(LENS, lens, 288, &next, &lenbits, work);
-
+            error_code ec;
+            inflate_table(LENS, lens, 288, &next, &lenbits, work, ec);
+            if(ec)
+                throw std::logic_error{ec.message()};
             sym = 0;
             while(sym < 32)
                 lens[sym++] = 5;
             next = &dist[0];
-            inflate_table(DISTS, lens, 32, &next, &distbits, work);
+            inflate_table(DISTS, lens, 32, &next, &distbits, work, ec);
+            if(ec)
+                throw std::logic_error{ec.message()};
 
             // VFALCO These hacks work around a bug in Zlib
             len[99].op = 64;
