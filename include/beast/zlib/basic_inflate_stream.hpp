@@ -64,6 +64,11 @@ public:
     /// Destructor.
     ~basic_inflate_stream();
 
+    /** Clear the stream.
+    */
+    void
+    clear(z_params& zs, std::uint8_t windowBitss);
+
     /** Reset the stream.
 
         This puts the stream in a newly constructed state with the
@@ -71,7 +76,7 @@ public:
         created structures.
     */
     void
-    reset(z_params& zs, std::uint8_t windowBits);
+    reset(std::uint8_t windowBits);
 
     int
     write(z_params& zs, int flush);
@@ -125,23 +130,20 @@ private:
     inflate_fast(z_params& zs, unsigned start);
 
     void
-    resetKeep(z_params& zs);
-
-    void
     fixedTables();
 
     detail::bitstream bi_;
 
-    inflate_mode mode_;             // current inflate mode
-    int last_;                      // true if processing last block
-    unsigned dmax_;                 // zlib header max distance (INFLATE_STRICT)
+    inflate_mode mode_ = HEAD;      // current inflate mode
+    int last_ = 0;                  // true if processing last block
+    unsigned dmax_ = 32768U;        // zlib header max distance (INFLATE_STRICT)
 
     // sliding window
     detail::window w_;
 
     // bit accumulator
-    unsigned long hold_;            // input bit accumulator
-    unsigned bits_;                 // number of bits in "in"
+    unsigned long hold_ = 0;        // input bit accumulator
+    unsigned bits_ = 0;             // number of bits in "in"
 
     // for string and stored block copying
     unsigned length_;               // literal or length of data to copy
@@ -150,24 +152,26 @@ private:
     // for table and code decoding
     unsigned extra_;                // extra bits needed
 
-    // fixed and dynamic code tables
-    detail::code const *lencode_;   // starting table for length/literal codes
-    detail::code const *distcode_;  // starting table for distance codes
-    unsigned lenbits_;              // index bits for lencode
-    unsigned distbits_;             // index bits for distcode
-
     // dynamic table building
     unsigned ncode_;                // number of code length code lengths
     unsigned nlen_;                 // number of length code lengths
     unsigned ndist_;                // number of distance code lengths
     unsigned have_;                 // number of code lengths in lens[]
-    detail::code *next_;            // next available space in codes[]
     unsigned short lens_[320];      // temporary storage for code lengths
     unsigned short work_[288];      // work area for code table building
     detail::code codes_[detail::ENOUGH];     // space for code tables
-    int sane_;                      // if false, allow invalid distance too far
-    int back_;                      // bits back of last unprocessed length/lit
+    detail::code *next_ = codes_;   // next available space in codes[]
+    int sane_ = 1;                  // if false, allow invalid distance too far
+    int back_ = -1;                 // bits back of last unprocessed length/lit
     unsigned was_;                  // initial length of match
+
+    // fixed and dynamic code tables
+    detail::code const *
+        lencode_ = codes_;          // starting table for length/literal codes
+    detail::code const *
+        distcode_ = codes_;         // starting table for distance codes
+    unsigned lenbits_;              // index bits for lencode
+    unsigned distbits_;             // index bits for distcode
 };
 
 } // zlib

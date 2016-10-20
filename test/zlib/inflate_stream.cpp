@@ -96,7 +96,7 @@ public:
                 zs.next_out = (Bytef*)out.data();
                 zs.avail_out = j;
                 inflate_stream is;
-                is.reset(zs, windowBits);
+                is.reset(windowBits);
                 bool bi = false;
                 bool bo = false;
                 for(;;)
@@ -208,7 +208,7 @@ public:
         zs.next_out = (Bytef*)out.data();
         zs.avail_out = out.size();
         inflate_stream is;
-        is.reset(zs, windowBits);
+        is.reset(windowBits);
         {
             bool progress = true;
             for(;;)

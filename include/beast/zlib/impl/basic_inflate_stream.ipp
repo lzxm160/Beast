@@ -49,6 +49,7 @@ template<class Allocator>
 basic_inflate_stream<Allocator>::
 basic_inflate_stream()
 {
+    w_.reset(15);
 }
 
 template<class Allocator>
@@ -60,22 +61,13 @@ basic_inflate_stream<Allocator>::
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-reset(z_params& zs, std::uint8_t windowBits)
+reset(std::uint8_t windowBits)
 {
     if(windowBits < 8 || windowBits > 15)
         throw std::domain_error("windowBits out of range");
     w_.reset(windowBits);
-    resetKeep(zs);
-}
 
-template<class Allocator>
-void
-basic_inflate_stream<Allocator>::
-resetKeep(z_params& zs)
-{
-    zs.total_in = 0;
-    zs.total_out = 0;
-    zs.msg = 0;
+    bi_.flush();
     mode_ = HEAD;
     last_ = 0;
     dmax_ = 32768U;
@@ -86,8 +78,6 @@ resetKeep(z_params& zs)
     next_ = codes_;
     sane_ = 1;
     back_ = -1;
-
-    bi_.flush();
 }
 
 template<class Allocator>
