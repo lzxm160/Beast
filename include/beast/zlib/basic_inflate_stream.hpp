@@ -38,6 +38,7 @@
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/bitstream.hpp>
 #include <beast/zlib/detail/inflate_tables.hpp>
+#include <beast/zlib/detail/ranges.hpp>
 #include <beast/zlib/detail/window.hpp>
 #include <beast/core/error.hpp>
 #include <cstdint>
@@ -117,50 +118,6 @@ private:
         SYNC        // looking for synchronization bytes to restart inflate()
     };
 
-    struct ranges
-    {
-        template<bool isConst>
-        struct range
-        {
-            using iter_t = typename std::conditional<
-                isConst, std::uint8_t const*,
-                std::uint8_t*>::type;
-
-            iter_t first;
-            iter_t last;
-            iter_t next;
-
-            std::size_t
-            size() const
-            {
-                return last - first;
-            }
-
-            std::size_t
-            used() const
-            {
-                return next - first;
-            }
-
-            std::size_t
-            avail() const
-            {
-                return last - next;
-            }
-
-            template<class Int>
-            range&
-            operator+=(Int v)
-            {
-                next += v;
-                return *this;
-            }
-        };
-
-        range<true> in;
-        range<false> out;
-    };
-
     template<class U1, class U2>
     static
     U1
@@ -172,7 +129,7 @@ private:
     }
 
     void
-    inflate_fast(ranges& r, error_code& ec);
+    inflate_fast(detail::ranges& r, error_code& ec);
 
     void
     fixedTables();

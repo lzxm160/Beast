@@ -98,7 +98,7 @@ void
 basic_inflate_stream<Allocator>::
 write(z_params& zs, Flush flush, error_code& ec)
 {
-    ranges r;
+    detail::ranges r;
     r.in.first = reinterpret_cast<
         std::uint8_t const*>(zs.next_in);
     r.in.last = r.in.first + zs.avail_in;
@@ -489,7 +489,7 @@ write(z_params& zs, Flush flush, error_code& ec)
         {
             if(! r.out.avail())
                 return done();
-            if(offset_ > r.out.avail())
+            if(offset_ > r.out.used())
             {
                 // copy from window
                 auto offset = static_cast<std::uint16_t>(
@@ -515,8 +515,10 @@ write(z_params& zs, Flush flush, error_code& ec)
                 if(length_ > 0)
                 {
                     // fill from output
-                    std::memset(r.out.next, r.out.next[-1], length_);
+                    auto n = clamp(length_, r.out.avail());
+                    std::memset(r.out.next, r.out.next[-1], n);
                     r.out.next += length_;
+                    length_ -= n;
                 }
             }
             if(length_ == 0)
@@ -590,7 +592,7 @@ write(z_params& zs, Flush flush, error_code& ec)
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-inflate_fast(ranges& r, error_code& ec)
+inflate_fast(detail::ranges& r, error_code& ec)
 {
     unsigned char const* last;  // have enough input while in < last
     unsigned char *end;         // while out < end, enough space available
