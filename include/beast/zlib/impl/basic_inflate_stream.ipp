@@ -99,7 +99,6 @@ resetKeep(z_params& zs)
     zs.total_in = 0;
     zs.total_out = 0;
     zs.msg = 0;
-    total_ = 0;
     mode_ = HEAD;
     last_ = 0;
     dmax_ = 32768U;
@@ -717,7 +716,6 @@ write(z_params& zs, int flush)
     out -= zs.avail_out;
     zs.total_in += in;
     zs.total_out += out;
-    total_ += out;
     zs.data_type = bits_ + (last_ ? 64 : 0) +
                       (mode_ == TYPE ? 128 : 0) +
                       (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);

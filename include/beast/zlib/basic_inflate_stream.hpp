@@ -161,8 +161,6 @@ private:
     inflate_mode mode_;             // current inflate mode
     int last_;                      // true if processing last block
     unsigned dmax_;                 // zlib header max distance (INFLATE_STRICT)
-    // VFALCO This might be unused
-    unsigned long total_;           // protected copy of output count
 
     // sliding window
     detail::window w_;
