@@ -98,13 +98,16 @@ void
 basic_inflate_stream<Allocator>::
 write(z_params& zs, Flush flush, error_code& ec)
 {
-    unsigned in;
-    unsigned out; // save starting available input and output
+    ranges r;
+    r.in.first = reinterpret_cast<
+        std::uint8_t const*>(zs.next_in);
+    r.in.last = r.in.first + zs.avail_in;
+    r.in.next = r.in.first;
+    r.out.first = reinterpret_cast<
+        std::uint8_t*>(zs.next_out);
+    r.out.last = r.out.first + zs.avail_out;
+    r.out.next = r.out.first;
 
-    auto put = zs.next_out;
-    auto next = zs.next_in;
-    auto const outend = put + zs.avail_out;
-    auto const end = next + zs.avail_in;
     auto const done =
         [&]
         {
@@ -114,25 +117,25 @@ write(z_params& zs, Flush flush, error_code& ec)
                error.  Call updatewindow() to create and/or update the window state.
                Note: a memory error from inflate() is non-recoverable.
              */
-            auto const nwritten = put - zs.next_out;
-            zs.next_out = put;
-            zs.avail_out = outend - put;
-            zs.next_in = next;
-            zs.avail_in = end - next;
+
 
             // VFALCO TODO Don't allocate update the window unless necessary
-            if(/*wsize_ ||*/ (out != zs.avail_out && mode_ < BAD &&
+            if(/*wsize_ ||*/ (r.out.used() && mode_ < BAD &&
                     (mode_ < CHECK || flush != Flush::finish)))
-                w_.write(zs.next_out, put - zs.next_out);
+                w_.write(r.out.first, r.out.used());
 
-            in -= zs.avail_in;
-            out -= zs.avail_out;
-            zs.total_in += next - zs.next_in;
-            zs.total_out += nwritten;
+            zs.next_in = r.in.next;
+            zs.avail_in = r.in.avail();
+            zs.next_out = r.out.next;
+            zs.avail_out = r.out.avail();
+            zs.total_in += r.in.used();
+            zs.total_out += r.out.used();
             zs.data_type = bi_.size() + (last_ ? 64 : 0) +
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-            if (((in == 0 && out == 0) || flush == Flush::finish) && ! ec)
+
+            if(((! r.in.used() && ! r.out.used()) ||
+                    flush == Flush::finish) && ! ec)
                 ec = error::no_progress;
         };
     auto const err =
@@ -144,8 +147,6 @@ write(z_params& zs, Flush flush, error_code& ec)
 
     if(mode_ == TYPE)
         mode_ = TYPEDO;
-    in = zs.avail_in;
-    out = zs.avail_out;
 
     for(;;)
     {
@@ -168,12 +169,12 @@ write(z_params& zs, Flush flush, error_code& ec)
                 mode_ = CHECK;
                 break;
             }
-            if(! bi_.fill(3, next, end))
+            if(! bi_.fill(3, r.in.next, r.in.last))
                 return done();
             std::uint8_t v;
-            bi_.read(v, 1, next, end);
+            bi_.read(v, 1, r.in.next, r.in.last);
             last_ = v != 0;
-            bi_.read(v, 2, next, end);
+            bi_.read(v, 2, r.in.next, r.in.last);
             switch(v)
             {
             case 0:
@@ -205,7 +206,7 @@ write(z_params& zs, Flush flush, error_code& ec)
         {
             bi_.flush_byte();
             std::uint32_t v;
-            if(! bi_.peek(v, 32, next, end))
+            if(! bi_.peek(v, 32, r.in.next, r.in.last))
                 return done();
             length_ = v & 0xffff;
             if(length_ != ((v >> 16) ^ 0xffff))
@@ -231,29 +232,25 @@ write(z_params& zs, Flush flush, error_code& ec)
                 mode_ = TYPE;
                 break;
             }
-            auto const have =
-                static_cast<std::size_t>(end - next);
-            copy = clamp(copy, have);
-            auto const left =
-                static_cast<std::size_t>(outend - put);
-            copy = clamp(copy, left);
+            copy = clamp(copy, r.in.avail());
+            copy = clamp(copy, r.out.avail());
             if(copy == 0)
                 return done();
-            std::memcpy(put, next, copy);
-            next += copy;
-            put += copy;
+            std::memcpy(r.out.next, r.in.next, copy);
+            r.in.next += copy;
+            r.out.next += copy;
             length_ -= copy;
             break;
         }
 
         case TABLE:
-            if(! bi_.fill(5 + 5 + 4, next, end))
+            if(! bi_.fill(5 + 5 + 4, r.in.next, r.in.last))
                 return done();
-            bi_.read(nlen_, 5, next, end);
+            bi_.read(nlen_, 5, r.in.next, r.in.last);
             nlen_ += 257;
-            bi_.read(ndist_, 5, next, end);
+            bi_.read(ndist_, 5, r.in.next, r.in.last);
             ndist_ += 1;
-            bi_.read(ncode_, 4, next, end);
+            bi_.read(ncode_, 4, r.in.next, r.in.last);
             ncode_ += 4;
             if(nlen_ > 286 || ndist_ > 30)
                 return err(error::too_many_symbols);
@@ -267,7 +264,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15}};
             while(have_ < ncode_)
             {
-                if(! bi_.read(lens_[order[have_]], 3, next, end))
+                if(! bi_.read(lens_[order[have_]], 3, r.in.next, r.in.last))
                     return done();
                 ++have_;
             }
@@ -293,7 +290,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             while(have_ < nlen_ + ndist_)
             {
                 std::uint16_t v;
-                if(! bi_.peek(v, lenbits_, next, end))
+                if(! bi_.peek(v, lenbits_, r.in.next, r.in.last))
                     return done();
                 auto cp = &lencode_[v];
                 if(cp->val < 16)
@@ -307,31 +304,31 @@ write(z_params& zs, Flush flush, error_code& ec)
                     std::uint16_t copy;
                     if(cp->val == 16)
                     {
-                        if(! bi_.fill(cp->bits + 2, next, end))
+                        if(! bi_.fill(cp->bits + 2, r.in.next, r.in.last))
                             return done();
                         bi_.drop(cp->bits);
                         if(have_ == 0)
                             return err(error::invalid_bit_length_repeat);
-                        bi_.read(copy, 2, next, end);
+                        bi_.read(copy, 2, r.in.next, r.in.last);
                         len = lens_[have_ - 1];
                         copy += 3;
 
                     }
                     else if(cp->val == 17)
                     {
-                        if(! bi_.fill(cp->bits + 3, next, end))
+                        if(! bi_.fill(cp->bits + 3, r.in.next, r.in.last))
                             return done();
                         bi_.drop(cp->bits);
-                        bi_.read(copy, 3, next, end);
+                        bi_.read(copy, 3, r.in.next, r.in.last);
                         len = 0;
                         copy += 3;
                     }
                     else
                     {
-                        if(! bi_.fill(cp->bits + 7, next, end))
+                        if(! bi_.fill(cp->bits + 7, r.in.next, r.in.last))
                             return done();
                         bi_.drop(cp->bits);
-                        bi_.read(copy, 7, next, end);
+                        bi_.read(copy, 7, r.in.next, r.in.last);
                         len = 0;
                         copy += 11;
                     }
@@ -381,39 +378,27 @@ write(z_params& zs, Flush flush, error_code& ec)
 
         case LEN:
         {
-#if 1
-            if(zs.avail_in >= 6 && zs.avail_out >= 258)
+            if(r.in.avail() >= 6 && r.out.avail() >= 258)
             {
-                zs.total_in += next - zs.next_in;
-                zs.total_out += put - zs.next_out;
-                zs.next_out = put;
-                zs.avail_out = outend - put;
-                zs.next_in = next;
-                zs.avail_in = end - next;
-                inflate_fast(zs, out, ec);
+                inflate_fast(r, ec);
                 if(ec)
                 {
                     mode_ = BAD;
                     return;
                 }
-                zs.total_in += zs.next_in - next;
-                zs.total_out += zs.next_out - put;
-                put = zs.next_out;
-                next = zs.next_in;
                 if(mode_ == TYPE)
                     back_ = -1;
                 break;
             }
-#endif
             std::uint16_t v;
             back_ = 0;
-            if(! bi_.peek(v, lenbits_, next, end))
+            if(! bi_.peek(v, lenbits_, r.in.next, r.in.last))
                 return done();
             auto cp = &lencode_[v];
             if(cp->op && (cp->op & 0xf0) == 0)
             {
                 auto prev = cp;
-                if(! bi_.peek(v, prev->bits + prev->op, next, end))
+                if(! bi_.peek(v, prev->bits + prev->op, r.in.next, r.in.last))
                     return done();
                 cp = &lencode_[prev->val + (v >> prev->bits)];
                 bi_.drop(prev->bits + cp->bits);
@@ -447,7 +432,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             if(extra_)
             {
                 std::uint16_t v;
-                if(! bi_.read(v, extra_, next, end))
+                if(! bi_.read(v, extra_, r.in.next, r.in.last))
                     return done();
                 length_ += v;
                 back_ += extra_;
@@ -459,13 +444,13 @@ write(z_params& zs, Flush flush, error_code& ec)
         case DIST:
         {
             std::uint16_t v;
-            if(! bi_.peek(v, distbits_, next, end))
+            if(! bi_.peek(v, distbits_, r.in.next, r.in.last))
                 return done();
             auto cp = &distcode_[v];
             if((cp->op & 0xf0) == 0)
             {
                 auto prev = cp;
-                if(! bi_.peek(v, prev->bits + prev->op, next, end))
+                if(! bi_.peek(v, prev->bits + prev->op, r.in.next, r.in.last))
                     return done();
                 cp = &distcode_[prev->val + (v >> prev->bits)];
                 bi_.drop(prev->bits + cp->bits);
@@ -488,7 +473,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             if(extra_)
             {
                 std::uint16_t v;
-                if(! bi_.read(v, extra_, next, end))
+                if(! bi_.read(v, extra_, r.in.next, r.in.last))
                     return done();
                 offset_ += v;
                 back_ += extra_;
@@ -502,34 +487,37 @@ write(z_params& zs, Flush flush, error_code& ec)
 
         case MATCH:
         {
-            if(put == outend)
+            if(! r.out.avail())
                 return done();
-            auto const copy =
-                static_cast<std::size_t>(put - zs.next_out);
-            if(offset_ > copy)
+            if(offset_ > r.out.avail())
             {
                 // copy from window
                 auto offset = static_cast<std::uint16_t>(
-                    offset_ - copy);
+                    offset_ - r.out.avail());
                 if(offset > w_.size())
                     return err(error::distance_overflow);
                 auto const n = clamp(length_, offset);
-                w_.read(put, offset, n);
-                put += n;
+                w_.read(r.out.next, offset, n);
+                r.out.next += n;
                 length_ -= n;
             }
             else
             {
-                // copy from output
-                auto from = put - offset_;
-                auto n = clamp(length_,
-                    zs.avail_out - (put - zs.next_out));
-                length_ -= n;
-                do
+                if(offset_ > 1)
                 {
-                    *put++ = *from++;
+                    // copy from output
+                    auto n = clamp(length_, offset_);
+                    std::memcpy(
+                        r.out.next, r.out.next - offset_, n);
+                    r.out.next += n;
+                    length_ -= n;
                 }
-                while(--n);
+                if(length_ > 0)
+                {
+                    // fill from output
+                    std::memset(r.out.next, r.out.next[-1], length_);
+                    r.out.next += length_;
+                }
             }
             if(length_ == 0)
                 mode_ = LEN;
@@ -538,10 +526,10 @@ write(z_params& zs, Flush flush, error_code& ec)
 
         case LIT:
         {
-            if(put == outend)
+            if(! r.out.avail())
                 return done();
             auto const v = static_cast<std::uint8_t>(length_);
-            *put++ = v;
+            *r.out.next++ = v;
             mode_ = LEN;
             break;
         }
@@ -602,15 +590,9 @@ write(z_params& zs, Flush flush, error_code& ec)
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-inflate_fast(
-    z_params& zs,
-    unsigned start,             // inflate()'s starting value for zs.avail_out
-    error_code& ec)
+inflate_fast(ranges& r, error_code& ec)
 {
-    unsigned char const* in;    // local zs.next_in
     unsigned char const* last;  // have enough input while in < last
-    unsigned char *out;         // local zs.next_out
-    unsigned char *beg;         // inflate()'s initial zs.next_out
     unsigned char *end;         // while out < end, enough space available
     unsigned op;                // code bits, operation, extra bits, or window position, window bytes to copy
     unsigned len;               // match length, unused bytes
@@ -620,19 +602,15 @@ inflate_fast(
     unsigned dmask =
         (1U << distbits_) - 1;  // mask for first level of distance codes
 
-    /* copy state to local variables */
-    in = zs.next_in;
-    last = in + (zs.avail_in - 5);
-    out = zs.next_out;
-    beg = out - (start - zs.avail_out);
-    end = out + (zs.avail_out - 257);
+    last = r.in.next + (r.in.avail() - 5);
+    end = r.out.next + (r.out.avail() - 257);
 
     /* decode literals and length/distances until end-of-block or not enough
        input data or output space */
     do
     {
         if(bi_.size() < 15)
-            bi_.fill_16(in);
+            bi_.fill_16(r.in.next);
         auto cp = &lencode_[bi_.peek_fast() & lmask];
     dolen:
         bi_.drop(cp->bits);
@@ -640,7 +618,7 @@ inflate_fast(
         if(op == 0)
         {
             // literal
-            *out++ = (unsigned char)(cp->val);
+            *r.out.next++ = (unsigned char)(cp->val);
         }
         else if(op & 16)
         {
@@ -650,12 +628,12 @@ inflate_fast(
             if(op)
             {
                 if(bi_.size() < op)
-                    bi_.fill_8(in);
+                    bi_.fill_8(r.in.next);
                 len += (unsigned)bi_.peek_fast() & ((1U << op) - 1);
                 bi_.drop(op);
             }
             if(bi_.size() < 15)
-                bi_.fill_16(in);
+                bi_.fill_16(r.in.next);
             cp = &distcode_[bi_.peek_fast() & dmask];
         dodist:
             bi_.drop(cp->bits);
@@ -667,9 +645,9 @@ inflate_fast(
                 op &= 15; // number of extra bits
                 if(bi_.size() < op)
                 {
-                    bi_.fill_8(in);
+                    bi_.fill_8(r.in.next);
                     if(bi_.size() < op)
-                        bi_.fill_8(in);
+                        bi_.fill_8(r.in.next);
                 }
                 dist += (unsigned)bi_.peek_fast() & ((1U << op) - 1);
 #ifdef INFLATE_STRICT
@@ -682,7 +660,7 @@ inflate_fast(
 #endif
                 bi_.drop(op);
 
-                op = (unsigned)(out - beg); // max distance in output
+                op = (unsigned)(r.out.next - r.out.first); // max distance in output
                 if(dist > op)
                 {
                     // copy from window
@@ -694,8 +672,8 @@ inflate_fast(
                         break;
                     }
                     auto const n = clamp(len, op);
-                    w_.read(out, op, n);
-                    out += n;
+                    w_.read(r.out.next, op, n);
+                    r.out.next += n;
                     len -= n;
                     dist = op;
                 }
@@ -703,17 +681,17 @@ inflate_fast(
                 {
                     if(dist > 1)
                     {
-                        auto n = clamp(len, dist);
                         // copy from output
-                        std::memcpy(out, out - dist, n);
-                        out += n;
+                        auto n = clamp(len, dist);
+                        std::memcpy(r.out.next, r.out.next - dist, n);
+                        r.out.next += n;
                         len -= n;
                     }
                     if(len > 0)
                     {
                         // fill from output
-                        std::memset(out, out[-1], len);
-                        out += len;
+                        std::memset(r.out.next, r.out.next[-1], len);
+                        r.out.next += len;
                     }
                 }
             }
@@ -749,18 +727,10 @@ inflate_fast(
             break;
         }
     }
-    while(in < last && out < end);
+    while(r.in.next < last && r.out.next < end);
 
     // return unused bytes (on entry, bits < 8, so in won't go too far back)
-    bi_.rewind(in);
-
-    // update state and return
-    zs.next_in = in;
-    zs.next_out = out;
-    zs.avail_in = (unsigned)(in < last ?
-        5 + (last - in) : 5 - (in - last));
-    zs.avail_out = (unsigned)(out < end ?
-        257 + (end - out) : 257 - (out - end));
+    bi_.rewind(r.in.next);
 }
 
 /*
