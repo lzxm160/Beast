@@ -52,20 +52,9 @@ namespace zlib {
     This is a port of zlib's "inflate" functionality to C++.
 */
 template<class Allocator>
-class basic_inflate_stream : public z_params
+class basic_inflate_stream
 {
 public:
-    struct params
-    {
-        void const* next_in;        // next input byte
-        std::size_t avail_in;       // number of bytes available at next_in
-        std::size_t total_in = 0;   // total number of input bytes read so far
-
-        void*       next_out;       // next output byte should be put there
-        std::size_t avail_out;      // remaining free space at next_out
-        std::size_t total_out = 0;  // total number of bytes output so far
-    };
-
     /** Construct a raw deflate decompression stream.
 
         The window size is set to the default of 15 bits.
@@ -82,19 +71,10 @@ public:
         created structures.
     */
     void
-    reset(std::uint8_t windowBits);
-
-#if 0
-    /** Write compressed data to the stream.
-
-        @return `true` if the end of stream is reached.
-    */
-    bool
-    write(params& ps, error_code& ec);
-#endif
+    reset(z_params& zs, std::uint8_t windowBits);
 
     int
-    write(int flush);
+    write(z_params& zs, int flush);
 
 private:
     enum inflate_mode
@@ -143,9 +123,6 @@ private:
 
     void
     inflate_fast(z_params& zs, unsigned start);
-
-    int
-    write(z_params& zs, int flush);
 
     void
     resetKeep(z_params& zs);

@@ -49,7 +49,6 @@ template<class Allocator>
 basic_inflate_stream<Allocator>::
 basic_inflate_stream()
 {
-    reset(15);
 }
 
 template<class Allocator>
@@ -61,20 +60,12 @@ basic_inflate_stream<Allocator>::
 template<class Allocator>
 void
 basic_inflate_stream<Allocator>::
-reset(std::uint8_t windowBits)
+reset(z_params& zs, std::uint8_t windowBits)
 {
     if(windowBits < 8 || windowBits > 15)
         throw std::domain_error("windowBits out of range");
     w_.reset(windowBits);
-    resetKeep(*this);
-}
-
-template<class Allocator>
-int
-basic_inflate_stream<Allocator>::
-write(int flush)
-{
-    return write(*this, flush);
+    resetKeep(zs);
 }
 
 template<class Allocator>
@@ -104,12 +95,11 @@ void
 basic_inflate_stream<Allocator>::
 fixedTables()
 {
-auto strm = this;
     auto const fc = detail::get_fixed_tables();
-    strm->lencode_ = fc.lencode;
-    strm->lenbits_ = fc.lenbits;
-    strm->distcode_ = fc.distcode;
-    strm->distbits_ = fc.distbits;
+    lencode_ = fc.lencode;
+    lenbits_ = fc.lenbits;
+    distcode_ = fc.distcode;
+    distbits_ = fc.distbits;
 }
 
 //------------------------------------------------------------------------------
@@ -374,7 +364,7 @@ write(z_params& zs, int flush)
                     }
                     if(have_ + copy > nlen_ + ndist_)
                     {
-                        msg = (char *)"invalid bit length repeat";
+                        zs.msg = (char *)"invalid bit length repeat";
                         mode_ = BAD;
                         break;
                     }
@@ -569,7 +559,7 @@ write(z_params& zs, int flush)
                 {
                     if(sane_)
                     {
-                        msg = (char *)"invalid distance too far back";
+                        zs.msg = (char *)"invalid distance too far back";
                         mode_ = BAD;
                         break;
                     }

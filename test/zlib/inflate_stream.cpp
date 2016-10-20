@@ -90,24 +90,19 @@ public:
                 int result;
                 std::string out;
                 out.resize(check.size() + 1);
-                inflate_stream zs;
-                zs.next_in = 0;
-                zs.avail_in = 0;
-                zs.next_out = 0;
-                zs.avail_out = 0;
-                zs.total_in = 0;
-                zs.total_out = 0;
-                zs.reset(windowBits);
+                z_params zs;
                 zs.next_in = (Bytef*)in.data();
                 zs.avail_in = i;
                 zs.next_out = (Bytef*)out.data();
                 zs.avail_out = j;
+                inflate_stream is;
+                is.reset(zs, windowBits);
                 bool bi = false;
                 bool bo = false;
                 for(;;)
                 {
                     auto const flush = Z_SYNC_FLUSH;
-                    result = zs.write(flush);
+                    result = is.write(zs, flush);
                     if(result == Z_BUF_ERROR) // per zlib FAQ
                         goto fin;
                     if(! BEAST_EXPECT(result == Z_OK))
@@ -207,24 +202,19 @@ public:
         int result;
         std::string out;
         out.resize(check.size() + 1);
-        inflate_stream zs;
-        zs.next_in = 0;
-        zs.avail_in = 0;
-        zs.next_out = 0;
-        zs.avail_out = 0;
-        zs.total_in = 0;
-        zs.total_out = 0;
-        zs.reset(windowBits);
+        z_params zs;
         zs.next_in = (Bytef*)in.data();
         zs.avail_in = in.size();
         zs.next_out = (Bytef*)out.data();
         zs.avail_out = out.size();
+        inflate_stream is;
+        is.reset(zs, windowBits);
         {
             bool progress = true;
             for(;;)
             {
                 auto const flush = Z_SYNC_FLUSH;
-                result = zs.write(flush);
+                result = is.write(zs, flush);
                 if(result == Z_BUF_ERROR) // per zlib FAQ
                     goto fin;
                 if(! BEAST_EXPECT(progress))
