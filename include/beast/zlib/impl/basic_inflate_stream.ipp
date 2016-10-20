@@ -141,11 +141,9 @@ write(z_params& zs, int flush)
             out -= zs.avail_out;
             zs.total_in += next - zs.next_in;
             zs.total_out += nwritten;
-            /*
-            zs.data_type = bits_ + (last_ ? 64 : 0) +
+            zs.data_type = bi_.size() + (last_ ? 64 : 0) +
                 (mode_ == TYPE ? 128 : 0) +
                 (mode_ == LEN_ || mode_ == COPY_ ? 256 : 0);
-            */
             if (((in == 0 && out == 0) || flush == Z_FINISH) && result == Z_OK)
                 result = Z_BUF_ERROR;
             return result;
