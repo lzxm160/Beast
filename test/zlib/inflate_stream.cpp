@@ -224,7 +224,7 @@ public:
                 if(! BEAST_EXPECTS(! ec, ec.message()))
                     goto err;
             #else
-                if(! BEAST_EXPECT(! ec))
+                if(! BEAST_EXPECTS(! ec, ec.message()))
                     goto err;
             #endif
                 progress = false;
@@ -233,7 +233,17 @@ public:
 
     fin:
         out.resize(zs.total_out);
-        BEAST_EXPECT(out == check);
+        {
+            auto const result = std::mismatch(
+                out.begin(), out.end(), check.begin());
+            std::size_t i;
+            for(i = 0; i < std::min(out.size(), check.size()); ++i)
+            {
+                if(out[i] != check[i])
+                    break;
+            }
+            BEAST_EXPECT(out == check);
+        }
 
     err:
         ;
@@ -271,7 +281,7 @@ public:
     {
         testcase("case 1");
         {
-            auto const s = corpus1(4096);
+            auto const s = corpus1(300);
             doMatrix2("zlib  ", s, &self::doInflate2_zlib);
             doMatrix2("beast ", s, &self::doInflate2_beast);
         }

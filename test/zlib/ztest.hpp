@@ -131,14 +131,19 @@ corpus1(std::size_t n)
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
     };
     std::string s;
-    s.reserve(n * 5);
+    s.reserve(n + 5);
     std::mt19937 g;
     std::uniform_int_distribution<std::size_t> d0{
         0, alphabet.size() - 1};
     std::uniform_int_distribution<std::size_t> d1{
         1, 5};
-    while(n--)
-        s.insert(s.end(), d1(g), alphabet[d0(g)]);
+    while(s.size() < n)
+    {
+        auto const rep = d1(g);
+        auto const ch = alphabet[d0(g)];
+        s.insert(s.end(), rep, ch);
+    }
+    s.resize(n);
     return s;
 }
 

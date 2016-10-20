@@ -133,6 +133,10 @@ private:
     void
     fixedTables();
 
+    struct work
+    {
+    };
+
     detail::bitstream bi_;
 
     inflate_mode mode_ = HEAD;      // current inflate mode
@@ -162,7 +166,6 @@ private:
     unsigned short work_[288];      // work area for code table building
     detail::code codes_[detail::ENOUGH];     // space for code tables
     detail::code *next_ = codes_;   // next available space in codes[]
-    int sane_ = 1;                  // if false, allow invalid distance too far
     int back_ = -1;                 // bits back of last unprocessed length/lit
     unsigned was_;                  // initial length of match
 

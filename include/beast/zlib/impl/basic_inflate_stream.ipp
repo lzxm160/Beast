@@ -76,7 +76,6 @@ reset(std::uint8_t windowBits)
     lencode_ = codes_;
     distcode_ = codes_;
     next_ = codes_;
-    sane_ = 1;
     back_ = -1;
 }
 
@@ -382,20 +381,25 @@ write(z_params& zs, Flush flush, error_code& ec)
 
         case LEN:
         {
-#if 0
-            if(avail_in >= 6 && avail_out >= 258)
+#if 1
+            if(zs.avail_in >= 6 && zs.avail_out >= 258)
             {
-                auto const nwritten = put - zs.next_out;
-                z_params zc = zs;
-                zc.next_out = put;
-                zc.avail_out = outend - put;
-                zc.next_in = next;
-                zc.avail_in = end - next;
-                inflate_fast(zc, out);
-                put = zc.next_out;
-                next = zc.next_in;
-                in = zc.avail_in;
-                out = zc.avail_out;
+                zs.total_in += next - zs.next_in;
+                zs.total_out += put - zs.next_out;
+                zs.next_out = put;
+                zs.avail_out = outend - put;
+                zs.next_in = next;
+                zs.avail_in = end - next;
+                inflate_fast(zs, out, ec);
+                if(ec)
+                {
+                    mode_ = BAD;
+                    return;
+                }
+                zs.total_in += zs.next_in - next;
+                zs.total_out += zs.next_out - put;
+                put = zs.next_out;
+                next = zs.next_in;
                 if(mode_ == TYPE)
                     back_ = -1;
                 break;
@@ -508,10 +512,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 auto offset = static_cast<std::uint16_t>(
                     offset_ - copy);
                 if(offset > w_.size())
-                {
-                    if(sane_)
-                        return err(error::distance_overflow);
-                }
+                    return err(error::distance_overflow);
                 auto const n = clamp(length_, offset);
                 w_.read(put, offset, n);
                 put += n;
@@ -674,7 +675,7 @@ inflate_fast(
 #ifdef INFLATE_STRICT
                 if(dist > dmax_)
                 {
-                    zs.msg = (char *)"invalid distance too far back";
+                    ec = error::distance_overflow;
                     mode_ = BAD;
                     break;
                 }
@@ -688,24 +689,32 @@ inflate_fast(
                     op = dist - op; // distance back in window
                     if(op > w_.size())
                     {
-                        if(sane_)
-                        {
-                            zs.msg =
-                                (char *)"invalid distance too far back";
-                            mode_ = BAD;
-                            break;
-                        }
+                        ec = error::distance_overflow;
+                        mode_ = BAD;
+                        break;
                     }
                     auto const n = clamp(len, op);
                     w_.read(out, op, n);
                     out += n;
                     len -= n;
+                    dist = op;
                 }
                 if(len > 0)
                 {
-                    // copy from output
-                    std::memcpy(out, out - dist, len);
-                    out += len;
+                    if(dist > 1)
+                    {
+                        auto n = clamp(len, dist);
+                        // copy from output
+                        std::memcpy(out, out - dist, n);
+                        out += n;
+                        len -= n;
+                    }
+                    if(len > 0)
+                    {
+                        // fill from output
+                        std::memset(out, out[-1], len);
+                        out += len;
+                    }
                 }
             }
             else if((op & 64) == 0)
@@ -716,7 +725,7 @@ inflate_fast(
             }
             else
             {
-                zs.msg = (char *)"invalid distance code";
+                ec = error::invalid_distance_code;
                 mode_ = BAD;
                 break;
             }
@@ -735,7 +744,7 @@ inflate_fast(
         }
         else
         {
-            zs.msg = (char *)"invalid literal/length code";
+            ec = error::invalid_literal_length;
             mode_ = BAD;
             break;
         }
