@@ -75,11 +75,11 @@ public:
     reset(int bits);
 
     void
-    read(std::uint8_t* out, unsigned pos, unsigned n);
+    read(std::uint8_t* out, std::size_t pos, std::size_t n);
 
     template<class = void>
     void
-    write(std::uint8_t const* in, unsigned n);
+    write(std::uint8_t const* in, std::size_t n);
 };
 
 inline
@@ -100,7 +100,7 @@ reset(int bits)
 inline
 void
 window::
-read(std::uint8_t* out, unsigned pos, unsigned n)
+read(std::uint8_t* out, std::size_t pos, std::size_t n)
 {
     if(i_ >= size_)
     {
@@ -123,7 +123,7 @@ read(std::uint8_t* out, unsigned pos, unsigned n)
 template<class>
 void
 window::
-write(std::uint8_t const* in, unsigned n)
+write(std::uint8_t const* in, std::size_t n)
 {
     if(! p_)
         p_.reset(new std::uint8_t[capacity_]);

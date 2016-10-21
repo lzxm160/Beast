@@ -125,7 +125,7 @@ void
 inflate_table(
     codetype type,
     std::uint16_t *lens,
-    unsigned codes,
+    std::size_t codes,
     code * *table,
     unsigned *bits,
     std::uint16_t* work,

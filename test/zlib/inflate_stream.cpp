@@ -42,9 +42,9 @@ public:
         if(! BEAST_EXPECT(result == Z_OK))
             goto err;
         zs.next_in = (Bytef*)in.data();
-        zs.avail_in = in.size();
+        zs.avail_in = static_cast<uInt>(in.size());
         zs.next_out = (Bytef*)out.data();
-        zs.avail_out = out.size();
+        zs.avail_out = static_cast<uInt>(out.size());
         {
             bool progress = true;
             for(;;)
@@ -74,9 +74,9 @@ public:
         std::string out;
         out.resize(check.size() + 1);
         z_params zs;
-        zs.next_in = (Bytef*)in.data();
+        zs.next_in = in.data();
         zs.avail_in = in.size();
-        zs.next_out = (Bytef*)out.data();
+        zs.next_out = &out[0];
         zs.avail_out = out.size();
         inflate_stream is;
         is.reset(windowBits);
@@ -127,9 +127,9 @@ public:
             if(! BEAST_EXPECT(result == Z_OK))
                 continue;
             zs.next_in = (Bytef*)in.data();
-            zs.avail_in = i;
+            zs.avail_in = static_cast<uInt>(i);
             zs.next_out = (Bytef*)out.data();
-            zs.avail_out = out.size();
+            zs.avail_out = static_cast<uInt>(out.size());
             bool b = false;
             for(;;)
             {
@@ -142,7 +142,7 @@ public:
                 if(zs.avail_in == 0 && ! b)
                 {
                     b = true;
-                    zs.avail_in = in.size() - i;
+                    zs.avail_in = static_cast<uInt>(in.size() - i);
                 }
             }
 
@@ -166,9 +166,9 @@ public:
             std::string out;
             out.resize(check.size() + 1);
             z_params zs;
-            zs.next_in = (Bytef*)in.data();
+            zs.next_in = in.data();
             zs.avail_in = i;
-            zs.next_out = (Bytef*)out.data();
+            zs.next_out = &out[0];
             zs.avail_out = out.size();
             inflate_stream is;
             is.reset(windowBits);
@@ -221,9 +221,9 @@ public:
             if(! BEAST_EXPECT(result == Z_OK))
                 continue;
             zs.next_in = (Bytef*)in.data();
-            zs.avail_in = i;
+            zs.avail_in = static_cast<uInt>(i);
             zs.next_out = (Bytef*)out.data();
-            zs.avail_out = out.size();
+            zs.avail_out = static_cast<uInt>(out.size());
             bool b = false;
             for(;;)
             {
@@ -236,7 +236,7 @@ public:
                 if(zs.avail_in == 0 && ! b)
                 {
                     b = true;
-                    zs.avail_in = in.size() - i;
+                    zs.avail_in = static_cast<uInt>(in.size() - i);
                 }
             }
 
@@ -260,9 +260,9 @@ public:
             std::string out;
             out.resize(check.size() + 1);
             z_params zs;
-            zs.next_in = (Bytef*)in.data();
+            zs.next_in = in.data();
             zs.avail_in = i;
-            zs.next_out = (Bytef*)out.data();
+            zs.next_out = &out[0];
             zs.avail_out = out.size();
             inflate_stream is;
             is.reset(windowBits);
@@ -318,9 +318,9 @@ public:
                 if(! BEAST_EXPECT(result == Z_OK))
                     continue;
                 zs.next_in = (Bytef*)in.data();
-                zs.avail_in = i;
+                zs.avail_in = static_cast<uInt>(i);
                 zs.next_out = (Bytef*)out.data();
-                zs.avail_out = j;
+                zs.avail_out = static_cast<uInt>(j);
                 bool bi = false;
                 bool bo = false;
                 for(;;)
@@ -334,12 +334,14 @@ public:
                     if(zs.avail_in == 0 && ! bi)
                     {
                         bi = true;
-                        zs.avail_in = in.size() - i;
+                        zs.avail_in =
+                            static_cast<uInt>(in.size() - i);
                     }
                     if(zs.avail_out == 0 && ! bo)
                     {
                         bo = true;
-                        zs.avail_out = check.size() - j;
+                        zs.avail_out =
+                            static_cast<uInt>(check.size() - j);
                     }
                 }
 
@@ -366,10 +368,10 @@ public:
                 std::string out;
                 out.resize(check.size() + 1);
                 z_params zs;
-                zs.next_in = (Bytef*)in.data();
-                zs.avail_in = i;
-                zs.next_out = (Bytef*)out.data();
-                zs.avail_out = j;
+                zs.next_in = in.data();
+                zs.avail_in = static_cast<uInt>(i);
+                zs.next_out = &out[0];
+                zs.avail_out = static_cast<uInt>(j);
                 inflate_stream is;
                 is.reset(windowBits);
                 bool bi = false;

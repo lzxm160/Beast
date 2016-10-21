@@ -60,10 +60,10 @@ public:
 
     // discard n bits
     void
-    drop(unsigned n)
+    drop(std::size_t n)
     {
         BOOST_ASSERT(n <= n_);
-        n_ -= n;
+        n_ -= static_cast<unsigned>(n);
         v_ >>= n;
     }
 
@@ -85,7 +85,7 @@ public:
     // ensure at least n bits
     template<class FwdIt>
     bool
-    fill(unsigned n, FwdIt& first, FwdIt const& last);
+    fill(std::size_t n, FwdIt& first, FwdIt const& last);
 
     // fill 8 bits, unchecked
     template<class FwdIt>
@@ -100,7 +100,7 @@ public:
     // return n bits
     template<class Unsigned, class FwdIt>
     bool
-    peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last);
+    peek(Unsigned& value, std::size_t n, FwdIt& first, FwdIt const& last);
 
     // return everything in the reservoir
     value_type
@@ -112,7 +112,7 @@ public:
     // return n bits, and consume
     template<class Unsigned, class FwdIt>
     bool
-    read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last);
+    read(Unsigned& value, std::size_t n, FwdIt& first, FwdIt const& last);
 
     // rewind by the number of whole bytes stored (unchecked)
     template<class BidirIt>
@@ -124,7 +124,7 @@ template<class FwdIt>
 inline
 bool
 bitstream::
-fill(unsigned n, FwdIt& first, FwdIt const& last)
+fill(std::size_t n, FwdIt& first, FwdIt const& last)
 {
     while(n_ < n)
     {
@@ -162,7 +162,7 @@ template<class Unsigned, class FwdIt>
 inline
 bool
 bitstream::
-peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
+peek(Unsigned& value, std::size_t n, FwdIt& first, FwdIt const& last)
 {
     BOOST_ASSERT(n <= sizeof(value)*8);
     if(! fill(n, first, last))
@@ -176,13 +176,13 @@ template<class Unsigned, class FwdIt>
 inline
 bool
 bitstream::
-read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
+read(Unsigned& value, std::size_t n, FwdIt& first, FwdIt const& last)
 {
     BOOST_ASSERT(n < sizeof(v_)*8);
     if(! peek(value, n, first, last))
         return false;
     v_ >>= n;
-    n_ -= n;
+    n_ -= static_cast<unsigned>(n);
     return true;
 }
 

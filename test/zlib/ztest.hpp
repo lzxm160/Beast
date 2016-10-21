@@ -65,11 +65,12 @@ public:
         if(result != Z_OK)
             throw std::logic_error("deflateInit2 failed");
         std::string out;
-        out.resize(deflateBound(&zs, in.size()));
+        out.resize(deflateBound(&zs,
+            static_cast<uLong>(in.size())));
         zs.next_in = (Bytef*)in.data();
-        zs.avail_in = in.size();
+        zs.avail_in = static_cast<uInt>(in.size());
         zs.next_out = (Bytef*)&out[0];
-        zs.avail_out = out.size();
+        zs.avail_out = static_cast<uInt>(out.size());
         result = deflate(&zs, Z_FULL_FLUSH);
         if(result != Z_OK)
             throw std::logic_error("deflate failed");
@@ -93,12 +94,13 @@ public:
         try
         {
             zs.next_in = (Bytef*)in.data();
-            zs.avail_in = in.size();
+            zs.avail_in = static_cast<uInt>(in.size());
             for(;;)
             {
                 out.resize(zs.total_out + 1024);
                 zs.next_out = (Bytef*)&out[zs.total_out];
-                zs.avail_out = out.size() - zs.total_out;
+                zs.avail_out = static_cast<uInt>(
+                    out.size() - zs.total_out);
                 result = inflate(&zs, Z_SYNC_FLUSH);
                 if( result == Z_NEED_DICT ||
                     result == Z_DATA_ERROR ||

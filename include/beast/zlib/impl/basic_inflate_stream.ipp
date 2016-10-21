@@ -600,7 +600,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
 {
     unsigned char const* last;  // have enough input while in < last
     unsigned char *end;         // while out < end, enough space available
-    unsigned op;                // code bits, operation, extra bits, or window position, window bytes to copy
+    std::size_t op;             // code bits, operation, extra bits, or window position, window bytes to copy
     unsigned len;               // match length, unused bytes
     unsigned dist;              // match distance
     unsigned const lmask =
