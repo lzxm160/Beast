@@ -115,6 +115,95 @@ public:
 private:
     detail::deflate_tables const& lut_;
 
+    static void fill_window(basic_deflate_stream *s);
+    static block_state deflate_stored(basic_deflate_stream *s, int flush);
+    static block_state deflate_fast(basic_deflate_stream *s, int flush);
+    static block_state deflate_slow(basic_deflate_stream *s, int flush);
+    static block_state deflate_rle(basic_deflate_stream *s, int flush);
+    static block_state deflate_huff(basic_deflate_stream *s, int flush);
+
+    static void lm_init        (basic_deflate_stream *s);
+    static void flush_pending  (basic_deflate_stream* strm);
+    static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
+    static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
+
+    static void init_block     (basic_deflate_stream *s);
+    static void pqdownheap     (basic_deflate_stream *s, detail::ct_data *tree, int k);
+    static void gen_bitlen     (basic_deflate_stream *s, tree_desc *desc);
+    static void build_tree     (basic_deflate_stream *s, tree_desc *desc);
+    static void scan_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
+    static void send_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
+    static int  build_bl_tree  (basic_deflate_stream *s);
+    static void send_all_trees (basic_deflate_stream *s, int lcodes, int dcodes,
+                                int blcodes);
+
+    static void _tr_init (basic_deflate_stream *s);
+    static int _tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);
+    static void _tr_flush_block (basic_deflate_stream *s, char *buf,
+                            std::uint32_t stored_len, int last);
+    static void _tr_flush_bits (basic_deflate_stream *s);
+    static void _tr_align (basic_deflate_stream *s);
+    static void _tr_stored_block (basic_deflate_stream *s, char *bu,
+                            std::uint32_t stored_len, int last);
+
+    static void compress_block (basic_deflate_stream *s, const detail::ct_data *ltree,
+                                const detail::ct_data *dtree);
+    static int  detect_data_type (basic_deflate_stream *s);
+    static void bi_flush       (basic_deflate_stream *s);
+    static void bi_windup      (basic_deflate_stream *s);
+    static void copy_block     (basic_deflate_stream *s, char *buf, unsigned len,
+                                  int header);
+
+    using compress_func = block_state(*)(basic_deflate_stream*, int flush);
+
+    /* Values for max_lazy_match, good_match and max_chain_length, depending on
+     * the desired pack level (0..9). The values given below have been tuned to
+     * exclude worst case performance for pathological files. Better values may be
+     * found for specific files.
+     */
+    struct config {
+       std::uint16_t good_length; /* reduce lazy search above this match length */
+       std::uint16_t max_lazy;    /* do not perform lazy search above this match length */
+       std::uint16_t nice_length; /* quit search above this match length */
+       std::uint16_t max_chain;
+       compress_func func;
+
+       config(
+               std::uint16_t good_length_,
+               std::uint16_t max_lazy_,
+               std::uint16_t nice_length_,
+               std::uint16_t max_chain_,
+               compress_func func_)
+           : good_length(good_length_)
+           , max_lazy(max_lazy_)
+           , nice_length(nice_length_)
+           , max_chain(max_chain_)
+           , func(func_)
+       {
+       }
+    };
+
+    static
+    config
+    get_config(std::size_t level)
+    {
+        switch(level)
+        {
+        //      good lazy nice chain
+        case 0: return {  0,   0,   0,    0, &deflate_stored}; // store only
+        case 1: return {  4,   4,   8,    4, &deflate_fast};   // max speed, no lazy matches
+        case 2: return {  4,   5,  16,    8, &deflate_fast};
+        case 3: return {  4,   6,  32,   32, &deflate_fast};
+        case 4: return {  4,   4,  16,   16, &deflate_slow};   // lazy matches
+        case 5: return {  8,  16,  32,   32, &deflate_slow};
+        case 6: return {  8,  16, 128,  128, &deflate_slow};
+        case 7: return {  8,  32, 128,  256, &deflate_slow};
+        case 8: return { 32, 128, 258, 1024, &deflate_slow};
+        default:
+        case 9: return { 32, 258, 258, 4096, &deflate_slow};    // max compression
+        }
+    }
+
     int   status_;        /* as the name implies */
     Byte *pending_buf_;  /* output still pending */
     std::uint32_t   pending_buf_size_; /* size of pending_buf */
@@ -279,95 +368,6 @@ private:
      * updated to the new high water mark.
      */
     std::uint32_t high_water_;
-
-    static void fill_window(basic_deflate_stream *s);
-    static block_state deflate_stored(basic_deflate_stream *s, int flush);
-    static block_state deflate_fast(basic_deflate_stream *s, int flush);
-    static block_state deflate_slow(basic_deflate_stream *s, int flush);
-    static block_state deflate_rle(basic_deflate_stream *s, int flush);
-    static block_state deflate_huff(basic_deflate_stream *s, int flush);
-
-    static void lm_init        (basic_deflate_stream *s);
-    static void flush_pending  (basic_deflate_stream* strm);
-    static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
-    static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
-
-    static void init_block     (basic_deflate_stream *s);
-    static void pqdownheap     (basic_deflate_stream *s, detail::ct_data *tree, int k);
-    static void gen_bitlen     (basic_deflate_stream *s, tree_desc *desc);
-    static void build_tree     (basic_deflate_stream *s, tree_desc *desc);
-    static void scan_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
-    static void send_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
-    static int  build_bl_tree  (basic_deflate_stream *s);
-    static void send_all_trees (basic_deflate_stream *s, int lcodes, int dcodes,
-                                int blcodes);
-
-    static void _tr_init (basic_deflate_stream *s);
-    static int _tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);
-    static void _tr_flush_block (basic_deflate_stream *s, char *buf,
-                            std::uint32_t stored_len, int last);
-    static void _tr_flush_bits (basic_deflate_stream *s);
-    static void _tr_align (basic_deflate_stream *s);
-    static void _tr_stored_block (basic_deflate_stream *s, char *bu,
-                            std::uint32_t stored_len, int last);
-
-    static void compress_block (basic_deflate_stream *s, const detail::ct_data *ltree,
-                                const detail::ct_data *dtree);
-    static int  detect_data_type (basic_deflate_stream *s);
-    static void bi_flush       (basic_deflate_stream *s);
-    static void bi_windup      (basic_deflate_stream *s);
-    static void copy_block     (basic_deflate_stream *s, char *buf, unsigned len,
-                                  int header);
-
-    using compress_func = block_state(*)(basic_deflate_stream*, int flush);
-
-    /* Values for max_lazy_match, good_match and max_chain_length, depending on
-     * the desired pack level (0..9). The values given below have been tuned to
-     * exclude worst case performance for pathological files. Better values may be
-     * found for specific files.
-     */
-    struct config {
-       std::uint16_t good_length; /* reduce lazy search above this match length */
-       std::uint16_t max_lazy;    /* do not perform lazy search above this match length */
-       std::uint16_t nice_length; /* quit search above this match length */
-       std::uint16_t max_chain;
-       compress_func func;
-
-       config(
-               std::uint16_t good_length_,
-               std::uint16_t max_lazy_,
-               std::uint16_t nice_length_,
-               std::uint16_t max_chain_,
-               compress_func func_)
-           : good_length(good_length_)
-           , max_lazy(max_lazy_)
-           , nice_length(nice_length_)
-           , max_chain(max_chain_)
-           , func(func_)
-       {
-       }
-    };
-
-    static
-    config
-    get_config(std::size_t level)
-    {
-        switch(level)
-        {
-        //      good lazy nice chain
-        case 0: return {  0,   0,   0,    0, &deflate_stored}; // store only
-        case 1: return {  4,   4,   8,    4, &deflate_fast};   // max speed, no lazy matches
-        case 2: return {  4,   5,  16,    8, &deflate_fast};
-        case 3: return {  4,   6,  32,   32, &deflate_fast};
-        case 4: return {  4,   4,  16,   16, &deflate_slow};   // lazy matches
-        case 5: return {  8,  16,  32,   32, &deflate_slow};
-        case 6: return {  8,  16, 128,  128, &deflate_slow};
-        case 7: return {  8,  32, 128,  256, &deflate_slow};
-        case 8: return { 32, 128, 258, 1024, &deflate_slow};
-        default:
-        case 9: return { 32, 258, 258, 4096, &deflate_slow};    // max compression
-        }
-    }
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
