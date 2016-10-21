@@ -91,6 +91,8 @@ public:
                     goto fin;
                 if(! BEAST_EXPECTS(! ec, ec.message()))
                     goto err;
+                if(! BEAST_EXPECT(progress))
+                    goto err;
                 progress = false;
             }
         }
