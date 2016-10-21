@@ -1117,15 +1117,6 @@ copy_block(
 /* ========================================================================= */
 
 template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-deflateInit(basic_deflate_stream* strm, int level)
-{
-    return strm->reset(level, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
-    /* To do: ignore strm->next_in if we use it as window */
-}
-
-template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 fill_window(basic_deflate_stream *s)
