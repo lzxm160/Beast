@@ -1537,7 +1537,8 @@ flush_pending(basic_deflate_stream* strm)
     if (len == 0) return;
 
     std::memcpy(strm->next_out, s->pending_out_, len);
-    strm->next_out  += len;
+    strm->next_out = static_cast<std::uint8_t*>(
+        strm->next_out) + len;
     s->pending_out_  += len;
     strm->total_out += len;
     strm->avail_out  -= len;
@@ -1708,7 +1709,8 @@ read_buf(basic_deflate_stream* strm, Byte *buf, unsigned size)
     strm->avail_in  -= len;
 
     std::memcpy(buf, strm->next_in, len);
-    strm->next_in  += len;
+    strm->next_in = static_cast<std::uint8_t const*>(
+        strm->next_in) + len;
     strm->total_in += len;
 
     return (int)len;
