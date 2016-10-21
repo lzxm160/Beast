@@ -99,7 +99,7 @@ basic_deflate_stream()
     : lut_(detail::get_deflate_tables())
 {
     // default level 6
-    //deflateInit2(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+    //init2(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 }
 
 template<class Allocator>
@@ -1059,7 +1059,7 @@ int
 basic_deflate_stream<Allocator>::
 deflateInit(basic_deflate_stream* strm, int level)
 {
-    return deflateInit2(strm, level, 15, DEF_MEM_LEVEL,
+    return init2(strm, level, 15, DEF_MEM_LEVEL,
                          Z_DEFAULT_STRATEGY);
     /* To do: ignore strm->next_in if we use it as window */
 }
@@ -1208,7 +1208,7 @@ fill_window(basic_deflate_stream *s)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateInit2(
+init2(
     basic_deflate_stream* strm,
     int  level,
     int  windowBits,

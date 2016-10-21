@@ -49,7 +49,7 @@ namespace zlib {
     This is a port of zlib's "deflate" functionality to C++.
 */
 template<class Allocator>
-class basic_deflate_stream : public z_params
+class basic_deflate_stream : public z_stream
 {
     // maximum heap size
     static std::uint16_t constexpr HEAP_SIZE = 2 * limits::lCodes + 1;
@@ -107,7 +107,7 @@ public:
     static int deflatePending (basic_deflate_stream* strm, unsigned *pending, int *bits);
     static int deflatePrime (basic_deflate_stream* strm, int bits, int value);
     static int deflateInit (basic_deflate_stream* strm, int level);
-    static int deflateInit2 (basic_deflate_stream* strm, int level,
+    static int init2 (basic_deflate_stream* strm, int level,
         int windowBits, int memLevel, int strategy);
 
 private:
