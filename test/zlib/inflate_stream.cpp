@@ -485,7 +485,6 @@ public:
                 "OkQqHRLE/b8/Rw2k",
                     &self::doInflate4_beast);
         }
-
         {
             auto const s = corpus1(260);
             doMatrix("7.zlib  ", s, &self::doInflate4_zlib);

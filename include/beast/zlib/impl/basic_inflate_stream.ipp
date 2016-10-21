@@ -267,6 +267,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             }
             while(have_ < order.size())
                 lens_[order[have_++]] = 0;
+
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 7;
@@ -331,8 +332,14 @@ write(z_params& zs, Flush flush, error_code& ec)
                     }
                     if(have_ + copy > nlen_ + ndist_)
                         return err(error::invalid_bit_length_repeat);
+#if 0
                     while(copy--)
                         lens_[have_++] = len;
+#else
+                    std::fill(&lens_[have_], &lens_[have_ + copy], len);
+                    have_ += copy;
+                    copy = 0;
+#endif
                 }
             }
             // handle error breaks in while

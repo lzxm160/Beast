@@ -121,6 +121,7 @@ public:
 };
 
 template<class FwdIt>
+inline
 bool
 bitstream::
 fill(unsigned n, FwdIt& first, FwdIt const& last)
@@ -158,6 +159,7 @@ fill_16(FwdIt& it)
 }    
 
 template<class Unsigned, class FwdIt>
+inline
 bool
 bitstream::
 peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
@@ -171,6 +173,7 @@ peek(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
 }
 
 template<class Unsigned, class FwdIt>
+inline
 bool
 bitstream::
 read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
@@ -184,6 +187,7 @@ read(Unsigned& value, unsigned n, FwdIt& first, FwdIt const& last)
 }
 
 template<class BidirIt>
+inline
 void
 bitstream::
 rewind(BidirIt& it)
