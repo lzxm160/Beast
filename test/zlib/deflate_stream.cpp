@@ -79,7 +79,7 @@ public:
         int result;
         std::string out;
         deflate_stream zs;
-        result = deflate_stream::init2(&zs,
+        result = zs.reset(
             level,
             windowBits,
             8,
@@ -202,7 +202,7 @@ public:
             {
                 int result;
                 deflate_stream zs;
-                result = deflate_stream::init2(&zs,
+                result = zs.reset(
                     level,
                     windowBits,
                     8,

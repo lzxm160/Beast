@@ -93,7 +93,11 @@ public:
 
     ~basic_deflate_stream();
 
-    int deflate(int flush);
+    int
+    reset(int level, int windowBits, int memLevel, int strategy);
+
+    int
+    deflate(int flush);
 
     int deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
 
@@ -107,8 +111,6 @@ public:
     static int deflatePending (basic_deflate_stream* strm, unsigned *pending, int *bits);
     static int deflatePrime (basic_deflate_stream* strm, int bits, int value);
     static int deflateInit (basic_deflate_stream* strm, int level);
-    static int init2 (basic_deflate_stream* strm, int level,
-        int windowBits, int memLevel, int strategy);
 
 private:
     detail::deflate_tables const& lut_;

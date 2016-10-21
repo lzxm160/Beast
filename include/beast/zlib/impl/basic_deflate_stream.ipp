@@ -99,7 +99,7 @@ basic_deflate_stream()
     : lut_(detail::get_deflate_tables())
 {
     // default level 6
-    //init2(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+    //reset(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
 }
 
 template<class Allocator>
@@ -109,6 +109,65 @@ basic_deflate_stream<Allocator>::
     deflateEnd(this);
 }
 
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+reset(
+    int  level,
+    int  windowBits,
+    int  memLevel,
+    int  strategy)
+{
+    /* We overlay pending_buf and d_buf+l_buf. This works since the average
+     * output size for (length,distance) codes is <= 24 bits.
+     */
+    std::uint16_t* overlay;
+
+    //strm->msg = 0;
+
+    if (level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+
+    BOOST_ASSERT(windowBits >= 0);
+    if (memLevel < 1 || memLevel > MAX_MEM_LEVEL ||
+        windowBits < 8 || windowBits > 15 || level < 0 || level > 9 ||
+        strategy < 0 || strategy > Z_FIXED) {
+        return Z_STREAM_ERROR;
+    }
+    if (windowBits == 8)
+        windowBits = 9;  /* until 256-byte window bug fixed */
+
+    w_bits_ = windowBits;
+    w_size_ = 1 << w_bits_;
+    w_mask_ = w_size_ - 1;
+
+    hash_bits_ = memLevel + 7;
+    hash_size_ = 1 << hash_bits_;
+    hash_mask_ = hash_size_ - 1;
+    hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
+
+    // VFALCO use new instead of malloc
+    window_ = (Byte *) std::malloc(w_size_ * 2*sizeof(Byte));
+    prev_   = (std::uint16_t *)  std::malloc(w_size_ * sizeof(std::uint16_t));
+    head_   = (std::uint16_t *)  std::malloc(hash_size_ * sizeof(std::uint16_t));
+
+    high_water_ = 0;      /* nothing written to window_ yet */
+
+    lit_bufsize_ = 1 << (memLevel + 6); /* 16K elements by default */
+
+    // Use new instad of malloc
+    overlay = (std::uint16_t *) std::malloc(lit_bufsize_ * (sizeof(std::uint16_t)+2));
+    pending_buf_ = (std::uint8_t *) overlay;
+    pending_buf_size_ = (std::uint32_t)lit_bufsize_ * (sizeof(std::uint16_t)+2L);
+
+    d_buf_ = overlay + lit_bufsize_/sizeof(std::uint16_t);
+    l_buf_ = pending_buf_ + (1+sizeof(std::uint16_t))*lit_bufsize_;
+
+    level_ = level;
+    strategy_ = strategy;
+
+    return deflateReset(this);
+}
 
 
 
@@ -1059,8 +1118,7 @@ int
 basic_deflate_stream<Allocator>::
 deflateInit(basic_deflate_stream* strm, int level)
 {
-    return init2(strm, level, 15, DEF_MEM_LEVEL,
-                         Z_DEFAULT_STRATEGY);
+    return strm->reset(level, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
     /* To do: ignore strm->next_in if we use it as window */
 }
 
@@ -1201,76 +1259,6 @@ fill_window(basic_deflate_stream *s)
 
     Assert((std::uint32_t)s->strstart_ <= s->window_size_ - MIN_LOOKAHEAD,
            "not enough room for search");
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-init2(
-    basic_deflate_stream* strm,
-    int  level,
-    int  windowBits,
-    int  memLevel,
-    int  strategy)
-{
-    std::uint16_t *overlay;
-    /* We overlay pending_buf and d_buf+l_buf. This works since the average
-     * output size for (length,distance) codes is <= 24 bits.
-     */
-
-    if (strm == 0)
-        return Z_STREAM_ERROR;
-
-    strm->msg = 0;
-
-    if (level == Z_DEFAULT_COMPRESSION) level = 6;
-
-    BOOST_ASSERT(windowBits >= 0);
-    if (memLevel < 1 || memLevel > MAX_MEM_LEVEL ||
-        windowBits < 8 || windowBits > 15 || level < 0 || level > 9 ||
-        strategy < 0 || strategy > Z_FIXED) {
-        return Z_STREAM_ERROR;
-    }
-    if (windowBits == 8) windowBits = 9;  /* until 256-byte window bug fixed */
-    auto s = strm;
-
-    s->w_bits_ = windowBits;
-    s->w_size_ = 1 << s->w_bits_;
-    s->w_mask_ = s->w_size_ - 1;
-
-    s->hash_bits_ = memLevel + 7;
-    s->hash_size_ = 1 << s->hash_bits_;
-    s->hash_mask_ = s->hash_size_ - 1;
-    s->hash_shift_ =  ((s->hash_bits_+limits::minMatch-1)/limits::minMatch);
-
-    s->window_ = (Byte *) std::malloc(s->w_size_ * 2*sizeof(Byte));
-    s->prev_   = (std::uint16_t *)  std::malloc(s->w_size_ * sizeof(std::uint16_t));
-    s->head_   = (std::uint16_t *)  std::malloc(s->hash_size_ * sizeof(std::uint16_t));
-
-    s->high_water_ = 0;      /* nothing written to s->window_ yet */
-
-    s->lit_bufsize_ = 1 << (memLevel + 6); /* 16K elements by default */
-
-    overlay = (std::uint16_t *) std::malloc(s->lit_bufsize_ * (sizeof(std::uint16_t)+2));
-    s->pending_buf_ = (std::uint8_t *) overlay;
-    s->pending_buf_size_ = (std::uint32_t)s->lit_bufsize_ * (sizeof(std::uint16_t)+2L);
-
-    if (s->window_ == 0 || s->prev_ == 0 || s->head_ == 0 ||
-        s->pending_buf_ == 0) {
-        s->status_ = FINISH_STATE;
-        strm->msg = "unspecified zlib error";
-        deflateEnd (strm);
-        return Z_MEM_ERROR;
-    }
-    s->d_buf_ = overlay + s->lit_bufsize_/sizeof(std::uint16_t);
-    s->l_buf_ = s->pending_buf_ + (1+sizeof(std::uint16_t))*s->lit_bufsize_;
-
-    s->level_ = level;
-    s->strategy_ = strategy;
-
-    return deflateReset(strm);
 }
 
 /* ========================================================================= */
