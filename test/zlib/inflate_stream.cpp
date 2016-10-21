@@ -421,7 +421,7 @@ public:
         auto const when = clock_type::now();
         for(int level = 0; level <= 9; ++level)
         {
-            for(int windowBits = 8; windowBits <= 15; ++windowBits)
+            for(int windowBits = 8; windowBits <= 9; ++windowBits)
             {
                 for(int strategy = 0; strategy <= 4; ++strategy)
                 {

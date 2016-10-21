@@ -598,7 +598,7 @@ inflate_fast(detail::ranges& r, error_code& ec)
     unsigned dist;              // match distance
     unsigned const lmask =
         (1U << lenbits_) - 1;   // mask for first level of length codes
-    unsigned dmask =
+    unsigned const dmask =
         (1U << distbits_) - 1;  // mask for first level of distance codes
 
     last = r.in.next + (r.in.avail() - 5);
@@ -674,7 +674,6 @@ inflate_fast(detail::ranges& r, error_code& ec)
                     w_.read(r.out.next, op, n);
                     r.out.next += n;
                     len -= n;
-                    dist = op;
                 }
                 if(len > 0)
                 {
