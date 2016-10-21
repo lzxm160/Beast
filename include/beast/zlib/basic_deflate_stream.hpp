@@ -99,9 +99,9 @@ public:
     int
     deflate(int flush);
 
-    int deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
+    int
+    deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
 
-    static int deflateEnd (basic_deflate_stream* strm);
     static int deflateResetKeep (basic_deflate_stream* strm);
     static int deflateReset (basic_deflate_stream* strm);
     static int deflateParams (basic_deflate_stream* strm, int level, int strategy);

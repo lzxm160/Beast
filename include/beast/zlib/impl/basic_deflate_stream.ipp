@@ -106,7 +106,10 @@ template<class Allocator>
 basic_deflate_stream<Allocator>::
 ~basic_deflate_stream()
 {
-    deflateEnd(this);
+    std::free(pending_buf_);
+    std::free(head_);
+    std::free(prev_);
+    std::free(window_);
 }
 
 template<class Allocator>
@@ -1644,37 +1647,6 @@ auto strm = this;
 
     if (flush != Z_FINISH) return Z_OK;
     return Z_STREAM_END;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-deflateEnd(basic_deflate_stream* strm)
-{
-    int status;
-
-    if (strm == 0 || strm == 0) return Z_STREAM_ERROR;
-
-    status = strm->status_;
-    if (status != EXTRA_STATE &&
-        status != NAME_STATE &&
-        status != COMMENT_STATE &&
-        status != HCRC_STATE &&
-        status != BUSY_STATE &&
-        status != FINISH_STATE) {
-      return Z_STREAM_ERROR;
-    }
-
-    /* Deallocate in reverse order of allocations: */
-    std::free(strm->pending_buf_);
-    std::free(strm->head_);
-    std::free(strm->prev_);
-    std::free(strm->window_);
-    strm = 0;
-
-    return status == BUSY_STATE ? Z_DATA_ERROR : Z_OK;
 }
 
 /* ===========================================================================
