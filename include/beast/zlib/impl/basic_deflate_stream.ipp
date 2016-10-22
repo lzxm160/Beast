@@ -796,13 +796,12 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 tr_stored_block(
-    basic_deflate_stream *s,
-    char *buf,       /* input block */
-    std::uint32_t stored_len,   /* length of input block */
-    int last)         /* one if this is the last block for a file */
+    char *buf,                  // input block
+    std::uint32_t stored_len,   // length of input block
+    int last)                   // one if this is the last block for a file
 {
-    s->send_bits((STORED_BLOCK<<1)+last, 3);    /* send block type */
-    copy_block(s, buf, (unsigned)stored_len, 1); /* with header */
+    send_bits((STORED_BLOCK<<1)+last, 3);           // send block type
+    copy_block(this, buf, (unsigned)stored_len, 1); // with header
 }
 
 /* ===========================================================================
@@ -898,7 +897,7 @@ tr_flush_block(
          * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
          * transform a block into a stored block.
          */
-        tr_stored_block(this, buf, stored_len, last);
+        tr_stored_block(buf, stored_len, last);
 
 #ifdef FORCE_STATIC
     }
@@ -1721,7 +1720,7 @@ auto strm = this;
             if(flush == Z_PARTIAL_FLUSH) {
                 s->tr_align();
             } else if(flush != Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
-                tr_stored_block(s, (char*)0, 0L, 0);
+                s->tr_stored_block((char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */

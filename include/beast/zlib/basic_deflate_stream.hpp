@@ -149,8 +149,7 @@ private:
     void tr_flush_block(char *buf, std::uint32_t stored_len, int last);
     void tr_flush_bits();
     void tr_align();
-    static void tr_stored_block (basic_deflate_stream *s, char *bu,
-                            std::uint32_t stored_len, int last);
+    void tr_stored_block (char *bu, std::uint32_t stored_len, int last);
 
     static void compress_block (basic_deflate_stream *s, const detail::ct_data *ltree,
                                 const detail::ct_data *dtree);
