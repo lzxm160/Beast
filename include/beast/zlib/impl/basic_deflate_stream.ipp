@@ -838,29 +838,29 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 tr_flush_block(
-    basic_deflate_stream *s,
-    char *buf,       /* input block, or NULL if too old */
-    std::uint32_t stored_len,   /* length of input block */
-    int last)         /* one if this is the last block for a file */
+    char *buf,                  // input block, or NULL if too old
+    std::uint32_t stored_len,   // length of input block
+    int last)                   // one if this is the last block for a file
 {
-    std::uint32_t opt_lenb, static_lenb; /* opt_len and static_len in bytes */
-    int max_blindex = 0;  /* index of last bit length code of non zero freq */
+    std::uint32_t opt_lenb;
+    std::uint32_t static_lenb;  // opt_len and static_len in bytes
+    int max_blindex = 0;        // index of last bit length code of non zero freq
 
-    /* Build the Huffman trees unless a stored block is forced */
-    if(s->level_ > 0) {
+    // Build the Huffman trees unless a stored block is forced
+    if(level_ > 0)
+    {
+        // Check if the file is binary or text
+        if(data_type == Z_UNKNOWN)
+            data_type = detect_data_type(this);
 
-        /* Check if the file is binary or text */
-        if(s->data_type == Z_UNKNOWN)
-            s->data_type = detect_data_type(s);
+        // Construct the literal and distance trees
+        build_tree((tree_desc *)(&(l_desc_)));
+        Tracev((stderr, "\nlit data: dyn %ld, stat %ld", opt_len_,
+                static_len_));
 
-        /* Construct the literal and distance trees */
-        s->build_tree((tree_desc *)(&(s->l_desc_)));
-        Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len_,
-                s->static_len_));
-
-        s->build_tree((tree_desc *)(&(s->d_desc_)));
-        Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len_,
-                s->static_len_));
+        build_tree((tree_desc *)(&(d_desc_)));
+        Tracev((stderr, "\ndist data: dyn %ld, stat %ld", opt_len_,
+                static_len_));
         /* At this point, opt_len and static_len are the total bit lengths of
          * the compressed block data, excluding the tree representations.
          */
@@ -868,21 +868,22 @@ tr_flush_block(
         /* Build the bit length tree for the above two trees, and get the index
          * in bl_order of the last bit length code to send.
          */
-        max_blindex = s->build_bl_tree();
+        max_blindex = build_bl_tree();
 
         /* Determine the best encoding. Compute the block lengths in bytes. */
-        opt_lenb = (s->opt_len_+3+7)>>3;
-        static_lenb = (s->static_len_+3+7)>>3;
+        opt_lenb = (opt_len_+3+7)>>3;
+        static_lenb = (static_len_+3+7)>>3;
 
         Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
-                opt_lenb, s->opt_len_, static_lenb, s->static_len_, stored_len,
-                s->last_lit_));
-
-        if(static_lenb <= opt_lenb) opt_lenb = static_lenb;
-
-    } else {
+                opt_lenb, opt_len_, static_lenb, static_len_, stored_len,
+                last_lit_));
+        if(static_lenb <= opt_lenb)
+            opt_lenb = static_lenb;
+    }
+    else
+    {
         Assert(buf != (char*)0, "lost buf");
-        opt_lenb = static_lenb = stored_len + 5; /* force a stored block */
+        opt_lenb = static_lenb = stored_len + 5; // force a stored block
     }
 
 #ifdef FORCE_STORED
@@ -897,33 +898,41 @@ tr_flush_block(
          * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
          * transform a block into a stored block.
          */
-        tr_stored_block(s, buf, stored_len, last);
+        tr_stored_block(this, buf, stored_len, last);
 
 #ifdef FORCE_STATIC
-    } else if(static_lenb >= 0) { /* force static trees */
-#else
-    } else if(s->strategy_ == Z_FIXED || static_lenb == opt_lenb) {
-#endif
-        s->send_bits((STATIC_TREES<<1)+last, 3);
-        compress_block(s, s->lut_.ltree, s->lut_.dtree);
-    } else {
-        s->send_bits((DYN_TREES<<1)+last, 3);
-        s->send_all_trees(s->l_desc_.max_code+1, s->d_desc_.max_code+1,
-                       max_blindex+1);
-        compress_block(s, (const detail::ct_data *)s->dyn_ltree_,
-                       (const detail::ct_data *)s->dyn_dtree_);
     }
-    Assert (s->compressed_len_ == s->bits_sent_, "bad compressed size");
+    else if(static_lenb >= 0)
+    {
+        // force static trees
+#else
+    }
+    else if(strategy_ == Z_FIXED || static_lenb == opt_lenb)
+    {
+#endif
+        send_bits((STATIC_TREES<<1)+last, 3);
+        compress_block(this, lut_.ltree, lut_.dtree);
+    }
+    else
+    {
+        send_bits((DYN_TREES<<1)+last, 3);
+        send_all_trees(l_desc_.max_code+1, d_desc_.max_code+1,
+                       max_blindex+1);
+        compress_block(this, (const detail::ct_data *)dyn_ltree_,
+                       (const detail::ct_data *)dyn_dtree_);
+    }
+    Assert (compressed_len_ == bits_sent_, "bad compressed size");
     /* The above check is made mod 2^32, for files larger than 512 MB
      * and std::size_t implemented on 32 bits.
      */
-    s->init_block();
+    init_block();
 
-    if(last) {
-        bi_windup(s);
+    if(last)
+    {
+        bi_windup(this);
     }
-    Tracev((stderr,"\ncomprlen %lu(%lu) ", s->compressed_len_>>3,
-           s->compressed_len_-7*last));
+    Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
+           compressed_len_-7*last));
 }
 
 /* ===========================================================================
@@ -1907,7 +1916,7 @@ longest_match(basic_deflate_stream *s, IPos cur_match)
  * IN assertion: strstart is set to the end of the current match.
  */
 #define FLUSH_BLOCK_ONLY(s, last) { \
-   tr_flush_block(s, (s->block_start_ >= 0L ? \
+   s->tr_flush_block((s->block_start_ >= 0L ? \
                    (char *)&s->window_[(unsigned)s->block_start_] : \
                    (char *)0), \
                 (std::uint32_t)((long)s->strstart_ - s->block_start_), \
