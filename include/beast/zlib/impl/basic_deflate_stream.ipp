@@ -910,14 +910,14 @@ tr_flush_block(
     {
 #endif
         send_bits((STATIC_TREES<<1)+last, 3);
-        compress_block(this, lut_.ltree, lut_.dtree);
+        compress_block(lut_.ltree, lut_.dtree);
     }
     else
     {
         send_bits((DYN_TREES<<1)+last, 3);
         send_all_trees(l_desc_.max_code+1, d_desc_.max_code+1,
                        max_blindex+1);
-        compress_block(this, (const detail::ct_data *)dyn_ltree_,
+        compress_block((const detail::ct_data *)dyn_ltree_,
                        (const detail::ct_data *)dyn_dtree_);
     }
     Assert (compressed_len_ == bits_sent_, "bad compressed size");
@@ -995,9 +995,8 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 compress_block(
-    basic_deflate_stream *s,
-    const detail::ct_data *ltree, /* literal tree */
-    const detail::ct_data *dtree) /* distance tree */
+    detail::ct_data const* ltree, // literal tree
+    detail::ct_data const* dtree) // distance tree
 {
     unsigned dist;      /* distance of matched string */
     int lc;             /* match length or unmatched char (if dist == 0) */
@@ -1005,49 +1004,49 @@ compress_block(
     unsigned code;      /* the code to send */
     int extra;          /* number of extra bits to send */
 
-    if(s->last_lit_ != 0)
+    if(last_lit_ != 0)
     {
         do
         {
-            dist = s->d_buf_[lx];
-            lc = s->l_buf_[lx++];
+            dist = d_buf_[lx];
+            lc = l_buf_[lx++];
             if(dist == 0)
             {
-                s->send_code(lc, ltree); /* send a literal byte */
+                send_code(lc, ltree); /* send a literal byte */
                 Tracecv(isgraph(lc), (stderr," '%c' ", lc));
             }
             else
             {
                 /* Here, lc is the match length - limits::minMatch */
-                code = s->lut_.length_code[lc];
-                s->send_code(code+limits::literals+1, ltree); /* send the length code */
-                extra = s->lut_.extra_lbits[code];
+                code = lut_.length_code[lc];
+                send_code(code+limits::literals+1, ltree); /* send the length code */
+                extra = lut_.extra_lbits[code];
                 if(extra != 0)
                 {
-                    lc -= s->lut_.base_length[code];
-                    s->send_bits(lc, extra);       /* send the extra length bits */
+                    lc -= lut_.base_length[code];
+                    send_bits(lc, extra);       /* send the extra length bits */
                 }
                 dist--; /* dist is now the match distance - 1 */
-                code = s->d_code(dist);
+                code = d_code(dist);
                 Assert (code < limits::dCodes, "bad d_code");
 
-                s->send_code(code, dtree);       /* send the distance code */
-                extra = s->lut_.extra_dbits[code];
+                send_code(code, dtree);       /* send the distance code */
+                extra = lut_.extra_dbits[code];
                 if(extra != 0)
                 {
-                    dist -= s->lut_.base_dist[code];
-                    s->send_bits(dist, extra);   /* send the extra distance bits */
+                    dist -= lut_.base_dist[code];
+                    send_bits(dist, extra);   /* send the extra distance bits */
                 }
             } /* literal or match pair ? */
 
             /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
-            Assert((uInt)(s->pending_) < s->lit_bufsize_ + 2*lx,
+            Assert((uInt)(pending_) < lit_bufsize_ + 2*lx,
                "pendingBuf overflow");
         }
-        while(lx < s->last_lit_);
+        while(lx < last_lit_);
     }
 
-    s->send_code(END_BLOCK, ltree);
+    send_code(END_BLOCK, ltree);
 }
 
 /* ===========================================================================

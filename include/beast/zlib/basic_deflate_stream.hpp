@@ -151,8 +151,7 @@ private:
     void tr_align();
     void tr_stored_block (char *bu, std::uint32_t stored_len, int last);
 
-    static void compress_block (basic_deflate_stream *s, const detail::ct_data *ltree,
-                                const detail::ct_data *dtree);
+    void compress_block(detail::ct_data const* ltree, detail::ct_data const* dtree);
     static int  detect_data_type (basic_deflate_stream *s);
     static void bi_flush       (basic_deflate_stream *s);
     static void bi_windup      (basic_deflate_stream *s);
