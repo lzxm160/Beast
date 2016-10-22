@@ -1248,7 +1248,7 @@ fill_window()
          */
         Assert(more >= 2, "more < 2");
 
-        n = read_buf(this, window_ + strstart_ + lookahead_, more);
+        n = read_buf(window_ + strstart_ + lookahead_, more);
         lookahead_ += n;
 
         /* Initialize the hash value now that we have some input: */
@@ -1695,20 +1695,21 @@ deflate(int flush)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-read_buf(basic_deflate_stream* strm, Byte *buf, unsigned size)
+read_buf(Byte *buf, unsigned size)
 {
-    unsigned len = strm->avail_in;
+    unsigned len = avail_in;
 
-    if(len > size) len = size;
-    if(len == 0) return 0;
+    if(len > size)
+        len = size;
+    if(len == 0)
+        return 0;
 
-    strm->avail_in  -= len;
+    avail_in  -= len;
 
-    std::memcpy(buf, strm->next_in, len);
-    strm->next_in = static_cast<std::uint8_t const*>(
-        strm->next_in) + len;
-    strm->total_in += len;
-
+    std::memcpy(buf, next_in, len);
+    next_in = static_cast<
+        std::uint8_t const*>(next_in) + len;
+    total_in += len;
     return (int)len;
 }
 

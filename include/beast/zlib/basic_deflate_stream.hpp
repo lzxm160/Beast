@@ -132,7 +132,7 @@ private:
 
     void lm_init();
     void flush_pending();
-    static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
+    int read_buf(Byte *buf, unsigned size);
     static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
 
     void init_block     ();
