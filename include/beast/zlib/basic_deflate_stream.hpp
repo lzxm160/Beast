@@ -140,6 +140,7 @@ private:
     uInt longest_match(IPos cur_match);
 
     void init_block     ();
+    bool smaller        (detail::ct_data const* tree, int n, int m);
     void pqdownheap     (detail::ct_data const* tree, int k);
     void pqremove       (detail::ct_data const* tree, int& top);
     void gen_bitlen     (tree_desc *desc);

@@ -383,9 +383,16 @@ init_block()
  * Compares to subtrees, using the tree depth as tie breaker when
  * the subtrees have equal frequency. This minimizes the worst case length.
  */
-#define smaller(tree, n, m, depth) \
-   (tree[n].fc < tree[m].fc || \
-   (tree[n].fc == tree[m].fc && depth[n] <= depth[m]))
+template<class Allocator>
+inline
+bool
+basic_deflate_stream<Allocator>::
+smaller(detail::ct_data const* tree, int n, int m)
+{
+    return tree[n].fc < tree[m].fc ||
+        (tree[n].fc == tree[m].fc &&
+            depth_[n] <= depth_[m]);
+}
 
 /* ===========================================================================
  * Restore the heap property by moving down the tree starting at node k,
@@ -406,10 +413,10 @@ pqdownheap(
     {
         // Set j to the smallest of the two sons:
         if(j < heap_len_ &&
-                smaller(tree, heap_[j+1], heap_[j], depth_))
+                smaller(tree, heap_[j+1], heap_[j]))
             j++;
         // Exit if v is smaller than both sons
-        if(smaller(tree, v, heap_[j], depth_))
+        if(smaller(tree, v, heap_[j]))
             break;
 
         // Exchange v with the smallest son
