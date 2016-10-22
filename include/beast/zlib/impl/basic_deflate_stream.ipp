@@ -245,7 +245,7 @@ reset(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-_tr_init(basic_deflate_stream *s)
+tr_init(basic_deflate_stream *s)
 {
     s->l_desc_.dyn_tree = s->dyn_ltree_;
     s->l_desc_.stat_desc = &s->lut_.l_desc;
@@ -701,7 +701,7 @@ send_all_trees(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-_tr_stored_block(
+tr_stored_block(
     basic_deflate_stream *s,
     char *buf,       /* input block */
     std::uint32_t stored_len,   /* length of input block */
@@ -717,7 +717,7 @@ _tr_stored_block(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-_tr_flush_bits(basic_deflate_stream *s)
+tr_flush_bits(basic_deflate_stream *s)
 {
     bi_flush(s);
 }
@@ -729,7 +729,7 @@ _tr_flush_bits(basic_deflate_stream *s)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-_tr_align(basic_deflate_stream *s)
+tr_align(basic_deflate_stream *s)
 {
     send_bits(s, STATIC_TREES<<1, 3);
     send_code(s, END_BLOCK, s->lut_.ltree);
@@ -743,7 +743,7 @@ _tr_align(basic_deflate_stream *s)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-_tr_flush_block(
+tr_flush_block(
     basic_deflate_stream *s,
     char *buf,       /* input block, or NULL if too old */
     std::uint32_t stored_len,   /* length of input block */
@@ -803,7 +803,7 @@ _tr_flush_block(
          * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
          * transform a block into a stored block.
          */
-        _tr_stored_block(s, buf, stored_len, last);
+        tr_stored_block(s, buf, stored_len, last);
 
 #ifdef FORCE_STATIC
     } else if (static_lenb >= 0) { /* force static trees */
@@ -839,7 +839,7 @@ _tr_flush_block(
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-_tr_tally (
+tr_tally (
     basic_deflate_stream *s,
     unsigned dist,  /* distance of matched string */
     unsigned lc)    /* match length-limits::minMatch or unmatched char (if dist==0) */
@@ -855,7 +855,7 @@ _tr_tally (
         dist--;             /* dist = match distance - 1 */
         Assert((std::uint16_t)dist < (std::uint16_t)MAX_DIST(s) &&
                (std::uint16_t)lc <= (std::uint16_t)(limits::maxMatch-limits::minMatch) &&
-               (std::uint16_t)d_code(dist) < (std::uint16_t)limits::dCodes,  "_tr_tally: bad match");
+               (std::uint16_t)d_code(dist) < (std::uint16_t)limits::dCodes,  "tr_tally: bad match");
 
         s->dyn_ltree_[s->lut_.length_code[lc]+limits::literals+1].fc++;
         s->dyn_dtree_[d_code(dist)].fc++;
@@ -1120,7 +1120,7 @@ fill_window(basic_deflate_stream *s)
 {
     unsigned n, m;
     std::uint16_t *p;
-    unsigned more;    /* Amount of free space at the end of the window. */
+    unsigned more;    // Amount of free space at the end of the window.
     uInt wsize = s->w_size_;
 
     Assert(s->lookahead_ < MIN_LOOKAHEAD, "already enough lookahead");
@@ -1329,7 +1329,7 @@ deflateResetKeep(basic_deflate_stream* strm)
     s->status_ = BUSY_STATE;
     s->last_flush_ = Z_NO_FLUSH;
 
-    _tr_init(s);
+    tr_init(s);
 
     return Z_OK;
 }
@@ -1384,7 +1384,7 @@ deflatePrime(basic_deflate_stream* strm, int bits, int value)
             put = bits;
         s->bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << s->bi_valid_);
         s->bi_valid_ += put;
-        _tr_flush_bits(s);
+        tr_flush_bits(s);
         value >>= put;
         bits -= put;
     } while (bits);
@@ -1510,7 +1510,7 @@ flush_pending(basic_deflate_stream* strm)
     unsigned len;
     auto s = strm;
 
-    _tr_flush_bits(s);
+    tr_flush_bits(s);
     len = s->pending_;
     if (len > strm->avail_out) len = strm->avail_out;
     if (len == 0) return;
@@ -1609,9 +1609,9 @@ auto strm = this;
         }
         if (bstate == block_done) {
             if (flush == Z_PARTIAL_FLUSH) {
-                _tr_align(s);
+                tr_align(s);
             } else if (flush != Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
-                _tr_stored_block(s, (char*)0, 0L, 0);
+                tr_stored_block(s, (char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */
@@ -1806,7 +1806,7 @@ longest_match(basic_deflate_stream *s, IPos cur_match)
  * IN assertion: strstart is set to the end of the current match.
  */
 #define FLUSH_BLOCK_ONLY(s, last) { \
-   _tr_flush_block(s, (s->block_start_ >= 0L ? \
+   tr_flush_block(s, (s->block_start_ >= 0L ? \
                    (char *)&s->window_[(unsigned)s->block_start_] : \
                    (char *)0), \
                 (std::uint32_t)((long)s->strstart_ - s->block_start_), \

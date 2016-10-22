@@ -113,6 +113,7 @@ private:
     detail::deflate_tables const& lut_;
 
     static void fill_window(basic_deflate_stream *s);
+
     static block_state deflate_stored(basic_deflate_stream *s, int flush);
     static block_state deflate_fast(basic_deflate_stream *s, int flush);
     static block_state deflate_slow(basic_deflate_stream *s, int flush);
@@ -134,13 +135,13 @@ private:
     static void send_all_trees (basic_deflate_stream *s, int lcodes, int dcodes,
                                 int blcodes);
 
-    static void _tr_init (basic_deflate_stream *s);
-    static int _tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);
-    static void _tr_flush_block (basic_deflate_stream *s, char *buf,
+    static void tr_init (basic_deflate_stream *s);
+    static int  tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);
+    static void tr_flush_block (basic_deflate_stream *s, char *buf,
                             std::uint32_t stored_len, int last);
-    static void _tr_flush_bits (basic_deflate_stream *s);
-    static void _tr_align (basic_deflate_stream *s);
-    static void _tr_stored_block (basic_deflate_stream *s, char *bu,
+    static void tr_flush_bits (basic_deflate_stream *s);
+    static void tr_align (basic_deflate_stream *s);
+    static void tr_stored_block (basic_deflate_stream *s, char *bu,
                             std::uint32_t stored_len, int last);
 
     static void compress_block (basic_deflate_stream *s, const detail::ct_data *ltree,
