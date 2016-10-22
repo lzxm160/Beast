@@ -454,28 +454,31 @@ gen_bitlen(tree_desc *desc)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-build_tree(
-    basic_deflate_stream *s,
-    tree_desc *desc) /* the tree descriptor */
+build_tree(tree_desc *desc)
 {
     detail::ct_data *tree         = desc->dyn_tree;
-    const detail::ct_data *stree  = desc->stat_desc->static_tree;
-    int elems             = desc->stat_desc->elems;
-    int n, m;          /* iterate over heap elements */
-    int max_code = -1; /* largest code with non zero frequency */
-    int node;          /* new node being created */
+    detail::ct_data const* stree  = desc->stat_desc->static_tree;
+    int elems                     = desc->stat_desc->elems;
+    int n, m;          // iterate over heap elements
+    int max_code = -1; // largest code with non zero frequency
+    int node;          // new node being created
 
     /* Construct the initial heap, with least frequent element in
      * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
      * heap[0] is not used.
      */
-    s->heap_len_ = 0, s->heap_max_ = HEAP_SIZE;
+    heap_len_ = 0;
+    heap_max_ = HEAP_SIZE;
 
-    for (n = 0; n < elems; n++) {
-        if (tree[n].fc != 0) {
-            s->heap_[++(s->heap_len_)] = max_code = n;
-            s->depth_[n] = 0;
-        } else {
+    for(n = 0; n < elems; n++)
+    {
+        if(tree[n].fc != 0)
+        {
+            heap_[++(heap_len_)] = max_code = n;
+            depth_[n] = 0;
+        }
+        else
+        {
             tree[n].dl = 0;
         }
     }
@@ -485,52 +488,57 @@ build_tree(
      * possible code. So to avoid special checks later on we force at least
      * two codes of non zero frequency.
      */
-    while (s->heap_len_ < 2) {
-        node = s->heap_[++(s->heap_len_)] = (max_code < 2 ? ++max_code : 0);
+    while(heap_len_ < 2)
+    {
+        node = heap_[++(heap_len_)] = (max_code < 2 ? ++max_code : 0);
         tree[node].fc = 1;
-        s->depth_[node] = 0;
-        s->opt_len_--; if (stree) s->static_len_ -= stree[node].dl;
-        /* node is 0 or 1 so it does not have extra bits */
+        depth_[node] = 0;
+        opt_len_--;
+        if (stree)
+            static_len_ -= stree[node].dl;
+        // node is 0 or 1 so it does not have extra bits
     }
     desc->max_code = max_code;
 
     /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
      * establish sub-heaps of increasing lengths:
      */
-    for (n = s->heap_len_/2; n >= 1; n--)
-        s->pqdownheap(tree, n);
+    for(n = heap_len_/2; n >= 1; n--)
+        pqdownheap(tree, n);
 
     /* Construct the Huffman tree by repeatedly combining the least two
      * frequent nodes.
      */
     node = elems;              /* next internal node of the tree */
-    do {
-        pqremove(s, tree, n);  /* n = node of least frequency */
-        m = s->heap_[SMALLEST]; /* m = node of next least frequency */
+    do
+    {
+        pqremove(this, tree, n);  /* n = node of least frequency */
+        m = heap_[SMALLEST]; /* m = node of next least frequency */
 
-        s->heap_[--(s->heap_max_)] = n; /* keep the nodes sorted by frequency */
-        s->heap_[--(s->heap_max_)] = m;
+        heap_[--(heap_max_)] = n; /* keep the nodes sorted by frequency */
+        heap_[--(heap_max_)] = m;
 
         /* Create a new node father of n and m */
         tree[node].fc = tree[n].fc + tree[m].fc;
-        s->depth_[node] = (std::uint8_t)((s->depth_[n] >= s->depth_[m] ?
-                                s->depth_[n] : s->depth_[m]) + 1);
+        depth_[node] = (std::uint8_t)((depth_[n] >= depth_[m] ?
+                                depth_[n] : depth_[m]) + 1);
         tree[n].dl = tree[m].dl = (std::uint16_t)node;
         /* and insert the new node in the heap */
-        s->heap_[SMALLEST] = node++;
-        s->pqdownheap(tree, SMALLEST);
+        heap_[SMALLEST] = node++;
+        pqdownheap(tree, SMALLEST);
 
-    } while (s->heap_len_ >= 2);
+    }
+    while(heap_len_ >= 2);
 
-    s->heap_[--(s->heap_max_)] = s->heap_[SMALLEST];
+    heap_[--(heap_max_)] = heap_[SMALLEST];
 
     /* At this point, the fields freq and dad are set. We can now
      * generate the bit lengths.
      */
-    s->gen_bitlen((tree_desc *)desc);
+    gen_bitlen((tree_desc *)desc);
 
     /* The field len is now set, we can generate the bit codes */
-    detail::gen_codes (tree, max_code, s->bl_count_);
+    detail::gen_codes(tree, max_code, bl_count_);
 }
 
 /* ===========================================================================
@@ -651,7 +659,7 @@ build_bl_tree(basic_deflate_stream *s)
     scan_tree(s, (detail::ct_data *)s->dyn_dtree_, s->d_desc_.max_code);
 
     /* Build the bit length tree: */
-    build_tree(s, (tree_desc *)(&(s->bl_desc_)));
+    s->build_tree((tree_desc *)(&(s->bl_desc_)));
     /* opt_len now includes the length of the tree representations, except
      * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
      */
@@ -772,11 +780,11 @@ tr_flush_block(
             s->data_type = detect_data_type(s);
 
         /* Construct the literal and distance trees */
-        build_tree(s, (tree_desc *)(&(s->l_desc_)));
+        s->build_tree((tree_desc *)(&(s->l_desc_)));
         Tracev((stderr, "\nlit data: dyn %ld, stat %ld", s->opt_len_,
                 s->static_len_));
 
-        build_tree(s, (tree_desc *)(&(s->d_desc_)));
+        s->build_tree((tree_desc *)(&(s->d_desc_)));
         Tracev((stderr, "\ndist data: dyn %ld, stat %ld", s->opt_len_,
                 s->static_len_));
         /* At this point, opt_len and static_len are the total bit lengths of
