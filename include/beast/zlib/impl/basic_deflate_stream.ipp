@@ -812,7 +812,7 @@ void
 basic_deflate_stream<Allocator>::
 tr_flush_bits()
 {
-    bi_flush(this);
+    bi_flush();
 }
 
 /* ===========================================================================
@@ -826,7 +826,7 @@ tr_align()
 {
     send_bits(STATIC_TREES<<1, 3);
     send_code(END_BLOCK, lut_.ltree);
-    bi_flush(this);
+    bi_flush();
 }
 
 /* ===========================================================================
@@ -1099,17 +1099,19 @@ detect_data_type()
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-bi_flush(
-    basic_deflate_stream *s)
+bi_flush()
 {
-    if(s->bi_valid_ == 16) {
-        s->put_short(s->bi_buf_);
-        s->bi_buf_ = 0;
-        s->bi_valid_ = 0;
-    } else if(s->bi_valid_ >= 8) {
-        s->put_byte((Byte)s->bi_buf_);
-        s->bi_buf_ >>= 8;
-        s->bi_valid_ -= 8;
+    if(bi_valid_ == 16)
+    {
+        put_short(bi_buf_);
+        bi_buf_ = 0;
+        bi_valid_ = 0;
+    }
+    else if(bi_valid_ >= 8)
+    {
+        put_byte((Byte)bi_buf_);
+        bi_buf_ >>= 8;
+        bi_valid_ -= 8;
     }
 }
 
