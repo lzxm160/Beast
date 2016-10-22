@@ -338,22 +338,22 @@ d_code(unsigned dist)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-tr_init(basic_deflate_stream *s)
+tr_init()
 {
-    s->l_desc_.dyn_tree = s->dyn_ltree_;
-    s->l_desc_.stat_desc = &s->lut_.l_desc;
+    l_desc_.dyn_tree = dyn_ltree_;
+    l_desc_.stat_desc = &lut_.l_desc;
 
-    s->d_desc_.dyn_tree = s->dyn_dtree_;
-    s->d_desc_.stat_desc = &s->lut_.d_desc;
+    d_desc_.dyn_tree = dyn_dtree_;
+    d_desc_.stat_desc = &lut_.d_desc;
 
-    s->bl_desc_.dyn_tree = s->bl_tree_;
-    s->bl_desc_.stat_desc = &s->lut_.bl_desc;
+    bl_desc_.dyn_tree = bl_tree_;
+    bl_desc_.stat_desc = &lut_.bl_desc;
 
-    s->bi_buf_ = 0;
-    s->bi_valid_ = 0;
+    bi_buf_ = 0;
+    bi_valid_ = 0;
 
     /* Initialize the first block of the first file: */
-    s->init_block();
+    init_block();
 }
 
 // Initialize a new block.
@@ -1387,7 +1387,7 @@ deflateResetKeep()
     status_ = BUSY_STATE;
     last_flush_ = Z_NO_FLUSH;
 
-    tr_init(this);
+    tr_init();
 
     return Z_OK;
 }

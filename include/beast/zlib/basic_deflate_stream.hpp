@@ -144,7 +144,7 @@ private:
     int  build_bl_tree  ();
     void send_all_trees (int lcodes, int dcodes, int blcodes);
 
-    static void tr_init (basic_deflate_stream *s);
+    void tr_init();
     void tr_flush_block(char *buf, std::uint32_t stored_len, int last);
     void tr_flush_bits();
     void tr_align();
