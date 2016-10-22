@@ -100,8 +100,12 @@ public:
     int
     deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
 
-    int deflateResetKeep();
-    static int deflateReset (basic_deflate_stream* strm);
+    int
+    deflateResetKeep();
+    
+    int
+    deflateReset();
+
     static int deflateParams (basic_deflate_stream* strm, int level, int strategy);
     static int deflateTune (basic_deflate_stream* strm,
         int good_length, int max_lazy, int nice_length, int max_chain);

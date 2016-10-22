@@ -167,7 +167,7 @@ reset(
     level_ = level;
     strategy_ = strategy;
 
-    return deflateReset(this);
+    return deflateReset();
 }
 
 
@@ -1411,13 +1411,11 @@ deflateResetKeep()
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateReset(basic_deflate_stream* strm)
+deflateReset()
 {
-    int ret;
-
-    ret = strm->deflateResetKeep();
+    int ret = deflateResetKeep();
     if(ret == Z_OK)
-        strm->lm_init();
+        lm_init();
     return ret;
 }
 
