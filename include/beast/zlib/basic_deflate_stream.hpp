@@ -154,7 +154,7 @@ private:
     void compress_block(detail::ct_data const* ltree, detail::ct_data const* dtree);
     int  detect_data_type();
     void bi_flush();
-    static void bi_windup      (basic_deflate_stream *s);
+    void bi_windup();
     static void copy_block     (basic_deflate_stream *s, char *buf, unsigned len,
                                   int header);
 

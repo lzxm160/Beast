@@ -927,9 +927,7 @@ tr_flush_block(
     init_block();
 
     if(last)
-    {
-        bi_windup(this);
-    }
+        bi_windup();
     Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
            compressed_len_-7*last));
 }
@@ -1121,15 +1119,14 @@ bi_flush()
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-bi_windup(basic_deflate_stream *s)
+bi_windup()
 {
-    if(s->bi_valid_ > 8) {
-        s->put_short(s->bi_buf_);
-    } else if(s->bi_valid_ > 0) {
-        s->put_byte((Byte)s->bi_buf_);
-    }
-    s->bi_buf_ = 0;
-    s->bi_valid_ = 0;
+    if(bi_valid_ > 8)
+        put_short(bi_buf_);
+    else if(bi_valid_ > 0)
+        put_byte((Byte)bi_buf_);
+    bi_buf_ = 0;
+    bi_valid_ = 0;
 }
 
 /* ===========================================================================
@@ -1145,7 +1142,7 @@ copy_block(
     unsigned len,     /* its length */
     int      header)  /* true if block header must be written */
 {
-    bi_windup(s);        /* align on byte boundary */
+    s->bi_windup();     // align on byte boundary
 
     if(header) {
         s->put_short((std::uint16_t)len);
