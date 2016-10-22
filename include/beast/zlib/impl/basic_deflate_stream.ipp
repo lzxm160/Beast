@@ -171,14 +171,6 @@ reset(
 
 //------------------------------------------------------------------------------
 
-# define _tr_tally_lit(s, c, flush) \
-  { std::uint8_t cc = (c); \
-    s->d_buf_[s->last_lit_] = 0; \
-    s->l_buf_[s->last_lit_++] = cc; \
-    s->dyn_ltree_[cc].fc++; \
-    flush = (s->last_lit_ == s->lit_bufsize_-1); \
-   }
-
 /* To be used only when the state is known to be valid */
 #define ERR_RETURN(strm,err) \
   return (strm->msg = "unspecified zlib error", (err))
@@ -1156,6 +1148,18 @@ tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
     flush = (last_lit_ == lit_bufsize_-1);
 }
 
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+tr_tally_lit(std::uint8_t c, bool& flush)
+{
+    d_buf_[last_lit_] = 0;
+    l_buf_[last_lit_++] = c;
+    dyn_ltree_[c].fc++;
+    flush = (last_lit_ == lit_bufsize_-1);
+}
+
 //------------------------------------------------------------------------------
 
 /*  Initialize the "longest match" routines for a new zlib stream
@@ -2012,7 +2016,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
         } else {
             /* No match, output a literal byte */
             Tracevv((stderr,"%c", s->window_[s->strstart_]));
-            _tr_tally_lit (s, s->window_[s->strstart_], bflush);
+            s->tr_tally_lit(s->window_[s->strstart_], bflush);
             s->lookahead_--;
             s->strstart_++;
         }
@@ -2129,7 +2133,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
              * is longer, truncate the previous match to a single literal.
              */
             Tracevv((stderr,"%c", s->window_[s->strstart_-1]));
-            _tr_tally_lit(s, s->window_[s->strstart_-1], bflush);
+            s->tr_tally_lit(s->window_[s->strstart_-1], bflush);
             if(bflush) {
                 FLUSH_BLOCK_ONLY(s, 0);
             }
@@ -2148,7 +2152,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
     Assert (flush != Z_NO_FLUSH, "no flush?");
     if(s->match_available_) {
         Tracevv((stderr,"%c", s->window_[s->strstart_-1]));
-        _tr_tally_lit(s, s->window_[s->strstart_-1], bflush);
+        s->tr_tally_lit(s->window_[s->strstart_-1], bflush);
         s->match_available_ = 0;
     }
     s->insert_ = s->strstart_ < limits::minMatch-1 ? s->strstart_ : limits::minMatch-1;
@@ -2222,7 +2226,7 @@ deflate_rle(basic_deflate_stream *s, int flush) ->
         } else {
             /* No match, output a literal byte */
             Tracevv((stderr,"%c", s->window_[s->strstart_]));
-            _tr_tally_lit (s, s->window_[s->strstart_], bflush);
+            s->tr_tally_lit(s->window_[s->strstart_], bflush);
             s->lookahead_--;
             s->strstart_++;
         }
@@ -2248,29 +2252,34 @@ basic_deflate_stream<Allocator>::
 deflate_huff(basic_deflate_stream *s, int flush) ->
     block_state
 {
-    int bflush;             /* set if current block must be flushed */
+    bool bflush;             // set if current block must be flushed
 
-    for(;;) {
-        /* Make sure that we have a literal to write. */
-        if(s->lookahead_ == 0) {
+    for(;;)
+    {
+        // Make sure that we have a literal to write.
+        if(s->lookahead_ == 0)
+        {
             s->fill_window();
-            if(s->lookahead_ == 0) {
+            if(s->lookahead_ == 0)
+            {
                 if(flush == Z_NO_FLUSH)
                     return need_more;
-                break;      /* flush the current block */
+                break;      // flush the current block
             }
         }
 
-        /* Output a literal byte */
+        // Output a literal byte
         s->match_length_ = 0;
         Tracevv((stderr,"%c", s->window_[s->strstart_]));
-        _tr_tally_lit (s, s->window_[s->strstart_], bflush);
+        s->tr_tally_lit(s->window_[s->strstart_], bflush);
         s->lookahead_--;
         s->strstart_++;
-        if(bflush) FLUSH_BLOCK(s, 0);
+        if(bflush)
+            FLUSH_BLOCK(s, 0);
     }
     s->insert_ = 0;
-    if(flush == Z_FINISH) {
+    if(flush == Z_FINISH)
+    {
         FLUSH_BLOCK(s, 1);
         return finish_done;
     }

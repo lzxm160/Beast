@@ -129,6 +129,7 @@ private:
     void tr_stored_block (char *bu, std::uint32_t stored_len, int last);
     void tr_flush_block(char *buf, std::uint32_t stored_len, int last);
     void tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush);
+    void tr_tally_lit(std::uint8_t c, bool& flush);
 
     static block_state deflate_stored(basic_deflate_stream *s, int flush);
     static block_state deflate_fast(basic_deflate_stream *s, int flush);
