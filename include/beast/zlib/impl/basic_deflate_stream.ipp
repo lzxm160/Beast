@@ -1003,60 +1003,6 @@ tr_flush_block(
 }
 
 /* ===========================================================================
- * Save the match info and tally the frequency counts. Return true if
- * the current block must be flushed.
- */
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-tr_tally (
-    basic_deflate_stream *s,
-    unsigned dist,  /* distance of matched string */
-    unsigned lc)    /* match length-limits::minMatch or unmatched char (if dist==0) */
-{
-    s->d_buf_[s->last_lit_] = (std::uint16_t)dist;
-    s->l_buf_[s->last_lit_++] = (std::uint8_t)lc;
-    if(dist == 0) {
-        /* lc is the unmatched char */
-        s->dyn_ltree_[lc].fc++;
-    } else {
-        s->matches_++;
-        /* Here, lc is the match length - limits::minMatch */
-        dist--;             /* dist = match distance - 1 */
-        Assert((std::uint16_t)dist < (std::uint16_t)MAX_DIST(s) &&
-               (std::uint16_t)lc <= (std::uint16_t)(limits::maxMatch-limits::minMatch) &&
-               (std::uint16_t)s->d_code(dist) < (std::uint16_t)limits::dCodes,  "tr_tally: bad match");
-
-        s->dyn_ltree_[s->lut_.length_code[lc]+limits::literals+1].fc++;
-        s->dyn_dtree_[s->d_code(dist)].fc++;
-    }
-
-#ifdef TRUNCATE_BLOCK
-    /* Try to guess if it is profitable to stop the current block here */
-    if((s->last_lit_ & 0x1fff) == 0 && s->level > 2) {
-        /* Compute an upper bound for the compressed length */
-        std::uint32_t out_length = (std::uint32_t)s->last_lit_*8L;
-        std::uint32_t in_length = (std::uint32_t)((long)s->strstart - s->block_start);
-        int dcode;
-        for(dcode = 0; dcode < limits::dCodes; dcode++) {
-            out_length += (std::uint32_t)s->dyn_dtree_[dcode].fc *
-                (5L+extra_dbits[dcode]);
-        }
-        out_length >>= 3;
-        Tracev((stderr,"\nlast_lit %u, in %ld, out ~%ld(%ld%%) ",
-               s->last_lit_, in_length, out_length,
-               100L - out_length*100L/in_length));
-        if(s->matches_ < s->last_lit_/2 && out_length < in_length/2) return 1;
-    }
-#endif
-    return (s->last_lit_ == s->lit_bufsize_-1);
-    /* We avoid equality with lit_bufsize because of wraparound at 64K
-     * on 16 bit machines and because stored blocks are restricted to
-     * 64K-1 bytes.
-     */
-}
-
-/* ===========================================================================
  * Send the block data compressed using the given Huffman trees
  */
 template<class Allocator>
