@@ -110,7 +110,9 @@ public:
     static int deflateTune (basic_deflate_stream* strm,
         int good_length, int max_lazy, int nice_length, int max_chain);
     static std::size_t deflateBound (basic_deflate_stream* strm, std::size_t sourceLen);
-    static int deflatePending (basic_deflate_stream* strm, unsigned *pending, int *bits);
+    
+    int
+    pending(unsigned *pending, int *bits);
 
     int
     prime(int bits, int value);

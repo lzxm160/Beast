@@ -1410,15 +1410,12 @@ deflateReset()
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflatePending (
-    basic_deflate_stream* strm,
-    unsigned *pending,
-    int *bits)
+pending(unsigned *pending, int *bits)
 {
     if(pending != 0)
-        *pending = strm->pending_;
+        *pending = pending_;
     if(bits != 0)
-        *bits = strm->bi_valid_;
+        *bits = bi_valid_;
     return Z_OK;
 }
 
