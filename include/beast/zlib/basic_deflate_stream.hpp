@@ -194,7 +194,7 @@ private:
     {
         switch(level)
         {
-        //      good lazy nice chain
+        //              good lazy nice chain
         case 0: return {  0,   0,   0,    0, &deflate_stored}; // store only
         case 1: return {  4,   4,   8,    4, &deflate_fast};   // max speed, no lazy matches
         case 2: return {  4,   5,  16,    8, &deflate_fast};
@@ -209,169 +209,169 @@ private:
         }
     }
 
-    int   status_;        /* as the name implies */
-    Byte *pending_buf_;  /* output still pending */
-    std::uint32_t   pending_buf_size_; /* size of pending_buf */
-    Byte *pending_out_;  /* next pending byte to output to the stream */
-    uInt   pending_;      /* nb of bytes in the pending buffer */
-    int   last_flush_;    /* value of flush param for previous deflate call */
-
-    uInt  w_size_;        /* LZ77 window size (32K by default) */
-    uInt  w_bits_;        /* log2(w_size)  (8..16) */
-    uInt  w_mask_;        /* w_size - 1 */
-
     std::unique_ptr<std::uint8_t[]> buf_;
 
-    /* Sliding window. Input bytes are read into the second half of the window,
-     * and move to the first half later to keep a dictionary of at least wSize
-     * bytes. With this organization, matches are limited to a distance of
-     * wSize-limits::maxMatch bytes, but this ensures that IO is always
-     * performed with a length multiple of the block size. Also, it limits
-     * the window size to 64K.
-     * To do: use the user input buffer as sliding window.
-     */
+    int status_;                    // as the name implies
+    Byte* pending_buf_;             // output still pending
+    std::uint32_t
+        pending_buf_size_;          // size of pending_buf
+    Byte* pending_out_;             // next pending byte to output to the stream
+    uInt pending_;                  // nb of bytes in the pending buffer
+    int last_flush_;                // value of flush param for previous deflate call
+
+    uInt w_size_;                   // LZ77 window size (32K by default)
+    uInt w_bits_;                   // log2(w_size)  (8..16)
+    uInt w_mask_;                   // w_size - 1
+
+    /*  Sliding window. Input bytes are read into the second half of the window,
+        and move to the first half later to keep a dictionary of at least wSize
+        bytes. With this organization, matches are limited to a distance of
+        wSize-limits::maxMatch bytes, but this ensures that IO is always
+        performed with a length multiple of the block size. Also, it limits
+        the window size to 64K.
+        To do: use the user input buffer as sliding window.
+    */
     Byte *window_ = nullptr;
 
-    /* Actual size of window: 2*wSize, except when the user input buffer
-     * is directly used as sliding window.
-     */
+    /*  Actual size of window: 2*wSize, except when the user input buffer
+        is directly used as sliding window.
+    */
     std::uint32_t window_size_;
 
-    /* Link to older string with same hash index. To limit the size of this
-     * array to 64K, this link is maintained only for the last 32K strings.
-     * An index in this array is thus a window index modulo 32K.
-     */
-    std::uint16_t *prev_;
+    /*  Link to older string with same hash index. To limit the size of this
+        array to 64K, this link is maintained only for the last 32K strings.
+        An index in this array is thus a window index modulo 32K.
+    */
+    std::uint16_t* prev_;
 
-    std::uint16_t *head_; /* Heads of the hash chains or 0. */
+    std::uint16_t* head_;           // Heads of the hash chains or 0
 
-    uInt  ins_h_;          /* hash index of string to be inserted */
-    uInt  hash_size_;      /* number of elements in hash table */
-    uInt  hash_bits_;      /* log2(hash_size) */
-    uInt  hash_mask_;      /* hash_size-1 */
+    uInt  ins_h_;                   // hash index of string to be inserted
+    uInt  hash_size_;               // number of elements in hash table
+    uInt  hash_bits_;               // log2(hash_size)
+    uInt  hash_mask_;               // hash_size-1
 
-    /* Number of bits by which ins_h must be shifted at each input
-     * step. It must be such that after limits::minMatch steps, the oldest
-     * byte no longer takes part in the hash key, that is:
-     *   hash_shift * limits::minMatch >= hash_bits
-     */
-    uInt  hash_shift_;
+    /*  Number of bits by which ins_h must be shifted at each input
+        step. It must be such that after limits::minMatch steps,
+        the oldest byte no longer takes part in the hash key, that is:
+        hash_shift * limits::minMatch >= hash_bits
+    */
+    uInt hash_shift_;
 
+    /*  Window position at the beginning of the current output block.
+        Gets negative when the window is moved backwards.
+    */
     long block_start_;
-    /* Window position at the beginning of the current output block. Gets
-     * negative when the window is moved backwards.
-     */
 
-    uInt match_length_;           /* length of best match */
-    IPos prev_match_;             /* previous match */
-    int match_available_;         /* set if previous match exists */
-    uInt strstart_;               /* start of string to insert */
-    uInt match_start_;            /* start of matching string */
-    uInt lookahead_;              /* number of valid bytes ahead in window */
+    uInt match_length_;             // length of best match
+    IPos prev_match_;               // previous match
+    int match_available_;           // set if previous match exists
+    uInt strstart_;                 // start of string to insert
+    uInt match_start_;              // start of matching string
+    uInt lookahead_;                // number of valid bytes ahead in window
 
+    /*  Length of the best match at previous step. Matches not greater
+        than this are discarded. This is used in the lazy match evaluation.
+    */
     uInt prev_length_;
-    /* Length of the best match at previous step. Matches not greater than this
-     * are discarded. This is used in the lazy match evaluation.
-     */
 
+    /*  To speed up deflation, hash chains are never searched beyond
+        this length. A higher limit improves compression ratio but
+        degrades the speed.
+    */
     uInt max_chain_length_;
-    /* To speed up deflation, hash chains are never searched beyond this
-     * length.  A higher limit improves compression ratio but degrades the
-     * speed.
-     */
 
+    /*  Attempt to find a better match only when the current match is strictly
+        smaller than this value. This mechanism is used only for compression
+        levels >= 4.
+
+        OR Insert new strings in the hash table only if the match length is not
+        greater than this length. This saves time but degrades compression.
+        used only for compression levels <= 3.
+    */
     uInt max_lazy_match_;
-    /* Attempt to find a better match only when the current match is strictly
-     * smaller than this value. This mechanism is used only for compression
-     * levels >= 4.
-     */
-    /* OR Insert new strings in the hash table only if the match length is not
-     * greater than this length. This saves time but degrades compression.
-     * used only for compression levels <= 3.
-     */
 
-    int level_;    /* compression level (1..9) */
-    int strategy_; /* favor or force Huffman coding*/
+    int level_;                     // compression level (1..9)
+    int strategy_;                  // favor or force Huffman coding
 
+    // Use a faster search when the previous match is longer than this
     uInt good_match_;
-    /* Use a faster search when the previous match is longer than this */
 
-    int nice_match_; /* Stop searching when current match exceeds this */
+    int nice_match_;                // Stop searching when current match exceeds this
 
-                /* used by trees.c: */
-    /* Didn't use detail::ct_data typedef below to suppress compiler warning */
-    detail::ct_data dyn_ltree_[HEAP_SIZE];   /* literal and length tree */
-    detail::ct_data dyn_dtree_[2*limits::dCodes+1]; /* distance tree */
-    detail::ct_data bl_tree_[2*limits::blCodes+1];  /* Huffman tree for bit lengths */
+    detail::ct_data dyn_ltree_[
+        HEAP_SIZE];                 // literal and length tree
+    detail::ct_data dyn_dtree_[
+        2*limits::dCodes+1];        // distance tree */
+    detail::ct_data bl_tree_[
+        2*limits::blCodes+1];       // Huffman tree for bit lengths
 
-    tree_desc l_desc_;               /* desc. for literal tree */
-    tree_desc d_desc_;               /* desc. for distance tree */
-    tree_desc bl_desc_;              /* desc. for bit length tree */
+    tree_desc l_desc_;              // desc. for literal tree
+    tree_desc d_desc_;              // desc. for distance tree
+    tree_desc bl_desc_;             // desc. for bit length tree
 
+    // number of codes at each bit length for an optimal tree
     std::uint16_t bl_count_[limits::maxBits+1];
-    /* number of codes at each bit length for an optimal tree */
 
-    int heap_[2*limits::lCodes+1];      /* heap used to build the Huffman trees */
-    int heap_len_;               /* number of elements in the heap */
-    int heap_max_;               /* element of largest frequency */
-    /* The sons of heap[n] are heap[2*n] and heap[2*n+1]. heap[0] is not used.
-     * The same heap array is used to build all trees.
-     */
+    /*  The sons of heap[n] are heap[2*n] and heap[2*n+1].
+        heap[0] is not used. The same heap array is used to build all trees.
+    */
+    int heap_[2*limits::lCodes+1];  // heap used to build the Huffman trees
+    int heap_len_;                  // number of elements in the heap
+    int heap_max_;                  // element of largest frequency
 
+    // Depth of each subtree used as tie breaker for trees of equal frequency
     std::uint8_t depth_[2*limits::lCodes+1];
-    /* Depth of each subtree used as tie breaker for trees of equal frequency
-     */
 
-    std::uint8_t *l_buf_;          /* buffer for literals or lengths */
+    std::uint8_t *l_buf_;           // buffer for literals or lengths
 
-    /* Size of match buffer for literals/lengths.  There are 4 reasons for
-     * limiting lit_bufsize to 64K:
-     *   - frequencies can be kept in 16 bit counters
-     *   - if compression is not successful for the first block, all input
-     *     data is still in the window so we can still emit a stored block even
-     *     when input comes from standard input.  (This can also be done for
-     *     all blocks if lit_bufsize is not greater than 32K.)
-     *   - if compression is not successful for a file smaller than 64K, we can
-     *     even emit a stored file instead of a stored block (saving 5 bytes).
-     *     This is applicable only for zip (not gzip or zlib).
-     *   - creating new Huffman trees less frequently may not provide fast
-     *     adaptation to changes in the input data statistics. (Take for
-     *     example a binary file with poorly compressible code followed by
-     *     a highly compressible string table.) Smaller buffer sizes give
-     *     fast adaptation but have of course the overhead of transmitting
-     *     trees more frequently.
-     *   - I can't count above 4
-     */
-    uInt  lit_bufsize_;
+    /*  Size of match buffer for literals/lengths.
+        There are 4 reasons for limiting lit_bufsize to 64K:
+          - frequencies can be kept in 16 bit counters
+          - if compression is not successful for the first block, all input
+            data is still in the window so we can still emit a stored block even
+            when input comes from standard input.  (This can also be done for
+            all blocks if lit_bufsize is not greater than 32K.)
+          - if compression is not successful for a file smaller than 64K, we can
+            even emit a stored file instead of a stored block (saving 5 bytes).
+            This is applicable only for zip (not gzip or zlib).
+          - creating new Huffman trees less frequently may not provide fast
+            adaptation to changes in the input data statistics. (Take for
+            example a binary file with poorly compressible code followed by
+            a highly compressible string table.) Smaller buffer sizes give
+            fast adaptation but have of course the overhead of transmitting
+            trees more frequently.
+          - I can't count above 4
+    */
+    uInt lit_bufsize_;
+    uInt last_lit_;                 // running index in l_buf_
 
-    uInt last_lit_;      /* running index in l_buf */
+    /*  Buffer for distances. To simplify the code, d_buf_ and l_buf_
+        have the same number of elements. To use different lengths, an
+        extra flag array would be necessary.
+    */
+    std::uint16_t* d_buf_;
 
-    std::uint16_t *d_buf_;
-    /* Buffer for distances. To simplify the code, d_buf and l_buf have
-     * the same number of elements. To use different lengths, an extra flag
-     * array would be necessary.
-     */
+    std::uint32_t opt_len_;         // bit length of current block with optimal trees
+    std::uint32_t static_len_;      // bit length of current block with static trees
+    uInt matches_;                  // number of string matches in current block
+    uInt insert_;                   // bytes at end of window left to insert
 
-    std::uint32_t opt_len_;        /* bit length of current block with optimal trees */
-    std::uint32_t static_len_;     /* bit length of current block with static trees */
-    uInt matches_;       /* number of string matches in current block */
-    uInt insert_;        /* bytes at end of window left to insert */
-
-    /* Output buffer. bits are inserted starting at the bottom (least
-     * significant bits).
+    /*  Output buffer.
+        Bits are inserted starting at the bottom (least significant bits).
      */
     std::uint16_t bi_buf_;
 
-    /* Number of valid bits in bi_buf.  All bits above the last valid bit
-     * are always zero.
-     */
+    /*  Number of valid bits in bi_buf._  All bits above the last valid
+        bit are always zero.
+    */
     int bi_valid_;
 
-    /* High water mark offset in window for initialized bytes -- bytes above
-     * this are set to zero in order to avoid memory check warnings when
-     * longest match routines access bytes past the input.  This is then
-     * updated to the new high water mark.
-     */
+    /*  High water mark offset in window for initialized bytes -- bytes
+        above this are set to zero in order to avoid memory check warnings
+        when longest match routines access bytes past the input.  This is
+        then updated to the new high water mark.
+    */
     std::uint32_t high_water_;
 };
 
