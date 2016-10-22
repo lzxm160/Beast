@@ -132,8 +132,7 @@ private:
     void scan_tree(detail::ct_data *tree, int max_code);
     void send_tree(detail::ct_data *tree, int max_code);
     int  build_bl_tree();
-    static void send_all_trees (basic_deflate_stream *s, int lcodes, int dcodes,
-                                int blcodes);
+    void send_all_trees(int lcodes, int dcodes, int blcodes);
 
     static void tr_init (basic_deflate_stream *s);
     static int  tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);

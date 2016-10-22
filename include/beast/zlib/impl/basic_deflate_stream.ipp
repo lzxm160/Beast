@@ -740,7 +740,6 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 send_all_trees(
-    basic_deflate_stream *s,
     int lcodes,
     int dcodes,
     int blcodes) /* number of codes for each tree */
@@ -751,20 +750,21 @@ send_all_trees(
     Assert (lcodes <= limits::lCodes && dcodes <= limits::dCodes && blcodes <= limits::blCodes,
             "too many codes");
     Tracev((stderr, "\nbl counts: "));
-    send_bits(s, lcodes-257, 5); /* not +255 as stated in appnote.txt */
-    send_bits(s, dcodes-1,   5);
-    send_bits(s, blcodes-4,  4); /* not -3 as stated in appnote.txt */
-    for(rank = 0; rank < blcodes; rank++) {
+    send_bits(this, lcodes-257, 5); /* not +255 as stated in appnote.txt */
+    send_bits(this, dcodes-1,   5);
+    send_bits(this, blcodes-4,  4); /* not -3 as stated in appnote.txt */
+    for(rank = 0; rank < blcodes; rank++)
+    {
         Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
-        send_bits(s, s->bl_tree_[s->lut_.bl_order[rank]].dl, 3);
+        send_bits(this, bl_tree_[lut_.bl_order[rank]].dl, 3);
     }
-    Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent_));
+    Tracev((stderr, "\nbl tree: sent %ld", bits_sent_));
 
-    s->send_tree((detail::ct_data *)s->dyn_ltree_, lcodes-1); /* literal tree */
-    Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent_));
+    send_tree((detail::ct_data *)dyn_ltree_, lcodes-1); /* literal tree */
+    Tracev((stderr, "\nlit tree: sent %ld", bits_sent_));
 
-    s->send_tree((detail::ct_data *)s->dyn_dtree_, dcodes-1); /* distance tree */
-    Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent_));
+    send_tree((detail::ct_data *)dyn_dtree_, dcodes-1); /* distance tree */
+    Tracev((stderr, "\ndist tree: sent %ld", bits_sent_));
 }
 
 /* ===========================================================================
@@ -886,7 +886,7 @@ tr_flush_block(
         compress_block(s, s->lut_.ltree, s->lut_.dtree);
     } else {
         send_bits(s, (DYN_TREES<<1)+last, 3);
-        send_all_trees(s, s->l_desc_.max_code+1, s->d_desc_.max_code+1,
+        s->send_all_trees(s->l_desc_.max_code+1, s->d_desc_.max_code+1,
                        max_blindex+1);
         compress_block(s, (const detail::ct_data *)s->dyn_ltree_,
                        (const detail::ct_data *)s->dyn_dtree_);
