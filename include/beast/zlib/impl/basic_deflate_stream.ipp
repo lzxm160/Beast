@@ -1460,35 +1460,34 @@ prime(int bits, int value)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateParams(basic_deflate_stream* strm, int level, int strategy)
+params(int level, int strategy)
 {
     compress_func func;
     int err = Z_OK;
 
-    if(strm == 0 || strm == 0) return Z_STREAM_ERROR;
-    auto s = strm;
-
-    if(level == Z_DEFAULT_COMPRESSION) level = 6;
-    if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED) {
+    if(level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+    if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
         return Z_STREAM_ERROR;
-    }
-    func = get_config(s->level_).func;
+    func = get_config(level_).func;
 
-    if((strategy != s->strategy_ || func != get_config(level).func) &&
-        strm->total_in != 0) {
-        /* Flush the last buffer: */
+    if((strategy != strategy_ || func != get_config(level).func) &&
+        strm->total_in != 0)
+    {
+        // Flush the last buffer:
         err = strm->deflate(Z_BLOCK);
-        if(err == Z_BUF_ERROR && s->pending_ == 0)
+        if(err == Z_BUF_ERROR && pending_ == 0)
             err = Z_OK;
     }
-    if(s->level_ != level) {
-        s->level_ = level;
-        s->max_lazy_match_   = get_config(level).max_lazy;
-        s->good_match_       = get_config(level).good_length;
-        s->nice_match_       = get_config(level).nice_length;
-        s->max_chain_length_ = get_config(level).max_chain;
+    if(level_ != level)
+    {
+        level_ = level;
+        max_lazy_match_   = get_config(level).max_lazy;
+        good_match_       = get_config(level).good_length;
+        nice_match_       = get_config(level).nice_length;
+        max_chain_length_ = get_config(level).max_chain;
     }
-    s->strategy_ = strategy;
+    strategy_ = strategy;
     return err;
 }
 

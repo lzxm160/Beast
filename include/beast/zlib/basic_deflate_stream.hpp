@@ -106,7 +106,8 @@ public:
     int
     deflateReset();
 
-    static int deflateParams (basic_deflate_stream* strm, int level, int strategy);
+    int
+    params(int level, int strategy);
     
     int
     tune(int good_length, int max_lazy, int nice_length, int max_chain);
