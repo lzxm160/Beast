@@ -88,9 +88,9 @@ struct code
    inflate_table() calls in inflate.c and infback.c.  If the root table size is
    changed, then these maximum sizes would be need to be recalculated and
    updated. */
-std::uint16_t constexpr ENOUGH_LENS = 852;
-std::uint16_t constexpr ENOUGH_DISTS = 592;
-std::uint16_t constexpr ENOUGH = ENOUGH_LENS + ENOUGH_DISTS;
+std::uint16_t constexpr kEnoughLens = 852;
+std::uint16_t constexpr kEnoughDists = 592;
+std::uint16_t constexpr kEnough = kEnoughLens + kEnoughDists;
 
 struct codes
 {
@@ -114,7 +114,7 @@ enum codetype
    whose indices are 0..2^bits-1.  work is a writable array of at least
    lens shorts, which is used as a work area.  type is the type of code
    to be generated, CODES, LENS, or DISTS.  On return, zero is success,
-   -1 is an invalid code, and +1 means that ENOUGH isn't enough.  table
+   -1 is an invalid code, and +1 means that kEnough isn't enough.  table
    on return points to the next available entry's address.  bits is the
    requested root table index bits, and on return it is the actual root
    table index bits.  It will differ if the request is greater than the
@@ -279,7 +279,7 @@ inflate_table(
 
        used keeps track of how many table entries have been allocated from the
        provided *table space.  It is checked for LENS and DIST tables against
-       the constants ENOUGH_LENS and ENOUGH_DISTS to guard against changes in
+       the constants kEnoughLens and kEnoughDists to guard against changes in
        the initial root table size constants.  See the comments in inftrees.hpp
        for more information.
 
@@ -327,8 +327,8 @@ inflate_table(
     };
 
     /* check available table space */
-    if ((type == LENS && used > ENOUGH_LENS) ||
-            (type == DISTS && used > ENOUGH_DISTS))
+    if ((type == LENS && used > kEnoughLens) ||
+            (type == DISTS && used > kEnoughDists))
         return not_enough();
 
     /* process all codes and make table entries */
@@ -405,8 +405,8 @@ inflate_table(
 
             /* check for enough space */
             used += 1U << curr;
-            if ((type == LENS && used > ENOUGH_LENS) ||
-                    (type == DISTS && used > ENOUGH_DISTS))
+            if ((type == LENS && used > kEnoughLens) ||
+                    (type == DISTS && used > kEnoughDists))
                 return not_enough();
 
             /* point entry in root table to sub-table */

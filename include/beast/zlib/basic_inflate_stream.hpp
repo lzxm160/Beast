@@ -153,7 +153,7 @@ private:
     unsigned have_;                 // number of code lengths in lens[]
     unsigned short lens_[320];      // temporary storage for code lengths
     unsigned short work_[288];      // work area for code table building
-    detail::code codes_[detail::ENOUGH];     // space for code tables
+    detail::code codes_[detail::kEnough];     // space for code tables
     detail::code *next_ = codes_;   // next available space in codes[]
     int back_ = -1;                 // bits back of last unprocessed length/lit
     unsigned was_;                  // initial length of match

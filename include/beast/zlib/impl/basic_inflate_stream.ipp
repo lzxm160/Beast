@@ -350,7 +350,7 @@ write(z_params& zs, Flush flush, error_code& ec)
                 return err(error::missing_eob);
             /* build code tables -- note: do not change the lenbits or distbits
                values here (9 and 6) without reading the comments in inftrees.hpp
-               concerning the ENOUGH constants, which depend on those values */
+               concerning the kEnough constants, which depend on those values */
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 9;
