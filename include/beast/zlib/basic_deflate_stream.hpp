@@ -147,7 +147,7 @@ private:
     static void tr_init (basic_deflate_stream *s);
     static int  tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);
     void tr_flush_block(char *buf, std::uint32_t stored_len, int last);
-    static void tr_flush_bits (basic_deflate_stream *s);
+    void tr_flush_bits();
     static void tr_align (basic_deflate_stream *s);
     static void tr_stored_block (basic_deflate_stream *s, char *bu,
                             std::uint32_t stored_len, int last);

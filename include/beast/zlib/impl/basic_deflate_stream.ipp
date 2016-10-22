@@ -811,9 +811,9 @@ tr_stored_block(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-tr_flush_bits(basic_deflate_stream *s)
+tr_flush_bits()
 {
-    bi_flush(s);
+    bi_flush(this);
 }
 
 /* ===========================================================================
@@ -1494,7 +1494,7 @@ deflatePrime(basic_deflate_stream* strm, int bits, int value)
             put = bits;
         s->bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << s->bi_valid_);
         s->bi_valid_ += put;
-        tr_flush_bits(s);
+        s->tr_flush_bits();
         value >>= put;
         bits -= put;
     } while (bits);
@@ -1620,7 +1620,7 @@ flush_pending(basic_deflate_stream* strm)
     unsigned len;
     auto s = strm;
 
-    tr_flush_bits(s);
+    s->tr_flush_bits();
     len = s->pending_;
     if(len > strm->avail_out) len = strm->avail_out;
     if(len == 0) return;
