@@ -189,15 +189,6 @@ reset(
 #define RANK(f) (((f) << 1) - ((f) > 4 ? 9 : 0))
 
 /* ===========================================================================
- * Update a hash value with the given input byte
- * IN  assertion: all calls to to UPDATE_HASH are made with consecutive
- *    input characters, so that a running hash key can be computed from the
- *    previous key instead of complete recalculation each time.
- */
-#define UPDATE_HASH(s,h,c) (h = (((h)<<s->hash_shift_) ^ (c)) & s->hash_mask_)
-
-
-/* ===========================================================================
  * Insert string str in the dictionary and set match_head to the previous head
  * of the hash chain (the most recent string with same hash key). Return
  * the previous length of the hash chain.
@@ -208,7 +199,7 @@ reset(
  *    (except for the last limits::minMatch-1 bytes of the input file).
  */
 #define INSERT_STRING(s, str, match_head) \
-   (UPDATE_HASH(s, s->ins_h_, s->window_[(str) + (limits::minMatch-1)]), \
+   (s->update_hash(s->ins_h_, s->window_[(str) + (limits::minMatch-1)]), \
     match_head = s->prev_[(str) & s->w_mask_] = s->head_[s->ins_h_], \
     s->head_[s->ins_h_] = (std::uint16_t)(str))
 
@@ -302,6 +293,20 @@ d_code(unsigned dist)
     if(dist < 256)
         return lut_.dist_code[dist];
     return lut_.dist_code[256+(dist>>7)];
+}
+
+/*  Update a hash value with the given input byte
+    IN  assertion: all calls to to update_hash are made with consecutive
+        input characters, so that a running hash key can be computed from
+        the previous key instead of complete recalculation each time.
+*/
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+update_hash(uInt& h, std::uint8_t c)
+{
+    h = ((h << hash_shift_) ^ c) & hash_mask_;
 }
 
 //------------------------------------------------------------------------------
@@ -1274,9 +1279,10 @@ fill_window()
         if(lookahead_ + insert_ >= limits::minMatch) {
             uInt str = strstart_ - insert_;
             ins_h_ = window_[str];
-            UPDATE_HASH(this, ins_h_, window_[str + 1]);
-            while (insert_) {
-                UPDATE_HASH(this, ins_h_, window_[str + limits::minMatch-1]);
+            update_hash(ins_h_, window_[str + 1]);
+            while(insert_)
+            {
+                update_hash(ins_h_, window_[str + limits::minMatch-1]);
                 prev_[str & w_mask_] = head_[ins_h_];
                 head_[ins_h_] = (std::uint16_t)str;
                 str++;
@@ -1528,12 +1534,14 @@ auto strm = this;
     while (s->lookahead_ >= limits::minMatch) {
         str = s->strstart_;
         n = s->lookahead_ - (limits::minMatch-1);
-        do {
-            UPDATE_HASH(s, s->ins_h_, s->window_[str + limits::minMatch-1]);
+        do
+        {
+            s->update_hash(s->ins_h_, s->window_[str + limits::minMatch-1]);
             s->prev_[str & s->w_mask_] = s->head_[s->ins_h_];
             s->head_[s->ins_h_] = (std::uint16_t)str;
             str++;
-        } while (--n);
+        }
+        while (--n);
         s->strstart_ = str;
         s->lookahead_ = limits::minMatch-1;
         s->fill_window();
@@ -2008,7 +2016,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
                 s->strstart_ += s->match_length_;
                 s->match_length_ = 0;
                 s->ins_h_ = s->window_[s->strstart_];
-                UPDATE_HASH(s, s->ins_h_, s->window_[s->strstart_+1]);
+                s->update_hash(s->ins_h_, s->window_[s->strstart_+1]);
                 /* If lookahead < limits::minMatch, ins_h is garbage, but it does not
                  * matter since it will be recomputed at next deflate call.
                  */

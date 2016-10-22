@@ -106,6 +106,7 @@ private:
     void send_bits          (int value, int length);
     void send_code          (int value, detail::ct_data const* tree);
     std::uint8_t d_code     (unsigned dist);
+    void update_hash        (uInt& h, std::uint8_t c);
 
     void init_block         ();
     bool smaller            (detail::ct_data const* tree, int n, int m);
@@ -123,13 +124,13 @@ private:
     void bi_flush           ();
     void copy_block         (char *buf, unsigned len, int header);
 
-    void tr_init();
-    void tr_align();
-    void tr_flush_bits();
-    void tr_stored_block (char *bu, std::uint32_t stored_len, int last);
-    void tr_flush_block(char *buf, std::uint32_t stored_len, int last);
-    void tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush);
-    void tr_tally_lit(std::uint8_t c, bool& flush);
+    void tr_init            ();
+    void tr_align           ();
+    void tr_flush_bits      ();
+    void tr_stored_block    (char *bu, std::uint32_t stored_len, int last);
+    void tr_flush_block     (char *buf, std::uint32_t stored_len, int last);
+    void tr_tally_dist      (std::uint16_t dist, std::uint8_t len, bool& flush);
+    void tr_tally_lit       (std::uint8_t c, bool& flush);
 
     static block_state deflate_stored(basic_deflate_stream *s, int flush);
     static block_state deflate_fast(basic_deflate_stream *s, int flush);
