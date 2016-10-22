@@ -378,7 +378,7 @@ gen_bitlen(tree_desc *desc)
      */
     tree[heap_[heap_max_]].dl = 0; // root of the heap
 
-    for (h = heap_max_+1; h < HEAP_SIZE; h++) {
+    for(h = heap_max_+1; h < HEAP_SIZE; h++) {
         n = heap_[h];
         bits = tree[tree[n].dl].dl + 1;
         if(bits > max_length) bits = max_length, overflow++;
@@ -567,7 +567,7 @@ scan_tree(
     }
     tree[max_code+1].dl = (std::uint16_t)0xffff; /* guard */
 
-    for (n = 0; n <= max_code; n++)
+    for(n = 0; n <= max_code; n++)
     {
         curlen = nextlen; nextlen = tree[n+1].dl;
         if(++count < max_count && curlen == nextlen)
@@ -618,8 +618,7 @@ scan_tree(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-send_tree (
-    basic_deflate_stream *s,
+send_tree(
     detail::ct_data *tree, /* the tree to be scanned */
     int max_code)       /* and its largest code of non zero frequency */
 {
@@ -631,36 +630,66 @@ send_tree (
     int max_count = 7;         /* max repeat count */
     int min_count = 4;         /* min repeat count */
 
-    /* tree[max_code+1].dl = -1; */  /* guard already set */
-    if(nextlen == 0) max_count = 138, min_count = 3;
+    // tree[max_code+1].dl = -1; // guard already set */
+    if(nextlen == 0)
+    {
+        max_count = 138;
+        min_count = 3;
+    }
 
-    for (n = 0; n <= max_code; n++) {
-        curlen = nextlen; nextlen = tree[n+1].dl;
-        if(++count < max_count && curlen == nextlen) {
+    for(n = 0; n <= max_code; n++)
+    {
+        curlen = nextlen;
+        nextlen = tree[n+1].dl;
+        if(++count < max_count && curlen == nextlen)
+        {
             continue;
-        } else if(count < min_count) {
-            do { send_code(s, curlen, s->bl_tree_); } while (--count != 0);
-
-        } else if(curlen != 0) {
-            if(curlen != prevlen) {
-                send_code(s, curlen, s->bl_tree_); count--;
+        }
+        else if(count < min_count)
+        {
+            do
+            {
+                send_code(this, curlen, bl_tree_);
+            }
+            while (--count != 0);
+        }
+        else if(curlen != 0)
+        {
+            if(curlen != prevlen)
+            {
+                send_code(this, curlen, bl_tree_);
+                count--;
             }
             Assert(count >= 3 && count <= 6, " 3_6?");
-            send_code(s, REP_3_6, s->bl_tree_); send_bits(s, count-3, 2);
-
-        } else if(count <= 10) {
-            send_code(s, REPZ_3_10, s->bl_tree_); send_bits(s, count-3, 3);
-
-        } else {
-            send_code(s, REPZ_11_138, s->bl_tree_); send_bits(s, count-11, 7);
+            send_code(this, REP_3_6, bl_tree_);
+            send_bits(this, count-3, 2);
         }
-        count = 0; prevlen = curlen;
-        if(nextlen == 0) {
-            max_count = 138, min_count = 3;
-        } else if(curlen == nextlen) {
-            max_count = 6, min_count = 3;
-        } else {
-            max_count = 7, min_count = 4;
+        else if(count <= 10)
+        {
+            send_code(this, REPZ_3_10, bl_tree_);
+            send_bits(this, count-3, 3);
+        }
+        else
+        {
+            send_code(this, REPZ_11_138, bl_tree_);
+            send_bits(this, count-11, 7);
+        }
+        count = 0;
+        prevlen = curlen;
+        if(nextlen == 0)
+        {
+            max_count = 138;
+            min_count = 3;
+        }
+        else if(curlen == nextlen)
+        {
+            max_count = 6;
+            min_count = 3;
+        }
+        else
+        {
+            max_count = 7;
+            min_count = 4;
         }
     }
 }
@@ -690,7 +719,7 @@ build_bl_tree(basic_deflate_stream *s)
      * requires that at least 4 bit length codes be sent. (appnote.txt says
      * 3 but the actual value used is 4.)
      */
-    for (max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--) {
+    for(max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--) {
         if(s->bl_tree_[s->lut_.bl_order[max_blindex]].dl != 0) break;
     }
     /* Update opt_len to include the bit length tree and counts */
@@ -724,16 +753,16 @@ send_all_trees(
     send_bits(s, lcodes-257, 5); /* not +255 as stated in appnote.txt */
     send_bits(s, dcodes-1,   5);
     send_bits(s, blcodes-4,  4); /* not -3 as stated in appnote.txt */
-    for (rank = 0; rank < blcodes; rank++) {
+    for(rank = 0; rank < blcodes; rank++) {
         Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
         send_bits(s, s->bl_tree_[s->lut_.bl_order[rank]].dl, 3);
     }
     Tracev((stderr, "\nbl tree: sent %ld", s->bits_sent_));
 
-    send_tree(s, (detail::ct_data *)s->dyn_ltree_, lcodes-1); /* literal tree */
+    s->send_tree((detail::ct_data *)s->dyn_ltree_, lcodes-1); /* literal tree */
     Tracev((stderr, "\nlit tree: sent %ld", s->bits_sent_));
 
-    send_tree(s, (detail::ct_data *)s->dyn_dtree_, dcodes-1); /* distance tree */
+    s->send_tree((detail::ct_data *)s->dyn_dtree_, dcodes-1); /* distance tree */
     Tracev((stderr, "\ndist tree: sent %ld", s->bits_sent_));
 }
 
@@ -910,7 +939,7 @@ tr_tally (
         std::uint32_t out_length = (std::uint32_t)s->last_lit_*8L;
         std::uint32_t in_length = (std::uint32_t)((long)s->strstart - s->block_start);
         int dcode;
-        for (dcode = 0; dcode < limits::dCodes; dcode++) {
+        for(dcode = 0; dcode < limits::dCodes; dcode++) {
             out_length += (std::uint32_t)s->dyn_dtree_[dcode].fc *
                 (5L+extra_dbits[dcode]);
         }
@@ -1007,7 +1036,7 @@ detect_data_type(basic_deflate_stream *s)
     int n;
 
     /* Check for non-textual ("black-listed") bytes. */
-    for (n = 0; n <= 31; n++, black_mask >>= 1)
+    for(n = 0; n <= 31; n++, black_mask >>= 1)
         if((black_mask & 1) && (s->dyn_ltree_[n].fc != 0))
             return Z_BINARY;
 
@@ -1015,7 +1044,7 @@ detect_data_type(basic_deflate_stream *s)
     if(s->dyn_ltree_[9].fc != 0 || s->dyn_ltree_[10].fc != 0
             || s->dyn_ltree_[13].fc != 0)
         return Z_TEXT;
-    for (n = 32; n < limits::literals; n++)
+    for(n = 32; n < limits::literals; n++)
         if(s->dyn_ltree_[n].fc != 0)
             return Z_TEXT;
 
@@ -1890,7 +1919,7 @@ block_state
     }
 
     /* Copy as much as possible from input to output: */
-    for (;;) {
+    for(;;) {
         /* Fill the window as much as possible: */
         if(s->lookahead_ <= 1) {
 
@@ -1948,7 +1977,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
     IPos hash_head;       /* head of the hash chain */
     int bflush;           /* set if current block must be flushed */
 
-    for (;;) {
+    for(;;) {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the next match, plus limits::minMatch bytes to insert the
@@ -2047,7 +2076,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
     int bflush;              /* set if current block must be flushed */
 
     /* Process the input block. */
-    for (;;) {
+    for(;;) {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the next match, plus limits::minMatch bytes to insert the
@@ -2179,7 +2208,7 @@ deflate_rle(basic_deflate_stream *s, int flush) ->
     uInt prev;              /* byte at distance one to match */
     Byte *scan, *strend;   /* scan goes up to strend for length of run */
 
-    for (;;) {
+    for(;;) {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the longest run, plus one for the unrolled loop.
@@ -2252,7 +2281,7 @@ deflate_huff(basic_deflate_stream *s, int flush) ->
 {
     int bflush;             /* set if current block must be flushed */
 
-    for (;;) {
+    for(;;) {
         /* Make sure that we have a literal to write. */
         if(s->lookahead_ == 0) {
             fill_window(s);
