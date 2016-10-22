@@ -260,27 +260,27 @@ tr_init(basic_deflate_stream *s)
     s->bi_valid_ = 0;
 
     /* Initialize the first block of the first file: */
-    init_block(s);
+    s->init_block();
 }
 
-/* ===========================================================================
- * Initialize a new block.
- */
+// Initialize a new block.
+//
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-init_block(basic_deflate_stream *s)
+init_block()
 {
-    int n; /* iterates over tree elements */
-
-    /* Initialize the trees. */
-    for (n = 0; n < limits::lCodes;  n++) s->dyn_ltree_[n].fc = 0;
-    for (n = 0; n < limits::dCodes;  n++) s->dyn_dtree_[n].fc = 0;
-    for (n = 0; n < limits::blCodes; n++) s->bl_tree_[n].fc = 0;
-
-    s->dyn_ltree_[END_BLOCK].fc = 1;
-    s->opt_len_ = s->static_len_ = 0L;
-    s->last_lit_ = s->matches_ = 0;
+    for(int n = 0; n < limits::lCodes;  n++)
+        dyn_ltree_[n].fc = 0;
+    for(int n = 0; n < limits::dCodes;  n++)
+        dyn_dtree_[n].fc = 0;
+    for(int n = 0; n < limits::blCodes; n++)
+        bl_tree_[n].fc = 0;
+    dyn_ltree_[END_BLOCK].fc = 1;
+    opt_len_ = 0L;
+    static_len_ = 0L;
+    last_lit_ = 0;
+    matches_ = 0;
 }
 
 #define SMALLEST 1
@@ -295,7 +295,7 @@ init_block(basic_deflate_stream *s)
 {\
     top = s->heap_[SMALLEST]; \
     s->heap_[SMALLEST] = s->heap_[s->heap_len_--]; \
-    pqdownheap(s, tree, SMALLEST); \
+    s->pqdownheap(tree, SMALLEST); \
 }
 
 /* ===========================================================================
@@ -316,28 +316,30 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 pqdownheap(
-    basic_deflate_stream *s,
     detail::ct_data *tree,  /* the tree to restore */
     int k)               /* node to move down */
 {
-    int v = s->heap_[k];
-    int j = k << 1;  /* left son of k */
-    while (j <= s->heap_len_) {
-        /* Set j to the smallest of the two sons: */
-        if (j < s->heap_len_ &&
-            smaller(tree, s->heap_[j+1], s->heap_[j], s->depth_)) {
+    int v = heap_[k];
+    int j = k << 1;  // left son of k
+    while(j <= heap_len_)
+    {
+        // Set j to the smallest of the two sons:
+        if(j < heap_len_ &&
+                smaller(tree, heap_[j+1], heap_[j], depth_))
             j++;
-        }
-        /* Exit if v is smaller than both sons */
-        if (smaller(tree, v, s->heap_[j], s->depth_)) break;
+        // Exit if v is smaller than both sons
+        if(smaller(tree, v, heap_[j], depth_))
+            break;
 
-        /* Exchange v with the smallest son */
-        s->heap_[k] = s->heap_[j];  k = j;
+        // Exchange v with the smallest son
+        heap_[k] = heap_[j];
+        k = j;
 
-        /* And continue down the tree, setting j to the left son of k */
+        // And continue down the tree,
+        // setting j to the left son of k
         j <<= 1;
     }
-    s->heap_[k] = v;
+    heap_[k] = v;
 }
 
 /* ===========================================================================
@@ -486,7 +488,8 @@ build_tree(
     /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
      * establish sub-heaps of increasing lengths:
      */
-    for (n = s->heap_len_/2; n >= 1; n--) pqdownheap(s, tree, n);
+    for (n = s->heap_len_/2; n >= 1; n--)
+        s->pqdownheap(tree, n);
 
     /* Construct the Huffman tree by repeatedly combining the least two
      * frequent nodes.
@@ -506,7 +509,7 @@ build_tree(
         tree[n].dl = tree[m].dl = (std::uint16_t)node;
         /* and insert the new node in the heap */
         s->heap_[SMALLEST] = node++;
-        pqdownheap(s, tree, SMALLEST);
+        s->pqdownheap(tree, SMALLEST);
 
     } while (s->heap_len_ >= 2);
 
@@ -823,7 +826,7 @@ tr_flush_block(
     /* The above check is made mod 2^32, for files larger than 512 MB
      * and std::size_t implemented on 32 bits.
      */
-    init_block(s);
+    s->init_block();
 
     if (last) {
         bi_windup(s);

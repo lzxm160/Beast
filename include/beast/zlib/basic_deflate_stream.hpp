@@ -125,8 +125,8 @@ private:
     static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
     static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
 
-    static void init_block     (basic_deflate_stream *s);
-    static void pqdownheap     (basic_deflate_stream *s, detail::ct_data *tree, int k);
+    void init_block();
+    void pqdownheap(detail::ct_data *tree, int k);
     static void gen_bitlen     (basic_deflate_stream *s, tree_desc *desc);
     static void build_tree     (basic_deflate_stream *s, tree_desc *desc);
     static void scan_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
