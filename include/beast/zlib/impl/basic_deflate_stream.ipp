@@ -701,16 +701,16 @@ send_tree(
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-build_bl_tree(basic_deflate_stream *s)
+build_bl_tree()
 {
-    int max_blindex;  /* index of last bit length code of non zero freq */
+    int max_blindex;  // index of last bit length code of non zero freq
 
-    /* Determine the bit length frequencies for literal and distance trees */
-    s->scan_tree((detail::ct_data *)s->dyn_ltree_, s->l_desc_.max_code);
-    s->scan_tree((detail::ct_data *)s->dyn_dtree_, s->d_desc_.max_code);
+    // Determine the bit length frequencies for literal and distance trees
+    scan_tree((detail::ct_data *)dyn_ltree_, l_desc_.max_code);
+    scan_tree((detail::ct_data *)dyn_dtree_, d_desc_.max_code);
 
-    /* Build the bit length tree: */
-    s->build_tree((tree_desc *)(&(s->bl_desc_)));
+    // Build the bit length tree:
+    build_tree((tree_desc *)(&(bl_desc_)));
     /* opt_len now includes the length of the tree representations, except
      * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
      */
@@ -719,14 +719,15 @@ build_bl_tree(basic_deflate_stream *s)
      * requires that at least 4 bit length codes be sent. (appnote.txt says
      * 3 but the actual value used is 4.)
      */
-    for(max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--) {
-        if(s->bl_tree_[s->lut_.bl_order[max_blindex]].dl != 0) break;
+    for(max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--)
+    {
+        if(bl_tree_[lut_.bl_order[max_blindex]].dl != 0)
+            break;
     }
-    /* Update opt_len to include the bit length tree and counts */
-    s->opt_len_ += 3*(max_blindex+1) + 5+5+4;
+    // Update opt_len to include the bit length tree and counts
+    opt_len_ += 3*(max_blindex+1) + 5+5+4;
     Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
-            s->opt_len_, s->static_len_));
-
+            opt_len_, static_len_));
     return max_blindex;
 }
 
@@ -845,7 +846,7 @@ tr_flush_block(
         /* Build the bit length tree for the above two trees, and get the index
          * in bl_order of the last bit length code to send.
          */
-        max_blindex = build_bl_tree(s);
+        max_blindex = s->build_bl_tree();
 
         /* Determine the best encoding. Compute the block lengths in bytes. */
         opt_lenb = (s->opt_len_+3+7)>>3;
