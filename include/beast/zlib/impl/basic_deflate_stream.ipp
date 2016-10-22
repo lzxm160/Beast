@@ -182,10 +182,6 @@ reset(
 
 
 
-/* Output a byte on the stream.
- * IN assertion: there is enough room in pending_buf.
- */
-#define put_byte(s, c) {s->pending_buf_[s->pending_++] = (c);}
 
 
 #define MIN_LOOKAHEAD (limits::maxMatch+limits::minMatch+1)
@@ -214,15 +210,6 @@ reset(
 #  define send_code(s, c, tree) send_bits(s, tree[c].fc, tree[c].dl)
 
 /* ===========================================================================
- * Output a short LSB first on the stream.
- * IN assertion: there is enough room in pendingBuf.
- */
-#define put_short(s, w) { \
-    put_byte(s, (std::uint8_t)((w) & 0xff)); \
-    put_byte(s, (std::uint8_t)((std::uint16_t)(w) >> 8)); \
-}
-
-/* ===========================================================================
  * Send a value on a given number of bits.
  * IN assertion: length <= 16 and value fits in length bits.
  */
@@ -231,7 +218,7 @@ reset(
   if(s->bi_valid_ > (int)Buf_size - len) {\
     int val = value;\
     s->bi_buf_ |= (std::uint16_t)val << s->bi_valid_;\
-    put_short(s, s->bi_buf_);\
+    s->put_short(s->bi_buf_);\
     s->bi_buf_ = (std::uint16_t)val >> (Buf_size - s->bi_valid_);\
     s->bi_valid_ += len - Buf_size;\
   } else {\
@@ -1065,11 +1052,11 @@ bi_flush(
     basic_deflate_stream *s)
 {
     if(s->bi_valid_ == 16) {
-        put_short(s, s->bi_buf_);
+        s->put_short(s->bi_buf_);
         s->bi_buf_ = 0;
         s->bi_valid_ = 0;
     } else if(s->bi_valid_ >= 8) {
-        put_byte(s, (Byte)s->bi_buf_);
+        s->put_byte((Byte)s->bi_buf_);
         s->bi_buf_ >>= 8;
         s->bi_valid_ -= 8;
     }
@@ -1084,9 +1071,9 @@ basic_deflate_stream<Allocator>::
 bi_windup(basic_deflate_stream *s)
 {
     if(s->bi_valid_ > 8) {
-        put_short(s, s->bi_buf_);
+        s->put_short(s->bi_buf_);
     } else if(s->bi_valid_ > 0) {
-        put_byte(s, (Byte)s->bi_buf_);
+        s->put_byte((Byte)s->bi_buf_);
     }
     s->bi_buf_ = 0;
     s->bi_valid_ = 0;
@@ -1108,11 +1095,11 @@ copy_block(
     bi_windup(s);        /* align on byte boundary */
 
     if(header) {
-        put_short(s, (std::uint16_t)len);
-        put_short(s, (std::uint16_t)~len);
+        s->put_short((std::uint16_t)len);
+        s->put_short((std::uint16_t)~len);
     }
     while (len--) {
-        put_byte(s, *buf++);
+        s->put_byte(*buf++);
     }
 }
 

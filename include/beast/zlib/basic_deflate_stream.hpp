@@ -371,6 +371,21 @@ private:
      * updated to the new high water mark.
      */
     std::uint32_t high_water_;
+
+    inline
+    void
+    put_byte(std::uint8_t c)
+    {
+        pending_buf_[pending_++] = c;
+    }
+
+    inline
+    void
+    put_short(std::uint16_t w)
+    {
+        put_byte(w & 0xff);
+        put_byte(w >> 8);
+    }
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
