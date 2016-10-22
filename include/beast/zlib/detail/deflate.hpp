@@ -289,10 +289,18 @@ get_deflate_tables()
             std::uint16_t bl_count[limits::maxBits+1];
             std::memset(bl_count, 0, sizeof(bl_count));
             std::size_t n = 0;
-            while (n <= 143) tables.ltree[n++].dl = 8, bl_count[8]++;
-            while (n <= 255) tables.ltree[n++].dl = 9, bl_count[9]++;
-            while (n <= 279) tables.ltree[n++].dl = 7, bl_count[7]++;
-            while (n <= 287) tables.ltree[n++].dl = 8, bl_count[8]++;
+            while (n <= 143)
+                tables.ltree[n++].dl = 8;
+            bl_count[8] += 144;
+            while (n <= 255)
+                tables.ltree[n++].dl = 9;
+            bl_count[9] += 112;
+            while (n <= 279)
+                tables.ltree[n++].dl = 7;
+            bl_count[7] += 24;
+            while (n <= 287)
+                tables.ltree[n++].dl = 8;
+            bl_count[8] += 8;
             // Codes 286 and 287 do not exist, but we must include them in the tree
             // construction to get a canonical Huffman tree (longest code all ones)
             gen_codes(tables.ltree, limits::lCodes+1, bl_count);
