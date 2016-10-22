@@ -801,7 +801,7 @@ tr_stored_block(
     int last)                   // one if this is the last block for a file
 {
     send_bits((STORED_BLOCK<<1)+last, 3);           // send block type
-    copy_block(this, buf, (unsigned)stored_len, 1); // with header
+    copy_block(buf, (unsigned)stored_len, 1); // with header
 }
 
 /* ===========================================================================
@@ -1137,20 +1137,20 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 copy_block(
-    basic_deflate_stream *s,
     char    *buf,    /* the input data */
     unsigned len,     /* its length */
     int      header)  /* true if block header must be written */
 {
-    s->bi_windup();     // align on byte boundary
+    bi_windup();     // align on byte boundary
 
-    if(header) {
-        s->put_short((std::uint16_t)len);
-        s->put_short((std::uint16_t)~len);
+    if(header)
+    {
+        put_short((std::uint16_t)len);
+        put_short((std::uint16_t)~len);
     }
-    while (len--) {
-        s->put_byte(*buf++);
-    }
+    // VFALCO Use memcpy?
+    while (len--)
+        put_byte(*buf++);
 }
 
 # define _tr_tally_lit(s, c, flush) \

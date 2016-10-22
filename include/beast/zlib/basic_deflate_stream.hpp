@@ -155,8 +155,7 @@ private:
     int  detect_data_type();
     void bi_flush();
     void bi_windup();
-    static void copy_block     (basic_deflate_stream *s, char *buf, unsigned len,
-                                  int header);
+    void copy_block(char *buf, unsigned len, int header);
 
     using compress_func = block_state(*)(basic_deflate_stream*, int flush);
 
