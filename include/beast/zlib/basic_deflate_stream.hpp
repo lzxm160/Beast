@@ -107,8 +107,10 @@ public:
     deflateReset();
 
     static int deflateParams (basic_deflate_stream* strm, int level, int strategy);
-    static int deflateTune (basic_deflate_stream* strm,
-        int good_length, int max_lazy, int nice_length, int max_chain);
+    
+    int
+    tune(int good_length, int max_lazy, int nice_length, int max_chain);
+
     static std::size_t deflateBound (basic_deflate_stream* strm, std::size_t sourceLen);
     
     int

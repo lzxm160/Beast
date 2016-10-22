@@ -404,8 +404,8 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 pqdownheap(
-    detail::ct_data const* tree,  /* the tree to restore */
-    int k)               /* node to move down */
+    detail::ct_data const* tree,    // the tree to restore
+    int k)                          // node to move down
 {
     int v = heap_[k];
     int j = k << 1;  // left son of k
@@ -1497,18 +1497,16 @@ deflateParams(basic_deflate_stream* strm, int level, int strategy)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateTune(
-    basic_deflate_stream* strm,
+tune(
     int good_length,
     int max_lazy,
     int nice_length,
     int max_chain)
 {
-    auto s = strm;
-    s->good_match_ = good_length;
-    s->max_lazy_match_ = max_lazy;
-    s->nice_match_ = nice_length;
-    s->max_chain_length_ = max_chain;
+    good_match_ = good_length;
+    max_lazy_match_ = max_lazy;
+    nice_match_ = nice_length;
+    max_chain_length_ = max_chain;
     return Z_OK;
 }
 
