@@ -823,11 +823,11 @@ tr_flush_bits()
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-tr_align(basic_deflate_stream *s)
+tr_align()
 {
-    s->send_bits(STATIC_TREES<<1, 3);
-    s->send_code(END_BLOCK, s->lut_.ltree);
-    bi_flush(s);
+    send_bits(STATIC_TREES<<1, 3);
+    send_code(END_BLOCK, lut_.ltree);
+    bi_flush(this);
 }
 
 /* ===========================================================================
@@ -1719,7 +1719,7 @@ auto strm = this;
         }
         if(bstate == block_done) {
             if(flush == Z_PARTIAL_FLUSH) {
-                tr_align(s);
+                s->tr_align();
             } else if(flush != Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
                 tr_stored_block(s, (char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
