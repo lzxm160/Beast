@@ -173,6 +173,29 @@ reset(
 
 
 
+/* ===========================================================================
+ * Send a value on a given number of bits.
+ * IN assertion: length <= 16 and value fits in length bits.
+ */
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+send_bits(int value, int length)
+{
+    if(bi_valid_ > (int)Buf_size - length)
+    {
+        bi_buf_ |= (std::uint16_t)value << bi_valid_;
+        put_short(bi_buf_);
+        bi_buf_ = (std::uint16_t)value >> (Buf_size - bi_valid_);
+        bi_valid_ += length - Buf_size;
+    }
+    else
+    {
+        bi_buf_ |= (std::uint16_t)(value) << bi_valid_;
+        bi_valid_ += length;
+    }
+}
 
 
 
@@ -207,25 +230,8 @@ reset(
    ((dist) < 256 ? s->lut_.dist_code[dist] : s->lut_.dist_code[256+((dist)>>7)])
 
 /* Send a code of the given tree. c and tree must not have side effects */
-#  define send_code(s, c, tree) send_bits(s, tree[c].fc, tree[c].dl)
+#  define send_code(s, c, tree) s->send_bits(tree[c].fc, tree[c].dl)
 
-/* ===========================================================================
- * Send a value on a given number of bits.
- * IN assertion: length <= 16 and value fits in length bits.
- */
-#define send_bits(s, value, length) \
-{ int len = length;\
-  if(s->bi_valid_ > (int)Buf_size - len) {\
-    int val = value;\
-    s->bi_buf_ |= (std::uint16_t)val << s->bi_valid_;\
-    s->put_short(s->bi_buf_);\
-    s->bi_buf_ = (std::uint16_t)val >> (Buf_size - s->bi_valid_);\
-    s->bi_valid_ += len - Buf_size;\
-  } else {\
-    s->bi_buf_ |= (std::uint16_t)(value) << s->bi_valid_;\
-    s->bi_valid_ += len;\
-  }\
-}
 
 /* ===========================================================================
  * Initialize the tree data structures for a new zlib stream.
@@ -649,17 +655,17 @@ send_tree(
             }
             Assert(count >= 3 && count <= 6, " 3_6?");
             send_code(this, REP_3_6, bl_tree_);
-            send_bits(this, count-3, 2);
+            send_bits(count-3, 2);
         }
         else if(count <= 10)
         {
             send_code(this, REPZ_3_10, bl_tree_);
-            send_bits(this, count-3, 3);
+            send_bits(count-3, 3);
         }
         else
         {
             send_code(this, REPZ_11_138, bl_tree_);
-            send_bits(this, count-11, 7);
+            send_bits(count-11, 7);
         }
         count = 0;
         prevlen = curlen;
@@ -737,13 +743,13 @@ send_all_trees(
     Assert (lcodes <= limits::lCodes && dcodes <= limits::dCodes && blcodes <= limits::blCodes,
             "too many codes");
     Tracev((stderr, "\nbl counts: "));
-    send_bits(this, lcodes-257, 5); /* not +255 as stated in appnote.txt */
-    send_bits(this, dcodes-1,   5);
-    send_bits(this, blcodes-4,  4); /* not -3 as stated in appnote.txt */
+    send_bits(lcodes-257, 5); /* not +255 as stated in appnote.txt */
+    send_bits(dcodes-1,   5);
+    send_bits(blcodes-4,  4); /* not -3 as stated in appnote.txt */
     for(rank = 0; rank < blcodes; rank++)
     {
         Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
-        send_bits(this, bl_tree_[lut_.bl_order[rank]].dl, 3);
+        send_bits(bl_tree_[lut_.bl_order[rank]].dl, 3);
     }
     Tracev((stderr, "\nbl tree: sent %ld", bits_sent_));
 
@@ -766,7 +772,7 @@ tr_stored_block(
     std::uint32_t stored_len,   /* length of input block */
     int last)         /* one if this is the last block for a file */
 {
-    send_bits(s, (STORED_BLOCK<<1)+last, 3);    /* send block type */
+    s->send_bits((STORED_BLOCK<<1)+last, 3);    /* send block type */
     copy_block(s, buf, (unsigned)stored_len, 1); /* with header */
 }
 
@@ -790,7 +796,7 @@ void
 basic_deflate_stream<Allocator>::
 tr_align(basic_deflate_stream *s)
 {
-    send_bits(s, STATIC_TREES<<1, 3);
+    s->send_bits(STATIC_TREES<<1, 3);
     send_code(s, END_BLOCK, s->lut_.ltree);
     bi_flush(s);
 }
@@ -869,10 +875,10 @@ tr_flush_block(
 #else
     } else if(s->strategy_ == Z_FIXED || static_lenb == opt_lenb) {
 #endif
-        send_bits(s, (STATIC_TREES<<1)+last, 3);
+        s->send_bits((STATIC_TREES<<1)+last, 3);
         compress_block(s, s->lut_.ltree, s->lut_.dtree);
     } else {
-        send_bits(s, (DYN_TREES<<1)+last, 3);
+        s->send_bits((DYN_TREES<<1)+last, 3);
         s->send_all_trees(s->l_desc_.max_code+1, s->d_desc_.max_code+1,
                        max_blindex+1);
         compress_block(s, (const detail::ct_data *)s->dyn_ltree_,
@@ -975,7 +981,7 @@ compress_block(
             extra = s->lut_.extra_lbits[code];
             if(extra != 0) {
                 lc -= s->lut_.base_length[code];
-                send_bits(s, lc, extra);       /* send the extra length bits */
+                s->send_bits(lc, extra);       /* send the extra length bits */
             }
             dist--; /* dist is now the match distance - 1 */
             code = d_code(dist);
@@ -985,7 +991,7 @@ compress_block(
             extra = s->lut_.extra_dbits[code];
             if(extra != 0) {
                 dist -= s->lut_.base_dist[code];
-                send_bits(s, dist, extra);   /* send the extra distance bits */
+                s->send_bits(dist, extra);   /* send the extra distance bits */
             }
         } /* literal or match pair ? */
 

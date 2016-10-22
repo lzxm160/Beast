@@ -386,6 +386,8 @@ private:
         put_byte(w & 0xff);
         put_byte(w >> 8);
     }
+
+    void send_bits(int value, int length);
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
