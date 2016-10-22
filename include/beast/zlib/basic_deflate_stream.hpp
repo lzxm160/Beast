@@ -127,7 +127,7 @@ private:
 
     void init_block();
     void pqdownheap(detail::ct_data *tree, int k);
-    static void gen_bitlen     (basic_deflate_stream *s, tree_desc *desc);
+    void gen_bitlen(tree_desc *desc);
     static void build_tree     (basic_deflate_stream *s, tree_desc *desc);
     static void scan_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);
     static void send_tree      (basic_deflate_stream *s, detail::ct_data *tree, int max_code);

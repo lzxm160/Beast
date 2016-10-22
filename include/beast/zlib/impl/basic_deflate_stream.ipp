@@ -36,6 +36,7 @@
 #define BEAST_ZLIB_IMPL_BASIC_DEFLATE_STREAM_IPP
 
 #include <beast/zlib/detail/deflate.hpp>
+#include <algorithm>
 #include <cassert>
 #include <cstring>
 #include <memory>
@@ -355,78 +356,86 @@ pqdownheap(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-gen_bitlen(
-    basic_deflate_stream *s,
-    tree_desc *desc)    /* the tree descriptor */
+gen_bitlen(tree_desc *desc)
 {
-    detail::ct_data *tree        = desc->dyn_tree;
-    int max_code         = desc->max_code;
-    const detail::ct_data *stree = desc->stat_desc->static_tree;
-    std::uint8_t const *extra    = desc->stat_desc->extra_bits;
-    int base             = desc->stat_desc->extra_base;
-    int max_length       = desc->stat_desc->max_length;
-    int h;              /* heap index */
-    int n, m;           /* iterate over the tree elements */
-    int bits;           /* bit length */
-    int xbits;          /* extra bits */
-    std::uint16_t f;              /* frequency */
-    int overflow = 0;   /* number of elements with bit length too large */
+    detail::ct_data *tree           = desc->dyn_tree;
+    int max_code                    = desc->max_code;
+    detail::ct_data const* stree    = desc->stat_desc->static_tree;
+    std::uint8_t const *extra       = desc->stat_desc->extra_bits;
+    int base                        = desc->stat_desc->extra_base;
+    int max_length                  = desc->stat_desc->max_length;
+    int h;                          // heap index
+    int n, m;                       // iterate over the tree elements
+    int bits;                       // bit length
+    int xbits;                      // extra bits
+    std::uint16_t f;                // frequency
+    int overflow = 0;               // number of elements with bit length too large
 
-    for (bits = 0; bits <= limits::maxBits; bits++) s->bl_count_[bits] = 0;
+    std::fill(&bl_count_[0], &bl_count_[limits::maxBits+1], 0);
 
     /* In a first pass, compute the optimal bit lengths (which may
      * overflow in the case of the bit length tree).
      */
-    tree[s->heap_[s->heap_max_]].dl = 0; /* root of the heap */
+    tree[heap_[heap_max_]].dl = 0; // root of the heap
 
-    for (h = s->heap_max_+1; h < HEAP_SIZE; h++) {
-        n = s->heap_[h];
+    for (h = heap_max_+1; h < HEAP_SIZE; h++) {
+        n = heap_[h];
         bits = tree[tree[n].dl].dl + 1;
         if (bits > max_length) bits = max_length, overflow++;
+        // We overwrite tree[n].dl which is no longer needed
         tree[n].dl = (std::uint16_t)bits;
-        /* We overwrite tree[n].dl which is no longer needed */
 
-        if (n > max_code) continue; /* not a leaf node */
+        if(n > max_code)
+            continue; // not a leaf node
 
-        s->bl_count_[bits]++;
+        bl_count_[bits]++;
         xbits = 0;
-        if (n >= base) xbits = extra[n-base];
+        if(n >= base)
+            xbits = extra[n-base];
         f = tree[n].fc;
-        s->opt_len_ += (std::uint32_t)f * (bits + xbits);
-        if (stree) s->static_len_ += (std::uint32_t)f * (stree[n].dl + xbits);
+        opt_len_ += (std::uint32_t)f * (bits + xbits);
+        if(stree)
+            static_len_ += (std::uint32_t)f * (stree[n].dl + xbits);
     }
-    if (overflow == 0) return;
+    if (overflow == 0)
+        return;
 
-    Trace((stderr,"\nbit length overflow\n"));
     /* This happens for example on obj2 and pic of the Calgary corpus */
+    Trace((stderr,"\nbit length overflow\n"));
 
-    /* Find the first bit length which could increase: */
-    do {
+    // Find the first bit length which could increase:
+    do
+    {
         bits = max_length-1;
-        while (s->bl_count_[bits] == 0) bits--;
-        s->bl_count_[bits]--;      /* move one leaf down the tree */
-        s->bl_count_[bits+1] += 2; /* move one overflow item as its brother */
-        s->bl_count_[max_length]--;
+        while(bl_count_[bits] == 0)
+            bits--;
+        bl_count_[bits]--;      // move one leaf down the tree
+        bl_count_[bits+1] += 2; // move one overflow item as its brother
+        bl_count_[max_length]--;
         /* The brother of the overflow item also moves one step up,
          * but this does not affect bl_count[max_length]
          */
         overflow -= 2;
-    } while (overflow > 0);
+    }
+    while(overflow > 0);
 
     /* Now recompute all bit lengths, scanning in increasing frequency.
      * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
      * lengths instead of fixing only the wrong ones. This idea is taken
      * from 'ar' written by Haruhiko Okumura.)
      */
-    for (bits = max_length; bits != 0; bits--) {
-        n = s->bl_count_[bits];
-        while (n != 0) {
-            m = s->heap_[--h];
-            if (m > max_code) continue;
-            if ((unsigned) tree[m].dl != (unsigned) bits) {
+    for(bits = max_length; bits != 0; bits--)
+    {
+        n = bl_count_[bits];
+        while(n != 0)
+        {
+            m = heap_[--h];
+            if(m > max_code)
+                continue;
+            if((unsigned) tree[m].dl != (unsigned) bits)
+            {
                 Trace((stderr,"code %d bits %d->%d\n", m, tree[m].dl, bits));
-                s->opt_len_ += ((long)bits - (long)tree[m].dl)
-                              *(long)tree[m].fc;
+                opt_len_ += ((long)bits - (long)tree[m].dl) *(long)tree[m].fc;
                 tree[m].dl = (std::uint16_t)bits;
             }
             n--;
@@ -518,7 +527,7 @@ build_tree(
     /* At this point, the fields freq and dad are set. We can now
      * generate the bit lengths.
      */
-    gen_bitlen(s, (tree_desc *)desc);
+    s->gen_bitlen((tree_desc *)desc);
 
     /* The field len is now set, we can generate the bit codes */
     detail::gen_codes (tree, max_code, s->bl_count_);
