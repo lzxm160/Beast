@@ -120,6 +120,7 @@ private:
     void put_short(std::uint16_t w);
     void send_bits(int value, int length);
     void send_code(int value, detail::ct_data const* tree);
+    std::uint8_t d_code(unsigned dist);
 
     static void fill_window(basic_deflate_stream *s);
 

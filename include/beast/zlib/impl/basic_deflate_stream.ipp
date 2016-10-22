@@ -224,8 +224,20 @@ send_code(int value, detail::ct_data const* tree)
     send_bits(tree[value].fc, tree[value].dl);
 }
 
-
-
+/* Mapping from a distance to a distance code. dist is the distance - 1 and
+ * must not have side effects. _dist_code[256] and _dist_code[257] are never
+ * used.
+ */
+template<class Allocator>
+inline
+std::uint8_t
+basic_deflate_stream<Allocator>::
+d_code(unsigned dist)
+{
+    if(dist < 256)
+        return lut_.dist_code[dist];
+    return lut_.dist_code[256+(dist>>7)];
+}
 
 
 
@@ -248,12 +260,6 @@ send_code(int value, detail::ct_data const* tree)
    memory checker errors from longest match routines */
 
 
-/* Mapping from a distance to a distance code. dist is the distance - 1 and
- * must not have side effects. _dist_code[256] and _dist_code[257] are never
- * used.
- */
-#define d_code(dist) \
-   ((dist) < 256 ? s->lut_.dist_code[dist] : s->lut_.dist_code[256+((dist)>>7)])
 
 
 /* ===========================================================================
@@ -943,10 +949,10 @@ tr_tally (
         dist--;             /* dist = match distance - 1 */
         Assert((std::uint16_t)dist < (std::uint16_t)MAX_DIST(s) &&
                (std::uint16_t)lc <= (std::uint16_t)(limits::maxMatch-limits::minMatch) &&
-               (std::uint16_t)d_code(dist) < (std::uint16_t)limits::dCodes,  "tr_tally: bad match");
+               (std::uint16_t)s->d_code(dist) < (std::uint16_t)limits::dCodes,  "tr_tally: bad match");
 
         s->dyn_ltree_[s->lut_.length_code[lc]+limits::literals+1].fc++;
-        s->dyn_dtree_[d_code(dist)].fc++;
+        s->dyn_dtree_[s->d_code(dist)].fc++;
     }
 
 #ifdef TRUNCATE_BLOCK
@@ -1007,7 +1013,7 @@ compress_block(
                 s->send_bits(lc, extra);       /* send the extra length bits */
             }
             dist--; /* dist is now the match distance - 1 */
-            code = d_code(dist);
+            code = s->d_code(dist);
             Assert (code < limits::dCodes, "bad d_code");
 
             s->send_code(code, dtree);       /* send the distance code */
@@ -1146,7 +1152,7 @@ copy_block(
     s->l_buf_[s->last_lit_++] = len; \
     dist--; \
     s->dyn_ltree_[s->lut_.length_code[len]+limits::literals+1].fc++; \
-    s->dyn_dtree_[d_code(dist)].fc++; \
+    s->dyn_dtree_[s->d_code(dist)].fc++; \
     flush = (s->last_lit_ == s->lit_bufsize_-1); \
   }
 
