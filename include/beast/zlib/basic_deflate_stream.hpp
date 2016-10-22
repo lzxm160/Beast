@@ -91,8 +91,6 @@ class basic_deflate_stream : public z_params
 public:
     basic_deflate_stream();
 
-    ~basic_deflate_stream();
-
     int
     reset(int level, int windowBits, int memLevel, int strategy);
 
@@ -215,6 +213,8 @@ private:
     uInt  w_size_;        /* LZ77 window size (32K by default) */
     uInt  w_bits_;        /* log2(w_size)  (8..16) */
     uInt  w_mask_;        /* w_size - 1 */
+
+    std::unique_ptr<std::uint8_t[]> buf_;
 
     /* Sliding window. Input bytes are read into the second half of the window,
      * and move to the first half later to keep a dictionary of at least wSize

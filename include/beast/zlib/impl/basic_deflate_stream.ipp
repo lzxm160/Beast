@@ -103,16 +103,6 @@ basic_deflate_stream()
 }
 
 template<class Allocator>
-basic_deflate_stream<Allocator>::
-~basic_deflate_stream()
-{
-    std::free(pending_buf_);
-    std::free(head_);
-    std::free(prev_);
-    std::free(window_);
-}
-
-template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
 reset(
@@ -149,17 +139,24 @@ reset(
     hash_mask_ = hash_size_ - 1;
     hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
 
-    // VFALCO use new instead of malloc
-    window_ = (Byte *) std::malloc(w_size_ * 2*sizeof(Byte));
-    prev_   = (std::uint16_t *)  std::malloc(w_size_ * sizeof(std::uint16_t));
-    head_   = (std::uint16_t *)  std::malloc(hash_size_ * sizeof(std::uint16_t));
+    lit_bufsize_ = 1 << (memLevel + 6); /* 16K elements by default */
+
+    {
+        auto const nwindow  = w_size_ * 2*sizeof(Byte);
+        auto const nprev    = w_size_ * sizeof(std::uint16_t);
+        auto const nhead    = hash_size_ * sizeof(std::uint16_t);
+        auto const noverlay = lit_bufsize_ * (sizeof(std::uint16_t)+2);
+        
+        buf_.reset(new std::uint8_t[nwindow + nprev + nhead + noverlay]);
+
+        window_ = reinterpret_cast<Byte*>(buf_.get());
+        prev_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow);
+        head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
+        overlay = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev + nhead);
+    }
 
     high_water_ = 0;      /* nothing written to window_ yet */
 
-    lit_bufsize_ = 1 << (memLevel + 6); /* 16K elements by default */
-
-    // Use new instad of malloc
-    overlay = (std::uint16_t *) std::malloc(lit_bufsize_ * (sizeof(std::uint16_t)+2));
     pending_buf_ = (std::uint8_t *) overlay;
     pending_buf_size_ = (std::uint32_t)lit_bufsize_ * (sizeof(std::uint16_t)+2L);
 
