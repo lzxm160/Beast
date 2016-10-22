@@ -97,7 +97,6 @@ namespace zlib {
 template<class Allocator>
 basic_deflate_stream<Allocator>::
 basic_deflate_stream()
-    : lut_(detail::get_deflate_tables())
 {
     // default level 6
     //reset(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
@@ -254,7 +253,7 @@ reset(
    memory checker errors from longest match routines */
 
 
-
+//------------------------------------------------------------------------------
 
 template<class Allocator>
 inline
@@ -323,38 +322,7 @@ d_code(unsigned dist)
     return lut_.dist_code[256+(dist>>7)];
 }
 
-
-
-
-
-
-
-
-
-
-/* ===========================================================================
- * Initialize the tree data structures for a new zlib stream.
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tr_init()
-{
-    l_desc_.dyn_tree = dyn_ltree_;
-    l_desc_.stat_desc = &lut_.l_desc;
-
-    d_desc_.dyn_tree = dyn_dtree_;
-    d_desc_.stat_desc = &lut_.d_desc;
-
-    bl_desc_.dyn_tree = bl_tree_;
-    bl_desc_.stat_desc = &lut_.bl_desc;
-
-    bi_buf_ = 0;
-    bi_valid_ = 0;
-
-    /* Initialize the first block of the first file: */
-    init_block();
-}
+//------------------------------------------------------------------------------
 
 // Initialize a new block.
 //
@@ -376,13 +344,9 @@ init_block()
     matches_ = 0;
 }
 
-
-
-
-/* ===========================================================================
- * Compares to subtrees, using the tree depth as tie breaker when
- * the subtrees have equal frequency. This minimizes the worst case length.
- */
+/*  Compares two subtrees, using the tree depth as tie breaker when
+    the subtrees have equal frequency. This minimizes the worst case length.
+*/
 template<class Allocator>
 inline
 bool
@@ -394,12 +358,11 @@ smaller(detail::ct_data const* tree, int n, int m)
             depth_[n] <= depth_[m]);
 }
 
-/* ===========================================================================
- * Restore the heap property by moving down the tree starting at node k,
- * exchanging a node with the smallest of its two sons if necessary, stopping
- * when the heap property is re-established (each father smaller than its
- * two sons).
- */
+/*  Restore the heap property by moving down the tree starting at node k,
+    exchanging a node with the smallest of its two sons if necessary,
+    stopping when the heap property is re-established (each father smaller
+    than its two sons).
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
@@ -430,10 +393,9 @@ pqdownheap(
     heap_[k] = v;
 }
 
-/* ===========================================================================
- * Remove the smallest element from the heap and recreate the heap with
- * one less element. Updates heap and heap_len.
- */
+/*  Remove the smallest element from the heap and recreate the heap
+    with one less element. Updates heap and heap_len.
+*/
 template<class Allocator>
 inline
 void
@@ -445,16 +407,15 @@ pqremove(detail::ct_data const* tree, int& top)
     pqdownheap(tree, kSmallest);
 }
 
-/* ===========================================================================
- * Compute the optimal bit lengths for a tree and update the total bit length
- * for the current block.
- * IN assertion: the fields freq and dad are set, heap[heap_max] and
- *    above are the tree nodes sorted by increasing frequency.
- * OUT assertions: the field len is set to the optimal bit length, the
- *     array bl_count contains the frequencies for each bit length.
- *     The length opt_len is updated; static_len is also updated if stree is
- *     not null.
- */
+/*  Compute the optimal bit lengths for a tree and update the total bit length
+    for the current block.
+    IN assertion: the fields freq and dad are set, heap[heap_max] and
+       above are the tree nodes sorted by increasing frequency.
+    OUT assertions: the field len is set to the optimal bit length, the
+        array bl_count contains the frequencies for each bit length.
+        The length opt_len is updated; static_len is also updated if stree is
+        not null.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
@@ -545,14 +506,13 @@ gen_bitlen(tree_desc *desc)
     }
 }
 
-/* ===========================================================================
- * Construct one Huffman tree and assigns the code bit strings and lengths.
- * Update the total bit length for the current block.
- * IN assertion: the field freq is set for all tree elements.
- * OUT assertions: the fields len and code are set to the optimal bit length
- *     and corresponding code. The length opt_len is updated; static_len is
- *     also updated if stree is not null. The field max_code is set.
- */
+/*  Construct one Huffman tree and assigns the code bit strings and lengths.
+    Update the total bit length for the current block.
+    IN assertion: the field freq is set for all tree elements.
+    OUT assertions: the fields len and code are set to the optimal bit length
+        and corresponding code. The length opt_len is updated; static_len is
+        also updated if stree is not null. The field max_code is set.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
@@ -643,31 +603,30 @@ build_tree(tree_desc *desc)
     detail::gen_codes(tree, max_code, bl_count_);
 }
 
-/* ===========================================================================
- * Scan a literal or distance tree to determine the frequencies of the codes
- * in the bit length tree.
- */
+/*  Scan a literal or distance tree to determine the frequencies
+    of the codes in the bit length tree.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 scan_tree(
-    detail::ct_data *tree,   /* the tree to be scanned */
-    int max_code)    /* and its largest code of non zero frequency */
+    detail::ct_data *tree,      // the tree to be scanned
+    int max_code)               // and its largest code of non zero frequency
 {
-    int n;                     /* iterates over all tree elements */
-    int prevlen = -1;          /* last emitted length */
-    int curlen;                /* length of current code */
-    int nextlen = tree[0].dl; /* length of next code */
-    int count = 0;             /* repeat count of the current code */
-    int max_count = 7;         /* max repeat count */
-    int min_count = 4;         /* min repeat count */
+    int n;                      // iterates over all tree elements
+    int prevlen = -1;           // last emitted length
+    int curlen;                 // length of current code
+    int nextlen = tree[0].dl;   // length of next code
+    int count = 0;              // repeat count of the current code
+    int max_count = 7;          // max repeat count
+    int min_count = 4;          // min repeat count
 
     if(nextlen == 0)
     {
         max_count = 138;
         min_count = 3;
     }
-    tree[max_code+1].dl = (std::uint16_t)0xffff; /* guard */
+    tree[max_code+1].dl = (std::uint16_t)0xffff; // guard
 
     for(n = 0; n <= max_code; n++)
     {
@@ -713,26 +672,25 @@ scan_tree(
     }
 }
 
-/* ===========================================================================
- * Send a literal or distance tree in compressed form, using the codes in
- * bl_tree.
- */
+/*  Send a literal or distance tree in compressed form,
+    using the codes in bl_tree.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 send_tree(
-    detail::ct_data *tree, /* the tree to be scanned */
-    int max_code)       /* and its largest code of non zero frequency */
+    detail::ct_data *tree,      // the tree to be scanned
+    int max_code)               // and its largest code of non zero frequency
 {
-    int n;                     /* iterates over all tree elements */
-    int prevlen = -1;          /* last emitted length */
-    int curlen;                /* length of current code */
-    int nextlen = tree[0].dl; /* length of next code */
-    int count = 0;             /* repeat count of the current code */
-    int max_count = 7;         /* max repeat count */
-    int min_count = 4;         /* min repeat count */
+    int n;                      // iterates over all tree elements
+    int prevlen = -1;           // last emitted length
+    int curlen;                 // length of current code
+    int nextlen = tree[0].dl;   // length of next code
+    int count = 0;              // repeat count of the current code
+    int max_count = 7;          // max repeat count
+    int min_count = 4;          // min repeat count
 
-    // tree[max_code+1].dl = -1; // guard already set */
+    // tree[max_code+1].dl = -1; // guard already set
     if(nextlen == 0)
     {
         max_count = 138;
@@ -796,10 +754,9 @@ send_tree(
     }
 }
 
-/* ===========================================================================
- * Construct the Huffman tree for the bit lengths and return the index in
- * bl_order of the last bit length code to send.
- */
+/*  Construct the Huffman tree for the bit lengths and return
+    the index in bl_order of the last bit length code to send.
+*/
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
@@ -833,28 +790,28 @@ build_bl_tree()
     return max_blindex;
 }
 
-/* ===========================================================================
- * Send the header for a block using dynamic Huffman trees: the counts, the
- * lengths of the bit length codes, the literal tree and the distance tree.
- * IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
- */
+/*  Send the header for a block using dynamic Huffman trees: the counts,
+    the lengths of the bit length codes, the literal tree and the distance
+    tree.
+    IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 send_all_trees(
     int lcodes,
     int dcodes,
-    int blcodes) /* number of codes for each tree */
+    int blcodes)    // number of codes for each tree
 {
-    int rank;                    /* index in bl_order */
+    int rank;       // index in bl_order
 
     Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
     Assert (lcodes <= limits::lCodes && dcodes <= limits::dCodes && blcodes <= limits::blCodes,
             "too many codes");
     Tracev((stderr, "\nbl counts: "));
-    send_bits(lcodes-257, 5); /* not +255 as stated in appnote.txt */
+    send_bits(lcodes-257, 5); // not +255 as stated in appnote.txt
     send_bits(dcodes-1,   5);
-    send_bits(blcodes-4,  4); /* not -3 as stated in appnote.txt */
+    send_bits(blcodes-4,  4); // not -3 as stated in appnote.txt
     for(rank = 0; rank < blcodes; rank++)
     {
         Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
@@ -862,43 +819,203 @@ send_all_trees(
     }
     Tracev((stderr, "\nbl tree: sent %ld", bits_sent_));
 
-    send_tree((detail::ct_data *)dyn_ltree_, lcodes-1); /* literal tree */
+    send_tree((detail::ct_data *)dyn_ltree_, lcodes-1); // literal tree
     Tracev((stderr, "\nlit tree: sent %ld", bits_sent_));
 
-    send_tree((detail::ct_data *)dyn_dtree_, dcodes-1); /* distance tree */
+    send_tree((detail::ct_data *)dyn_dtree_, dcodes-1); // distance tree
     Tracev((stderr, "\ndist tree: sent %ld", bits_sent_));
 }
 
-/* ===========================================================================
- * Send a stored block
- */
+/*  Send the block data compressed using the given Huffman trees
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-tr_stored_block(
-    char *buf,                  // input block
-    std::uint32_t stored_len,   // length of input block
-    int last)                   // one if this is the last block for a file
+compress_block(
+    detail::ct_data const* ltree, // literal tree
+    detail::ct_data const* dtree) // distance tree
 {
-    send_bits((STORED_BLOCK<<1)+last, 3);           // send block type
-    copy_block(buf, (unsigned)stored_len, 1); // with header
+    unsigned dist;      /* distance of matched string */
+    int lc;             /* match length or unmatched char (if dist == 0) */
+    unsigned lx = 0;    /* running index in l_buf */
+    unsigned code;      /* the code to send */
+    int extra;          /* number of extra bits to send */
+
+    if(last_lit_ != 0)
+    {
+        do
+        {
+            dist = d_buf_[lx];
+            lc = l_buf_[lx++];
+            if(dist == 0)
+            {
+                send_code(lc, ltree); /* send a literal byte */
+                Tracecv(isgraph(lc), (stderr," '%c' ", lc));
+            }
+            else
+            {
+                /* Here, lc is the match length - limits::minMatch */
+                code = lut_.length_code[lc];
+                send_code(code+limits::literals+1, ltree); /* send the length code */
+                extra = lut_.extra_lbits[code];
+                if(extra != 0)
+                {
+                    lc -= lut_.base_length[code];
+                    send_bits(lc, extra);       /* send the extra length bits */
+                }
+                dist--; /* dist is now the match distance - 1 */
+                code = d_code(dist);
+                Assert (code < limits::dCodes, "bad d_code");
+
+                send_code(code, dtree);       /* send the distance code */
+                extra = lut_.extra_dbits[code];
+                if(extra != 0)
+                {
+                    dist -= lut_.base_dist[code];
+                    send_bits(dist, extra);   /* send the extra distance bits */
+                }
+            } /* literal or match pair ? */
+
+            /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+            Assert((uInt)(pending_) < lit_bufsize_ + 2*lx,
+               "pendingBuf overflow");
+        }
+        while(lx < last_lit_);
+    }
+
+    send_code(END_BLOCK, ltree);
 }
 
-/* ===========================================================================
- * Flush the bits in the bit buffer to pending output (leaves at most 7 bits)
- */
+/*  Check if the data type is TEXT or BINARY, using the following algorithm:
+    - TEXT if the two conditions below are satisfied:
+        a) There are no non-portable control characters belonging to the
+            "black list" (0..6, 14..25, 28..31).
+        b) There is at least one printable character belonging to the
+            "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
+    - BINARY otherwise.
+    - The following partially-portable control characters form a
+        "gray list" that is ignored in this detection algorithm:
+        (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
+    IN assertion: the fields fc of dyn_ltree are set.
+*/
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+detect_data_type()
+{
+    /* black_mask is the bit mask of black-listed bytes
+     * set bits 0..6, 14..25, and 28..31
+     * 0xf3ffc07f = binary 11110011111111111100000001111111
+     */
+    unsigned long black_mask = 0xf3ffc07fUL;
+    int n;
+
+    // Check for non-textual ("black-listed") bytes.
+    for(n = 0; n <= 31; n++, black_mask >>= 1)
+        if((black_mask & 1) && (dyn_ltree_[n].fc != 0))
+            return Z_BINARY;
+
+    // Check for textual ("white-listed") bytes. */
+    if(dyn_ltree_[9].fc != 0 || dyn_ltree_[10].fc != 0
+            || dyn_ltree_[13].fc != 0)
+        return Z_TEXT;
+    for(n = 32; n < limits::literals; n++)
+        if(dyn_ltree_[n].fc != 0)
+            return Z_TEXT;
+
+    /* There are no "black-listed" or "white-listed" bytes:
+     * this stream either is empty or has tolerated ("gray-listed") bytes only.
+     */
+    return Z_BINARY;
+}
+
+/*  Flush the bit buffer and align the output on a byte boundary
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-tr_flush_bits()
+bi_windup()
 {
-    bi_flush();
+    if(bi_valid_ > 8)
+        put_short(bi_buf_);
+    else if(bi_valid_ > 0)
+        put_byte((Byte)bi_buf_);
+    bi_buf_ = 0;
+    bi_valid_ = 0;
 }
 
-/* ===========================================================================
- * Send one empty static block to give enough lookahead for inflate.
- * This takes 10 bits, of which 7 may remain in the bit buffer.
- */
+/*  Flush the bit buffer, keeping at most 7 bits in it.
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+bi_flush()
+{
+    if(bi_valid_ == 16)
+    {
+        put_short(bi_buf_);
+        bi_buf_ = 0;
+        bi_valid_ = 0;
+    }
+    else if(bi_valid_ >= 8)
+    {
+        put_byte((Byte)bi_buf_);
+        bi_buf_ >>= 8;
+        bi_valid_ -= 8;
+    }
+}
+
+/*  Copy a stored block, storing first the length and its
+    one's complement if requested.
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+copy_block(
+    char    *buf,       // the input data
+    unsigned len,       // its length
+    int      header)    // true if block header must be written
+{
+    bi_windup();        // align on byte boundary
+
+    if(header)
+    {
+        put_short((std::uint16_t)len);
+        put_short((std::uint16_t)~len);
+    }
+    // VFALCO Use memcpy?
+    while (len--)
+        put_byte(*buf++);
+}
+
+//------------------------------------------------------------------------------
+
+/* Initialize the tree data structures for a new zlib stream.
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+tr_init()
+{
+    l_desc_.dyn_tree = dyn_ltree_;
+    l_desc_.stat_desc = &lut_.l_desc;
+
+    d_desc_.dyn_tree = dyn_dtree_;
+    d_desc_.stat_desc = &lut_.d_desc;
+
+    bl_desc_.dyn_tree = bl_tree_;
+    bl_desc_.stat_desc = &lut_.bl_desc;
+
+    bi_buf_ = 0;
+    bi_valid_ = 0;
+
+    /* Initialize the first block of the first file: */
+    init_block();
+}
+
+/*  Send one empty static block to give enough lookahead for inflate.
+    This takes 10 bits, of which 7 may remain in the bit buffer.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
@@ -909,10 +1026,33 @@ tr_align()
     bi_flush();
 }
 
-/* ===========================================================================
- * Determine the best encoding for the current block: dynamic trees, static
- * trees or store, and output the encoded block to the zip file.
- */
+/* Flush the bits in the bit buffer to pending output (leaves at most 7 bits)
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+tr_flush_bits()
+{
+    bi_flush();
+}
+
+/* Send a stored block
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+tr_stored_block(
+    char *buf,                  // input block
+    std::uint32_t stored_len,   // length of input block
+    int last)                   // one if this is the last block for a file
+{
+    send_bits((STORED_BLOCK<<1)+last, 3);       // send block type
+    copy_block(buf, (unsigned)stored_len, 1);   // with header
+}
+
+/*  Determine the best encoding for the current block: dynamic trees,
+    static trees or store, and output the encoded block to the zip file.
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
@@ -1012,174 +1152,35 @@ tr_flush_block(
            compressed_len_-7*last));
 }
 
-/* ===========================================================================
- * Send the block data compressed using the given Huffman trees
- */
+//------------------------------------------------------------------------------
+
+/*  Initialize the "longest match" routines for a new zlib stream
+*/
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-compress_block(
-    detail::ct_data const* ltree, // literal tree
-    detail::ct_data const* dtree) // distance tree
+lm_init()
 {
-    unsigned dist;      /* distance of matched string */
-    int lc;             /* match length or unmatched char (if dist == 0) */
-    unsigned lx = 0;    /* running index in l_buf */
-    unsigned code;      /* the code to send */
-    int extra;          /* number of extra bits to send */
+    window_size_ = (std::uint32_t)2L*w_size_;
 
-    if(last_lit_ != 0)
-    {
-        do
-        {
-            dist = d_buf_[lx];
-            lc = l_buf_[lx++];
-            if(dist == 0)
-            {
-                send_code(lc, ltree); /* send a literal byte */
-                Tracecv(isgraph(lc), (stderr," '%c' ", lc));
-            }
-            else
-            {
-                /* Here, lc is the match length - limits::minMatch */
-                code = lut_.length_code[lc];
-                send_code(code+limits::literals+1, ltree); /* send the length code */
-                extra = lut_.extra_lbits[code];
-                if(extra != 0)
-                {
-                    lc -= lut_.base_length[code];
-                    send_bits(lc, extra);       /* send the extra length bits */
-                }
-                dist--; /* dist is now the match distance - 1 */
-                code = d_code(dist);
-                Assert (code < limits::dCodes, "bad d_code");
+    CLEAR_HASH(this);
 
-                send_code(code, dtree);       /* send the distance code */
-                extra = lut_.extra_dbits[code];
-                if(extra != 0)
-                {
-                    dist -= lut_.base_dist[code];
-                    send_bits(dist, extra);   /* send the extra distance bits */
-                }
-            } /* literal or match pair ? */
-
-            /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
-            Assert((uInt)(pending_) < lit_bufsize_ + 2*lx,
-               "pendingBuf overflow");
-        }
-        while(lx < last_lit_);
-    }
-
-    send_code(END_BLOCK, ltree);
-}
-
-/* ===========================================================================
- * Check if the data type is TEXT or BINARY, using the following algorithm:
- * - TEXT if the two conditions below are satisfied:
- *    a) There are no non-portable control characters belonging to the
- *       "black list" (0..6, 14..25, 28..31).
- *    b) There is at least one printable character belonging to the
- *       "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
- * - BINARY otherwise.
- * - The following partially-portable control characters form a
- *   "gray list" that is ignored in this detection algorithm:
- *   (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
- * IN assertion: the fields fc of dyn_ltree are set.
- */
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-detect_data_type()
-{
-    /* black_mask is the bit mask of black-listed bytes
-     * set bits 0..6, 14..25, and 28..31
-     * 0xf3ffc07f = binary 11110011111111111100000001111111
+    /* Set the default configuration parameters:
      */
-    unsigned long black_mask = 0xf3ffc07fUL;
-    int n;
+    // VFALCO TODO just copy the config struct
+    max_lazy_match_   = get_config(level_).max_lazy;
+    good_match_       = get_config(level_).good_length;
+    nice_match_       = get_config(level_).nice_length;
+    max_chain_length_ = get_config(level_).max_chain;
 
-    // Check for non-textual ("black-listed") bytes.
-    for(n = 0; n <= 31; n++, black_mask >>= 1)
-        if((black_mask & 1) && (dyn_ltree_[n].fc != 0))
-            return Z_BINARY;
-
-    // Check for textual ("white-listed") bytes. */
-    if(dyn_ltree_[9].fc != 0 || dyn_ltree_[10].fc != 0
-            || dyn_ltree_[13].fc != 0)
-        return Z_TEXT;
-    for(n = 32; n < limits::literals; n++)
-        if(dyn_ltree_[n].fc != 0)
-            return Z_TEXT;
-
-    /* There are no "black-listed" or "white-listed" bytes:
-     * this stream either is empty or has tolerated ("gray-listed") bytes only.
-     */
-    return Z_BINARY;
+    strstart_ = 0;
+    block_start_ = 0L;
+    lookahead_ = 0;
+    insert_ = 0;
+    match_length_ = prev_length_ = limits::minMatch-1;
+    match_available_ = 0;
+    ins_h_ = 0;
 }
-
-/* ===========================================================================
- * Flush the bit buffer, keeping at most 7 bits in it.
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-bi_flush()
-{
-    if(bi_valid_ == 16)
-    {
-        put_short(bi_buf_);
-        bi_buf_ = 0;
-        bi_valid_ = 0;
-    }
-    else if(bi_valid_ >= 8)
-    {
-        put_byte((Byte)bi_buf_);
-        bi_buf_ >>= 8;
-        bi_valid_ -= 8;
-    }
-}
-
-/* ===========================================================================
- * Flush the bit buffer and align the output on a byte boundary
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-bi_windup()
-{
-    if(bi_valid_ > 8)
-        put_short(bi_buf_);
-    else if(bi_valid_ > 0)
-        put_byte((Byte)bi_buf_);
-    bi_buf_ = 0;
-    bi_valid_ = 0;
-}
-
-/* ===========================================================================
- * Copy a stored block, storing first the length and its
- * one's complement if requested.
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-copy_block(
-    char    *buf,    /* the input data */
-    unsigned len,     /* its length */
-    int      header)  /* true if block header must be written */
-{
-    bi_windup();     // align on byte boundary
-
-    if(header)
-    {
-        put_short((std::uint16_t)len);
-        put_short((std::uint16_t)~len);
-    }
-    // VFALCO Use memcpy?
-    while (len--)
-        put_byte(*buf++);
-}
-
-/* ========================================================================= */
 
 template<class Allocator>
 void
@@ -1318,6 +1319,167 @@ fill_window()
 
     Assert((std::uint32_t)strstart_ <= window_size_ - MIN_LOOKAHEAD,
            "not enough room for search");
+}
+
+/*  Flush as much pending output as possible. All deflate() output goes
+    through this function so some applications may wish to modify it
+    to avoid allocating a large strm->next_out buffer and copying into it.
+    (See also read_buf()).
+*/
+template<class Allocator>
+void
+basic_deflate_stream<Allocator>::
+flush_pending()
+{
+    tr_flush_bits();
+    unsigned len = pending_;
+    if(len > avail_out)
+        len = avail_out;
+    if(len == 0) return;
+
+    std::memcpy(next_out, pending_out_, len);
+    next_out = static_cast<std::uint8_t*>(
+        next_out) + len;
+    pending_out_  += len;
+    total_out += len;
+    avail_out  -= len;
+    pending_ -= len;
+    if(pending_ == 0)
+        pending_out_ = pending_buf_;
+}
+
+/*  Read a new buffer from the current input stream, update the adler32
+    and total number of bytes read.  All deflate() input goes through
+    this function so some applications may wish to modify it to avoid
+    allocating a large strm->next_in buffer and copying from it.
+    (See also flush_pending()).
+*/
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+read_buf(Byte *buf, unsigned size)
+{
+    unsigned len = avail_in;
+
+    if(len > size)
+        len = size;
+    if(len == 0)
+        return 0;
+
+    avail_in  -= len;
+
+    std::memcpy(buf, next_in, len);
+    next_in = static_cast<
+        std::uint8_t const*>(next_in) + len;
+    total_in += len;
+    return (int)len;
+}
+
+/*  Set match_start to the longest match starting at the given string and
+    return its length. Matches shorter or equal to prev_length are discarded,
+    in which case the result is equal to prev_length and match_start is
+    garbage.
+    IN assertions: cur_match is the head of the hash chain for the current
+        string (strstart) and its distance is <= MAX_DIST, and prev_length >= 1
+    OUT assertion: the match length is not greater than s->lookahead_.
+
+    For 80x86 and 680x0, an optimized version will be provided in match.asm or
+    match.S. The code will be functionally equivalent.
+*/
+template<class Allocator>
+uInt
+basic_deflate_stream<Allocator>::
+longest_match(IPos cur_match)
+{
+    unsigned chain_length = max_chain_length_;/* max hash chain length */
+    Byte *scan = window_ + strstart_; /* current string */
+    Byte *match;                       /* matched string */
+    int len;                           /* length of current match */
+    int best_len = prev_length_;              /* best match length so far */
+    int nice_match = nice_match_;             /* stop if match long enough */
+    IPos limit = strstart_ > (IPos)MAX_DIST(this) ?
+        strstart_ - (IPos)MAX_DIST(this) : 0;
+    /* Stop when cur_match becomes <= limit. To simplify the code,
+     * we prevent matches with the string of window index 0.
+     */
+    std::uint16_t *prev = prev_;
+    uInt wmask = w_mask_;
+
+    Byte *strend = window_ + strstart_ + limits::maxMatch;
+    Byte scan_end1  = scan[best_len-1];
+    Byte scan_end   = scan[best_len];
+
+    /* The code is optimized for HASH_BITS >= 8 and limits::maxMatch-2 multiple of 16.
+     * It is easy to get rid of this optimization if necessary.
+     */
+    Assert(hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
+
+    /* Do not waste too much time if we already have a good match: */
+    if(prev_length_ >= good_match_) {
+        chain_length >>= 2;
+    }
+    /* Do not look for matches beyond the end of the input. This is necessary
+     * to make deflate deterministic.
+     */
+    if((uInt)nice_match > lookahead_)
+        nice_match = lookahead_;
+
+    Assert((std::uint32_t)strstart_ <= window_size_-MIN_LOOKAHEAD, "need lookahead");
+
+    do {
+        Assert(cur_match < strstart_, "no future");
+        match = window_ + cur_match;
+
+        /* Skip to next match if the match length cannot increase
+         * or if the match length is less than 2.  Note that the checks below
+         * for insufficient lookahead only occur occasionally for performance
+         * reasons.  Therefore uninitialized memory will be accessed, and
+         * conditional jumps will be made that depend on those values.
+         * However the length of the match is limited to the lookahead, so
+         * the output of deflate is not affected by the uninitialized values.
+         */
+        if(match[best_len]   != scan_end  ||
+            match[best_len-1] != scan_end1 ||
+            *match            != *scan     ||
+            *++match          != scan[1])      continue;
+
+        /* The check at best_len-1 can be removed because it will be made
+         * again later. (This heuristic is not always a win.)
+         * It is not necessary to compare scan[2] and match[2] since they
+         * are always equal when the other bytes match, given that
+         * the hash keys are equal and that HASH_BITS >= 8.
+         */
+        scan += 2, match++;
+        Assert(*scan == *match, "match[2]?");
+
+        /* We check for insufficient lookahead only every 8th comparison;
+         * the 256th check will be made at strstart+258.
+         */
+        do {
+        } while (*++scan == *++match && *++scan == *++match &&
+                 *++scan == *++match && *++scan == *++match &&
+                 *++scan == *++match && *++scan == *++match &&
+                 *++scan == *++match && *++scan == *++match &&
+                 scan < strend);
+
+        Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
+
+        len = limits::maxMatch - (int)(strend - scan);
+        scan = strend - limits::maxMatch;
+
+        if(len > best_len) {
+            match_start_ = cur_match;
+            best_len = len;
+            if(len >= nice_match) break;
+            scan_end1  = scan[best_len-1];
+            scan_end   = scan[best_len];
+        }
+    } while ((cur_match = prev[cur_match & wmask]) > limit
+             && --chain_length != 0);
+
+    if((uInt)best_len <= lookahead_)
+        return (uInt)best_len;
+    return lookahead_;
 }
 
 /* ========================================================================= */
@@ -1561,34 +1723,6 @@ upper_bound(std::size_t sourceLen) const
            (sourceLen >> 25) + 13 - 6 + wraplen;
 }
 
-/* =========================================================================
- * Flush as much pending output as possible. All deflate() output goes
- * through this function so some applications may wish to modify it
- * to avoid allocating a large strm->next_out buffer and copying into it.
- * (See also read_buf()).
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-flush_pending()
-{
-    tr_flush_bits();
-    unsigned len = pending_;
-    if(len > avail_out)
-        len = avail_out;
-    if(len == 0) return;
-
-    std::memcpy(next_out, pending_out_, len);
-    next_out = static_cast<std::uint8_t*>(
-        next_out) + len;
-    pending_out_  += len;
-    total_out += len;
-    avail_out  -= len;
-    pending_ -= len;
-    if(pending_ == 0)
-        pending_out_ = pending_buf_;
-}
-
 /* ========================================================================= */
 
 template<class Allocator>
@@ -1694,170 +1828,7 @@ deflate(int flush)
     return Z_STREAM_END;
 }
 
-/* ===========================================================================
- * Read a new buffer from the current input stream, update the adler32
- * and total number of bytes read.  All deflate() input goes through
- * this function so some applications may wish to modify it to avoid
- * allocating a large strm->next_in buffer and copying from it.
- * (See also flush_pending()).
- */
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-read_buf(Byte *buf, unsigned size)
-{
-    unsigned len = avail_in;
 
-    if(len > size)
-        len = size;
-    if(len == 0)
-        return 0;
-
-    avail_in  -= len;
-
-    std::memcpy(buf, next_in, len);
-    next_in = static_cast<
-        std::uint8_t const*>(next_in) + len;
-    total_in += len;
-    return (int)len;
-}
-
-/* ===========================================================================
- * Initialize the "longest match" routines for a new zlib stream
- */
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-lm_init()
-{
-    window_size_ = (std::uint32_t)2L*w_size_;
-
-    CLEAR_HASH(this);
-
-    /* Set the default configuration parameters:
-     */
-    // VFALCO TODO just copy the config struct
-    max_lazy_match_   = get_config(level_).max_lazy;
-    good_match_       = get_config(level_).good_length;
-    nice_match_       = get_config(level_).nice_length;
-    max_chain_length_ = get_config(level_).max_chain;
-
-    strstart_ = 0;
-    block_start_ = 0L;
-    lookahead_ = 0;
-    insert_ = 0;
-    match_length_ = prev_length_ = limits::minMatch-1;
-    match_available_ = 0;
-    ins_h_ = 0;
-}
-
-/* ===========================================================================
- * Set match_start to the longest match starting at the given string and
- * return its length. Matches shorter or equal to prev_length are discarded,
- * in which case the result is equal to prev_length and match_start is
- * garbage.
- * IN assertions: cur_match is the head of the hash chain for the current
- *   string (strstart) and its distance is <= MAX_DIST, and prev_length >= 1
- * OUT assertion: the match length is not greater than s->lookahead_.
- */
-/* For 80x86 and 680x0, an optimized version will be provided in match.asm or
- * match.S. The code will be functionally equivalent.
- */
-template<class Allocator>
-uInt
-basic_deflate_stream<Allocator>::
-longest_match(IPos cur_match)
-{
-    unsigned chain_length = max_chain_length_;/* max hash chain length */
-    Byte *scan = window_ + strstart_; /* current string */
-    Byte *match;                       /* matched string */
-    int len;                           /* length of current match */
-    int best_len = prev_length_;              /* best match length so far */
-    int nice_match = nice_match_;             /* stop if match long enough */
-    IPos limit = strstart_ > (IPos)MAX_DIST(this) ?
-        strstart_ - (IPos)MAX_DIST(this) : 0;
-    /* Stop when cur_match becomes <= limit. To simplify the code,
-     * we prevent matches with the string of window index 0.
-     */
-    std::uint16_t *prev = prev_;
-    uInt wmask = w_mask_;
-
-    Byte *strend = window_ + strstart_ + limits::maxMatch;
-    Byte scan_end1  = scan[best_len-1];
-    Byte scan_end   = scan[best_len];
-
-    /* The code is optimized for HASH_BITS >= 8 and limits::maxMatch-2 multiple of 16.
-     * It is easy to get rid of this optimization if necessary.
-     */
-    Assert(hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
-
-    /* Do not waste too much time if we already have a good match: */
-    if(prev_length_ >= good_match_) {
-        chain_length >>= 2;
-    }
-    /* Do not look for matches beyond the end of the input. This is necessary
-     * to make deflate deterministic.
-     */
-    if((uInt)nice_match > lookahead_)
-        nice_match = lookahead_;
-
-    Assert((std::uint32_t)strstart_ <= window_size_-MIN_LOOKAHEAD, "need lookahead");
-
-    do {
-        Assert(cur_match < strstart_, "no future");
-        match = window_ + cur_match;
-
-        /* Skip to next match if the match length cannot increase
-         * or if the match length is less than 2.  Note that the checks below
-         * for insufficient lookahead only occur occasionally for performance
-         * reasons.  Therefore uninitialized memory will be accessed, and
-         * conditional jumps will be made that depend on those values.
-         * However the length of the match is limited to the lookahead, so
-         * the output of deflate is not affected by the uninitialized values.
-         */
-        if(match[best_len]   != scan_end  ||
-            match[best_len-1] != scan_end1 ||
-            *match            != *scan     ||
-            *++match          != scan[1])      continue;
-
-        /* The check at best_len-1 can be removed because it will be made
-         * again later. (This heuristic is not always a win.)
-         * It is not necessary to compare scan[2] and match[2] since they
-         * are always equal when the other bytes match, given that
-         * the hash keys are equal and that HASH_BITS >= 8.
-         */
-        scan += 2, match++;
-        Assert(*scan == *match, "match[2]?");
-
-        /* We check for insufficient lookahead only every 8th comparison;
-         * the 256th check will be made at strstart+258.
-         */
-        do {
-        } while (*++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 scan < strend);
-
-        Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
-
-        len = limits::maxMatch - (int)(strend - scan);
-        scan = strend - limits::maxMatch;
-
-        if(len > best_len) {
-            match_start_ = cur_match;
-            best_len = len;
-            if(len >= nice_match) break;
-            scan_end1  = scan[best_len-1];
-            scan_end   = scan[best_len];
-        }
-    } while ((cur_match = prev[cur_match & wmask]) > limit
-             && --chain_length != 0);
-
-    if((uInt)best_len <= lookahead_)
-        return (uInt)best_len;
-    return lookahead_;
-}
 
 #  define check_match(s, start, match, length)
 
