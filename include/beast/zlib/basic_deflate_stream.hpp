@@ -164,7 +164,8 @@ private:
      * exclude worst case performance for pathological files. Better values may be
      * found for specific files.
      */
-    struct config {
+    struct config
+    {
        std::uint16_t good_length; /* reduce lazy search above this match length */
        std::uint16_t max_lazy;    /* do not perform lazy search above this match length */
        std::uint16_t nice_length; /* quit search above this match length */
@@ -213,8 +214,6 @@ private:
     Byte *pending_out_;  /* next pending byte to output to the stream */
     uInt   pending_;      /* nb of bytes in the pending buffer */
     int   last_flush_;    /* value of flush param for previous deflate call */
-
-                /* used by deflate.c: */
 
     uInt  w_size_;        /* LZ77 window size (32K by default) */
     uInt  w_bits_;        /* log2(w_size)  (8..16) */

@@ -172,6 +172,90 @@ reset(
 
 //------------------------------------------------------------------------------
 
+# define _tr_tally_lit(s, c, flush) \
+  { std::uint8_t cc = (c); \
+    s->d_buf_[s->last_lit_] = 0; \
+    s->l_buf_[s->last_lit_++] = cc; \
+    s->dyn_ltree_[cc].fc++; \
+    flush = (s->last_lit_ == s->lit_bufsize_-1); \
+   }
+# define _tr_tally_dist(s, distance, length, flush) \
+  { std::uint8_t len = (length); \
+    std::uint16_t dist = (distance); \
+    s->d_buf_[s->last_lit_] = dist; \
+    s->l_buf_[s->last_lit_++] = len; \
+    dist--; \
+    s->dyn_ltree_[s->lut_.length_code[len]+limits::literals+1].fc++; \
+    s->dyn_dtree_[s->d_code(dist)].fc++; \
+    flush = (s->last_lit_ == s->lit_bufsize_-1); \
+  }
+
+/* To be used only when the state is known to be valid */
+#define ERR_RETURN(strm,err) \
+  return (strm->msg = "unspecified zlib error", (err))
+
+/* Matches of length 3 are discarded if their distance exceeds TOO_FAR */
+#ifndef TOO_FAR
+#  define TOO_FAR 4096
+#endif
+
+/* Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
+ * For deflate_fast() (levels <= 3) good is ignored and lazy has a different
+ * meaning.
+ */
+
+/* rank Z_BLOCK between Z_NO_FLUSH and Z_PARTIAL_FLUSH */
+#define RANK(f) (((f) << 1) - ((f) > 4 ? 9 : 0))
+
+/* ===========================================================================
+ * Update a hash value with the given input byte
+ * IN  assertion: all calls to to UPDATE_HASH are made with consecutive
+ *    input characters, so that a running hash key can be computed from the
+ *    previous key instead of complete recalculation each time.
+ */
+#define UPDATE_HASH(s,h,c) (h = (((h)<<s->hash_shift_) ^ (c)) & s->hash_mask_)
+
+
+/* ===========================================================================
+ * Insert string str in the dictionary and set match_head to the previous head
+ * of the hash chain (the most recent string with same hash key). Return
+ * the previous length of the hash chain.
+ * If this file is compiled with -DFASTEST, the compression level is forced
+ * to 1, and no hash chains are maintained.
+ * IN  assertion: all calls to to INSERT_STRING are made with consecutive
+ *    input characters and the first limits::minMatch bytes of str are valid
+ *    (except for the last limits::minMatch-1 bytes of the input file).
+ */
+#define INSERT_STRING(s, str, match_head) \
+   (UPDATE_HASH(s, s->ins_h_, s->window_[(str) + (limits::minMatch-1)]), \
+    match_head = s->prev_[(str) & s->w_mask_] = s->head_[s->ins_h_], \
+    s->head_[s->ins_h_] = (std::uint16_t)(str))
+
+/* ===========================================================================
+ * Initialize the hash table (avoiding 64K overflow for 16 bit systems).
+ * prev[] will be initialized on the fly.
+ */
+#define CLEAR_HASH(s) \
+    s->head_[s->hash_size_-1] = 0; \
+    std::memset((Byte *)s->head_, 0, (unsigned)(s->hash_size_-1)*sizeof(*s->head_));
+
+#define MIN_LOOKAHEAD (limits::maxMatch+limits::minMatch+1)
+/* Minimum amount of lookahead, except at the end of the input file.
+ * See deflate.c for comments about the limits::minMatch+1.
+ */
+
+#define MAX_DIST(s)  ((s)->w_size_-MIN_LOOKAHEAD)
+/* In order to simplify the code, particularly on 16 bit machines, match
+ * distances are limited to MAX_DIST instead of WSIZE.
+ */
+
+#define WIN_INIT limits::maxMatch
+/* Number of bytes after end of data in window to initialize in order to avoid
+   memory checker errors from longest match routines */
+
+
+
+
 template<class Allocator>
 inline
 void
@@ -244,20 +328,6 @@ d_code(unsigned dist)
 
 
 
-
-#define MIN_LOOKAHEAD (limits::maxMatch+limits::minMatch+1)
-/* Minimum amount of lookahead, except at the end of the input file.
- * See deflate.c for comments about the limits::minMatch+1.
- */
-
-#define MAX_DIST(s)  ((s)->w_size_-MIN_LOOKAHEAD)
-/* In order to simplify the code, particularly on 16 bit machines, match
- * distances are limited to MAX_DIST instead of WSIZE.
- */
-
-#define WIN_INIT limits::maxMatch
-/* Number of bytes after end of data in window to initialize in order to avoid
-   memory checker errors from longest match routines */
 
 
 
@@ -1152,73 +1222,6 @@ copy_block(
     while (len--)
         put_byte(*buf++);
 }
-
-# define _tr_tally_lit(s, c, flush) \
-  { std::uint8_t cc = (c); \
-    s->d_buf_[s->last_lit_] = 0; \
-    s->l_buf_[s->last_lit_++] = cc; \
-    s->dyn_ltree_[cc].fc++; \
-    flush = (s->last_lit_ == s->lit_bufsize_-1); \
-   }
-# define _tr_tally_dist(s, distance, length, flush) \
-  { std::uint8_t len = (length); \
-    std::uint16_t dist = (distance); \
-    s->d_buf_[s->last_lit_] = dist; \
-    s->l_buf_[s->last_lit_++] = len; \
-    dist--; \
-    s->dyn_ltree_[s->lut_.length_code[len]+limits::literals+1].fc++; \
-    s->dyn_dtree_[s->d_code(dist)].fc++; \
-    flush = (s->last_lit_ == s->lit_bufsize_-1); \
-  }
-
-/* To be used only when the state is known to be valid */
-#define ERR_RETURN(strm,err) \
-  return (strm->msg = "unspecified zlib error", (err))
-
-/* Matches of length 3 are discarded if their distance exceeds TOO_FAR */
-#ifndef TOO_FAR
-#  define TOO_FAR 4096
-#endif
-
-/* Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
- * For deflate_fast() (levels <= 3) good is ignored and lazy has a different
- * meaning.
- */
-
-/* rank Z_BLOCK between Z_NO_FLUSH and Z_PARTIAL_FLUSH */
-#define RANK(f) (((f) << 1) - ((f) > 4 ? 9 : 0))
-
-/* ===========================================================================
- * Update a hash value with the given input byte
- * IN  assertion: all calls to to UPDATE_HASH are made with consecutive
- *    input characters, so that a running hash key can be computed from the
- *    previous key instead of complete recalculation each time.
- */
-#define UPDATE_HASH(s,h,c) (h = (((h)<<s->hash_shift_) ^ (c)) & s->hash_mask_)
-
-
-/* ===========================================================================
- * Insert string str in the dictionary and set match_head to the previous head
- * of the hash chain (the most recent string with same hash key). Return
- * the previous length of the hash chain.
- * If this file is compiled with -DFASTEST, the compression level is forced
- * to 1, and no hash chains are maintained.
- * IN  assertion: all calls to to INSERT_STRING are made with consecutive
- *    input characters and the first limits::minMatch bytes of str are valid
- *    (except for the last limits::minMatch-1 bytes of the input file).
- */
-#define INSERT_STRING(s, str, match_head) \
-   (UPDATE_HASH(s, s->ins_h_, s->window_[(str) + (limits::minMatch-1)]), \
-    match_head = s->prev_[(str) & s->w_mask_] = s->head_[s->ins_h_], \
-    s->head_[s->ins_h_] = (std::uint16_t)(str))
-
-/* ===========================================================================
- * Initialize the hash table (avoiding 64K overflow for 16 bit systems).
- * prev[] will be initialized on the fly.
- */
-#define CLEAR_HASH(s) \
-    s->head_[s->hash_size_-1] = 0; \
-    std::memset((Byte *)s->head_, 0, (unsigned)(s->hash_size_-1)*sizeof(*s->head_));
 
 /* ========================================================================= */
 
