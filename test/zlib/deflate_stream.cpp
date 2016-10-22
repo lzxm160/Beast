@@ -292,6 +292,9 @@ public:
         doMatrix("1.beast ", "Hello, world!", &self::doDeflate1_beast);
         doMatrix("2.zlib  ", "Hello, world!", &self::doDeflate2_zlib);
         doMatrix("2.beast ", "Hello, world!", &self::doDeflate2_beast);
+        auto const s = corpus1(100000);
+        doMatrix("3.zlib  ", s, &self::doDeflate1_zlib);
+        doMatrix("3.beast ", s, &self::doDeflate1_beast);
     }
 
     void
