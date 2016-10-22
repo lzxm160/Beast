@@ -214,6 +214,15 @@ send_bits(int value, int length)
     }
 }
 
+// Send a code of the given tree
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+send_code(int value, detail::ct_data const* tree)
+{
+    send_bits(tree[value].fc, tree[value].dl);
+}
 
 
 
@@ -245,9 +254,6 @@ send_bits(int value, int length)
  */
 #define d_code(dist) \
    ((dist) < 256 ? s->lut_.dist_code[dist] : s->lut_.dist_code[256+((dist)>>7)])
-
-/* Send a code of the given tree. c and tree must not have side effects */
-#  define send_code(s, c, tree) s->send_bits(tree[c].fc, tree[c].dl)
 
 
 /* ===========================================================================
@@ -659,7 +665,7 @@ send_tree(
         {
             do
             {
-                send_code(this, curlen, bl_tree_);
+                send_code(curlen, bl_tree_);
             }
             while (--count != 0);
         }
@@ -667,21 +673,21 @@ send_tree(
         {
             if(curlen != prevlen)
             {
-                send_code(this, curlen, bl_tree_);
+                send_code(curlen, bl_tree_);
                 count--;
             }
             Assert(count >= 3 && count <= 6, " 3_6?");
-            send_code(this, REP_3_6, bl_tree_);
+            send_code(REP_3_6, bl_tree_);
             send_bits(count-3, 2);
         }
         else if(count <= 10)
         {
-            send_code(this, REPZ_3_10, bl_tree_);
+            send_code(REPZ_3_10, bl_tree_);
             send_bits(count-3, 3);
         }
         else
         {
-            send_code(this, REPZ_11_138, bl_tree_);
+            send_code(REPZ_11_138, bl_tree_);
             send_bits(count-11, 7);
         }
         count = 0;
@@ -814,7 +820,7 @@ basic_deflate_stream<Allocator>::
 tr_align(basic_deflate_stream *s)
 {
     s->send_bits(STATIC_TREES<<1, 3);
-    send_code(s, END_BLOCK, s->lut_.ltree);
+    s->send_code(END_BLOCK, s->lut_.ltree);
     bi_flush(s);
 }
 
@@ -989,12 +995,12 @@ compress_block(
         dist = s->d_buf_[lx];
         lc = s->l_buf_[lx++];
         if(dist == 0) {
-            send_code(s, lc, ltree); /* send a literal byte */
+            s->send_code(lc, ltree); /* send a literal byte */
             Tracecv(isgraph(lc), (stderr," '%c' ", lc));
         } else {
             /* Here, lc is the match length - limits::minMatch */
             code = s->lut_.length_code[lc];
-            send_code(s, code+limits::literals+1, ltree); /* send the length code */
+            s->send_code(code+limits::literals+1, ltree); /* send the length code */
             extra = s->lut_.extra_lbits[code];
             if(extra != 0) {
                 lc -= s->lut_.base_length[code];
@@ -1004,7 +1010,7 @@ compress_block(
             code = d_code(dist);
             Assert (code < limits::dCodes, "bad d_code");
 
-            send_code(s, code, dtree);       /* send the distance code */
+            s->send_code(code, dtree);       /* send the distance code */
             extra = s->lut_.extra_dbits[code];
             if(extra != 0) {
                 dist -= s->lut_.base_dist[code];
@@ -1018,7 +1024,7 @@ compress_block(
 
     } while (lx < s->last_lit_);
 
-    send_code(s, END_BLOCK, ltree);
+    s->send_code(END_BLOCK, ltree);
 }
 
 /* ===========================================================================
