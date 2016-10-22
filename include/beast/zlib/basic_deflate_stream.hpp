@@ -116,6 +116,10 @@ public:
 private:
     detail::deflate_tables const& lut_;
 
+    void put_byte(std::uint8_t c);
+    void put_short(std::uint16_t w);
+    void send_bits(int value, int length);
+
     static void fill_window(basic_deflate_stream *s);
 
     static block_state deflate_stored(basic_deflate_stream *s, int flush);
@@ -371,23 +375,6 @@ private:
      * updated to the new high water mark.
      */
     std::uint32_t high_water_;
-
-    inline
-    void
-    put_byte(std::uint8_t c)
-    {
-        pending_buf_[pending_++] = c;
-    }
-
-    inline
-    void
-    put_short(std::uint16_t w)
-    {
-        put_byte(w & 0xff);
-        put_byte(w >> 8);
-    }
-
-    void send_bits(int value, int length);
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;

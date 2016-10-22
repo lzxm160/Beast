@@ -170,13 +170,30 @@ reset(
     return deflateReset();
 }
 
+//------------------------------------------------------------------------------
 
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+put_byte(std::uint8_t c)
+{
+    pending_buf_[pending_++] = c;
+}
 
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+put_short(std::uint16_t w)
+{
+    put_byte(w & 0xff);
+    put_byte(w >> 8);
+}
 
-/* ===========================================================================
- * Send a value on a given number of bits.
- * IN assertion: length <= 16 and value fits in length bits.
- */
+// Send a value on a given number of bits.
+// IN assertion: length <= 16 and value fits in length bits.
+//
 template<class Allocator>
 inline
 void
