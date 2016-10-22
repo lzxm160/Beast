@@ -376,8 +376,6 @@ init_block()
     matches_ = 0;
 }
 
-#define SMALLEST 1
-/* Index within the heap array of least frequent node in the Huffman tree */
 
 
 /* ===========================================================================
@@ -386,9 +384,9 @@ init_block()
  */
 #define pqremove(s, tree, top) \
 {\
-    top = s->heap_[SMALLEST]; \
-    s->heap_[SMALLEST] = s->heap_[s->heap_len_--]; \
-    s->pqdownheap(tree, SMALLEST); \
+    top = s->heap_[kSmallest]; \
+    s->heap_[kSmallest] = s->heap_[s->heap_len_--]; \
+    s->pqdownheap(tree, kSmallest); \
 }
 
 /* ===========================================================================
@@ -556,7 +554,7 @@ build_tree(tree_desc *desc)
     int node;          // new node being created
 
     /* Construct the initial heap, with least frequent element in
-     * heap[SMALLEST]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
+     * heap[kSmallest]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
      * heap[0] is not used.
      */
     heap_len_ = 0;
@@ -605,7 +603,7 @@ build_tree(tree_desc *desc)
     do
     {
         pqremove(this, tree, n);  /* n = node of least frequency */
-        m = heap_[SMALLEST]; /* m = node of next least frequency */
+        m = heap_[kSmallest]; /* m = node of next least frequency */
 
         heap_[--(heap_max_)] = n; /* keep the nodes sorted by frequency */
         heap_[--(heap_max_)] = m;
@@ -616,13 +614,13 @@ build_tree(tree_desc *desc)
                                 depth_[n] : depth_[m]) + 1);
         tree[n].dl = tree[m].dl = (std::uint16_t)node;
         /* and insert the new node in the heap */
-        heap_[SMALLEST] = node++;
-        pqdownheap(tree, SMALLEST);
+        heap_[kSmallest] = node++;
+        pqdownheap(tree, kSmallest);
 
     }
     while(heap_len_ >= 2);
 
-    heap_[--(heap_max_)] = heap_[SMALLEST];
+    heap_[--(heap_max_)] = heap_[kSmallest];
 
     /* At this point, the fields freq and dad are set. We can now
      * generate the bit lengths.

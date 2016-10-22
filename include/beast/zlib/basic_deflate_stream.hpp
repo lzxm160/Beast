@@ -315,9 +315,13 @@ private:
     // number of codes at each bit length for an optimal tree
     std::uint16_t bl_count_[limits::maxBits+1];
 
+    // Index within the heap array of least frequent node in the Huffman tree
+    static std::size_t constexpr kSmallest = 1;
+
     /*  The sons of heap[n] are heap[2*n] and heap[2*n+1].
         heap[0] is not used. The same heap array is used to build all trees.
     */
+
     int heap_[2*limits::lCodes+1];  // heap used to build the Huffman trees
     int heap_len_;                  // number of elements in the heap
     int heap_max_;                  // element of largest frequency
