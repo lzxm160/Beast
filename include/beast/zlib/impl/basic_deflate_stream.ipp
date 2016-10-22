@@ -1417,7 +1417,7 @@ deflateReset(basic_deflate_stream* strm)
 
     ret = deflateResetKeep(strm);
     if(ret == Z_OK)
-        lm_init(strm);
+        strm->lm_init();
     return ret;
 }
 
@@ -1742,27 +1742,27 @@ read_buf(basic_deflate_stream* strm, Byte *buf, unsigned size)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-lm_init(basic_deflate_stream *s)
+lm_init()
 {
-    s->window_size_ = (std::uint32_t)2L*s->w_size_;
+    window_size_ = (std::uint32_t)2L*w_size_;
 
-    CLEAR_HASH(s);
+    CLEAR_HASH(this);
 
     /* Set the default configuration parameters:
      */
     // VFALCO TODO just copy the config struct
-    s->max_lazy_match_   = get_config(s->level_).max_lazy;
-    s->good_match_       = get_config(s->level_).good_length;
-    s->nice_match_       = get_config(s->level_).nice_length;
-    s->max_chain_length_ = get_config(s->level_).max_chain;
+    max_lazy_match_   = get_config(level_).max_lazy;
+    good_match_       = get_config(level_).good_length;
+    nice_match_       = get_config(level_).nice_length;
+    max_chain_length_ = get_config(level_).max_chain;
 
-    s->strstart_ = 0;
-    s->block_start_ = 0L;
-    s->lookahead_ = 0;
-    s->insert_ = 0;
-    s->match_length_ = s->prev_length_ = limits::minMatch-1;
-    s->match_available_ = 0;
-    s->ins_h_ = 0;
+    strstart_ = 0;
+    block_start_ = 0L;
+    lookahead_ = 0;
+    insert_ = 0;
+    match_length_ = prev_length_ = limits::minMatch-1;
+    match_available_ = 0;
+    ins_h_ = 0;
 }
 
 /* ===========================================================================
