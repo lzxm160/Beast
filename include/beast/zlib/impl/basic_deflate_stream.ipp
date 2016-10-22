@@ -1561,26 +1561,23 @@ deflateBound(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-flush_pending(basic_deflate_stream* strm)
+flush_pending()
 {
-    unsigned len;
-    auto s = strm;
-
-    s->tr_flush_bits();
-    len = s->pending_;
-    if(len > strm->avail_out) len = strm->avail_out;
+    tr_flush_bits();
+    unsigned len = pending_;
+    if(len > avail_out)
+        len = avail_out;
     if(len == 0) return;
 
-    std::memcpy(strm->next_out, s->pending_out_, len);
-    strm->next_out = static_cast<std::uint8_t*>(
-        strm->next_out) + len;
-    s->pending_out_  += len;
-    strm->total_out += len;
-    strm->avail_out  -= len;
-    s->pending_ -= len;
-    if(s->pending_ == 0) {
-        s->pending_out_ = s->pending_buf_;
-    }
+    std::memcpy(next_out, pending_out_, len);
+    next_out = static_cast<std::uint8_t*>(
+        next_out) + len;
+    pending_out_  += len;
+    total_out += len;
+    avail_out  -= len;
+    pending_ -= len;
+    if(pending_ == 0)
+        pending_out_ = pending_buf_;
 }
 
 /* ========================================================================= */
@@ -1611,7 +1608,7 @@ auto strm = this;
 
     /* Flush as much pending output as possible */
     if(s->pending_ != 0) {
-        flush_pending(strm);
+        strm->flush_pending();
         if(strm->avail_out == 0) {
             /* Since avail_out is 0, deflate will be called again with
              * more output space, but possibly with both pending and
@@ -1680,7 +1677,7 @@ auto strm = this;
                     }
                 }
             }
-            flush_pending(strm);
+            strm->flush_pending();
             if(strm->avail_out == 0) {
               s->last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
               return Z_OK;
@@ -1868,7 +1865,7 @@ longest_match(basic_deflate_stream *s, IPos cur_match)
                 (std::uint32_t)((long)s->strstart_ - s->block_start_), \
                 (last)); \
    s->block_start_ = s->strstart_; \
-   flush_pending(s); \
+   s->flush_pending(); \
    Tracev((stderr,"[FLUSH]")); \
 }
 

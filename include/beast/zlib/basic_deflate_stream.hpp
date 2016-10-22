@@ -131,7 +131,7 @@ private:
     static block_state deflate_huff(basic_deflate_stream *s, int flush);
 
     void lm_init();
-    static void flush_pending  (basic_deflate_stream* strm);
+    void flush_pending();
     static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
     static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
 
