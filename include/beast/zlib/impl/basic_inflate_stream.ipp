@@ -271,7 +271,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 7;
-            inflate_table(detail::CODES, &lens_[0],
+            inflate_table(detail::build::codes, &lens_[0],
                 order.size(), &next_, &lenbits_, work_, ec);
             if(ec)
             {
@@ -354,7 +354,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             next_ = &codes_[0];
             lencode_ = next_;
             lenbits_ = 9;
-            inflate_table(detail::LENS, &lens_[0],
+            inflate_table(detail::build::lens, &lens_[0],
                 nlen_, &next_, &lenbits_, work_, ec);
             if(ec)
             {
@@ -363,7 +363,7 @@ write(z_params& zs, Flush flush, error_code& ec)
             }
             distcode_ = next_;
             distbits_ = 6;
-            inflate_table(detail::DISTS, lens_ + nlen_,
+            inflate_table(detail::build::dists, lens_ + nlen_,
                 ndist_, &next_, &distbits_, work_, ec);
             if(ec)
             {

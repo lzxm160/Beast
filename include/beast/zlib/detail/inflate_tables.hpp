@@ -38,12 +38,13 @@
 #include <beast/zlib/error.hpp>
 #include <cstdint>
 
+//------------------------------------------------------------------------------
+
 namespace beast {
 namespace zlib {
 namespace detail {
 
-/*
-    Structure for decoding tables.  Each entry provides either the
+/*  Structure for decoding tables.  Each entry provides either the
     information needed to do the operation requested by the code that
     indexed that table entry, or it provides a pointer to another
     table that indexes more bits of the code.  op indicates whether
@@ -67,27 +68,24 @@ namespace detail {
 */
 struct code
 {
-    std::uint8_t op;           // operation, extra bits, table bits
-    std::uint8_t bits;         // bits in this part of the code
-    std::uint16_t val;         // offset in table or code value
-
-    bool operator==(code const& other) const
-    {
-        return op == other.op && bits == other.bits && val == other.val;
-    }
+    std::uint8_t  op;   // operation, extra bits, table bits
+    std::uint8_t  bits; // bits in this part of the code
+    std::uint16_t val;  // offset in table or code value
 };
 
-/* Maximum size of the dynamic table.  The maximum number of code structures is
-   1444, which is the sum of 852 for literal/length codes and 592 for distance
-   codes.  These values were found by exhaustive searches using the program
-   examples/enough.c found in the zlib distribtution.  The arguments to that
-   program are the number of symbols, the initial root table size, and the
-   maximum bit length of a code.  "enough 286 9 15" for literal/length codes
-   returns returns 852, and "enough 30 6 15" for distance codes returns 592.
-   The initial root table size (9 or 6) is found in the fifth argument of the
-   inflate_table() calls in inflate.c and infback.c.  If the root table size is
-   changed, then these maximum sizes would be need to be recalculated and
-   updated. */
+/*  Maximum size of the dynamic table.  The maximum number of code
+    structures is 1444, which is the sum of 852 for literal/length codes
+    and 592 for distance codes.  These values were found by exhaustive
+    searches using the program examples/enough.c found in the zlib
+    distribtution.  The arguments to that program are the number of
+    symbols, the initial root table size, and the maximum bit length
+    of a code.  "enough 286 9 15" for literal/length codes returns
+    returns 852, and "enough 30 6 15" for distance codes returns 592.
+    The initial root table size (9 or 6) is found in the fifth argument
+    of the inflate_table() calls in inflate.c and infback.c.  If the
+    root table size is changed, then these maximum sizes would be need
+    to be recalculated and updated.
+*/
 std::uint16_t constexpr kEnoughLens = 852;
 std::uint16_t constexpr kEnoughDists = 592;
 std::uint16_t constexpr kEnough = kEnoughLens + kEnoughDists;
@@ -100,33 +98,33 @@ struct codes
     unsigned distbits;
 };
 
-/* Type of code to build for inflate_table() */
-enum codetype
+// Type of code to build for inflate_table()
+enum class build
 {
-    CODES,
-    LENS,
-    DISTS
+    codes,
+    lens,
+    dists
 };
 
-/*
-   Build a set of tables to decode the provided canonical Huffman code.
-   The code lengths are lens[0..codes-1].  The result starts at *table,
-   whose indices are 0..2^bits-1.  work is a writable array of at least
-   lens shorts, which is used as a work area.  type is the type of code
-   to be generated, CODES, LENS, or DISTS.  On return, zero is success,
-   -1 is an invalid code, and +1 means that kEnough isn't enough.  table
-   on return points to the next available entry's address.  bits is the
-   requested root table index bits, and on return it is the actual root
-   table index bits.  It will differ if the request is greater than the
-   longest code or if it is less than the shortest code.
- */
+/*  Build a set of tables to decode the provided canonical Huffman code.
+    The code lengths are lens[0..codes-1].  The result starts at *table,
+    whose indices are 0..2^bits-1.  work is a writable array of at least
+    lens shorts, which is used as a work area.  type is the type of code
+    to be generated, build::codes, build::lens, or build::dists.  On
+    return, zero is success, -1 is an invalid code, and +1 means that
+    kEnough isn't enough.  table on return points to the next available
+    entry's address.  bits is the requested root table index bits, and
+    on return it is the actual root table index bits.  It will differ if
+    the request is greater than the longest code or if it is less than
+    the shortest code.
+*/
 template<class = void>
 void
 inflate_table(
-    codetype type,
-    std::uint16_t *lens,
+    build type,
+    std::uint16_t* lens,
     std::size_t codes,
-    code * *table,
+    code** table,
     unsigned *bits,
     std::uint16_t* work,
     error_code& ec)
@@ -242,7 +240,7 @@ inflate_table(
             return;
         }
     }
-    if (left > 0 && (type == CODES || max != 1))
+    if (left > 0 && (type == build::codes || max != 1))
     {
         ec = error::incomplete_length_set;
         return;
@@ -278,7 +276,7 @@ inflate_table(
        entered in the tables.
 
        used keeps track of how many table entries have been allocated from the
-       provided *table space.  It is checked for LENS and DIST tables against
+       provided *table space.  It is checked for build::lens and DIST tables against
        the constants kEnoughLens and kEnoughDists to guard against changes in
        the initial root table size constants.  See the comments in inftrees.hpp
        for more information.
@@ -292,18 +290,18 @@ inflate_table(
     /* set up for code type */
     switch (type)
     {
-    case CODES:
+    case build::codes:
         base = extra = work;    /* dummy value--not used */
         end = 19;
         break;
-    case LENS:
+    case build::lens:
         base = lbase;
         base -= 257;
         extra = lext;
         extra -= 257;
         end = 256;
         break;
-    default:            /* DISTS */
+    default:            /* build::dists */
         base = dbase;
         extra = dext;
         end = -1;
@@ -326,9 +324,9 @@ inflate_table(
             "insufficient output size when inflating tables");
     };
 
-    /* check available table space */
-    if ((type == LENS && used > kEnoughLens) ||
-            (type == DISTS && used > kEnoughDists))
+    // check available table space
+    if ((type == build::lens && used > kEnoughLens) ||
+            (type == build::dists && used > kEnoughDists))
         return not_enough();
 
     /* process all codes and make table entries */
@@ -405,8 +403,8 @@ inflate_table(
 
             /* check for enough space */
             used += 1U << curr;
-            if ((type == LENS && used > kEnoughLens) ||
-                    (type == DISTS && used > kEnoughDists))
+            if ((type == build::lens && used > kEnoughLens) ||
+                    (type == build::dists && used > kEnoughDists))
                 return not_enough();
 
             /* point entry in root table to sub-table */
@@ -465,14 +463,14 @@ get_fixed_tables()
                 lens[sym++] = 8;
             next = &len[0];
             error_code ec;
-            inflate_table(LENS, lens, 288, &next, &lenbits, work, ec);
+            inflate_table(build::lens, lens, 288, &next, &lenbits, work, ec);
             if(ec)
                 throw std::logic_error{ec.message()};
             sym = 0;
             while(sym < 32)
                 lens[sym++] = 5;
             next = &dist[0];
-            inflate_table(DISTS, lens, 32, &next, &distbits, work, ec);
+            inflate_table(build::dists, lens, 32, &next, &distbits, work, ec);
             if(ec)
                 throw std::logic_error{ec.message()};
 
