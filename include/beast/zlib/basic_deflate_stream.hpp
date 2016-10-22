@@ -100,7 +100,7 @@ public:
     int
     deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
 
-    static int deflateResetKeep (basic_deflate_stream* strm);
+    int deflateResetKeep();
     static int deflateReset (basic_deflate_stream* strm);
     static int deflateParams (basic_deflate_stream* strm, int level, int strategy);
     static int deflateTune (basic_deflate_stream* strm,
@@ -125,14 +125,14 @@ private:
     static int read_buf        (basic_deflate_stream* strm, Byte *buf, unsigned size);
     static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
 
-    void init_block();
-    void pqdownheap(detail::ct_data *tree, int k);
-    void gen_bitlen(tree_desc *desc);
-    void build_tree(tree_desc *desc);
-    void scan_tree(detail::ct_data *tree, int max_code);
-    void send_tree(detail::ct_data *tree, int max_code);
-    int  build_bl_tree();
-    void send_all_trees(int lcodes, int dcodes, int blcodes);
+    void init_block     ();
+    void pqdownheap     (detail::ct_data *tree, int k);
+    void gen_bitlen     (tree_desc *desc);
+    void build_tree     (tree_desc *desc);
+    void scan_tree      (detail::ct_data *tree, int max_code);
+    void send_tree      (detail::ct_data *tree, int max_code);
+    int  build_bl_tree  ();
+    void send_all_trees (int lcodes, int dcodes, int blcodes);
 
     static void tr_init (basic_deflate_stream *s);
     static int  tr_tally (basic_deflate_stream *s, unsigned dist, unsigned lc);

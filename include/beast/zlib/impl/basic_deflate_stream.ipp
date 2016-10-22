@@ -1388,20 +1388,20 @@ auto strm = this;
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateResetKeep(basic_deflate_stream* strm)
+deflateResetKeep()
 {
-    strm->total_in = strm->total_out = 0;
-    strm->msg = 0;
-    strm->data_type = Z_UNKNOWN;
+    total_in = 0;
+    total_out = 0;
+    msg = 0;
+    data_type = Z_UNKNOWN;
 
-    auto s = strm;
-    s->pending_ = 0;
-    s->pending_out_ = s->pending_buf_;
+    pending_ = 0;
+    pending_out_ = pending_buf_;
 
-    s->status_ = BUSY_STATE;
-    s->last_flush_ = Z_NO_FLUSH;
+    status_ = BUSY_STATE;
+    last_flush_ = Z_NO_FLUSH;
 
-    tr_init(s);
+    tr_init(this);
 
     return Z_OK;
 }
@@ -1415,7 +1415,7 @@ deflateReset(basic_deflate_stream* strm)
 {
     int ret;
 
-    ret = deflateResetKeep(strm);
+    ret = strm->deflateResetKeep();
     if(ret == Z_OK)
         strm->lm_init();
     return ret;
