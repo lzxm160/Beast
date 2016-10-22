@@ -111,7 +111,9 @@ public:
         int good_length, int max_lazy, int nice_length, int max_chain);
     static std::size_t deflateBound (basic_deflate_stream* strm, std::size_t sourceLen);
     static int deflatePending (basic_deflate_stream* strm, unsigned *pending, int *bits);
-    static int deflatePrime (basic_deflate_stream* strm, int bits, int value);
+
+    int
+    prime(int bits, int value);
 
 private:
     detail::deflate_tables const& lut_;

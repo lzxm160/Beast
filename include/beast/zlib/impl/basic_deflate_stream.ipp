@@ -1427,23 +1427,24 @@ deflatePending (
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflatePrime(basic_deflate_stream* strm, int bits, int value)
+prime(int bits, int value)
 {
     int put;
 
-    auto s = strm;
-    if((Byte *)(s->d_buf_) < s->pending_out_ + ((Buf_size + 7) >> 3))
+    if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
         return Z_BUF_ERROR;
-    do {
-        put = Buf_size - s->bi_valid_;
+    do
+    {
+        put = Buf_size - bi_valid_;
         if(put > bits)
             put = bits;
-        s->bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << s->bi_valid_);
-        s->bi_valid_ += put;
-        s->tr_flush_bits();
+        bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
+        bi_valid_ += put;
+        tr_flush_bits();
         value >>= put;
         bits -= put;
-    } while (bits);
+    }
+    while(bits);
     return Z_OK;
 }
 
