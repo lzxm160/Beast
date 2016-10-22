@@ -1526,12 +1526,21 @@ tune(
  * upper bound of about 14% expansion does not seem onerous for output buffer
  * allocation.
  */
+
+inline
+std::size_t
+deflate_upper_bound(std::size_t bytes)
+{
+    return bytes +
+        ((bytes + 7) >> 3) +
+        ((bytes + 63) >> 6) + 5 +
+        6;
+}
+
 template<class Allocator>
 std::size_t
 basic_deflate_stream<Allocator>::
-deflateBound(
-    basic_deflate_stream* strm,
-    std::size_t sourceLen)
+upper_bound(std::size_t sourceLen) const
 {
     std::size_t complen;
     std::size_t wraplen;
@@ -1540,16 +1549,11 @@ deflateBound(
     complen = sourceLen +
               ((sourceLen + 7) >> 3) + ((sourceLen + 63) >> 6) + 5;
 
-    /* if can't get parameters, return conservative bound plus zlib wrapper */
-    if(strm == 0 || strm == 0)
-        return complen + 6;
-
     /* compute wrapper length */
-    auto s = strm;
     wraplen = 0;
 
     /* if not default parameters, return conservative bound */
-    if(s->w_bits_ != 15 || s->hash_bits_ != 8 + 7)
+    if(w_bits_ != 15 || hash_bits_ != 8 + 7)
         return complen + wraplen;
 
     /* default settings: return tight bound for that case */

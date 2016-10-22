@@ -86,7 +86,7 @@ public:
             strategy);
         if(! BEAST_EXPECT(result == Z_OK))
             goto err;
-        out.resize(deflate_stream::deflateBound(&zs,
+        out.resize(zs.upper_bound(
             static_cast<uLong>(check.size())));
         zs.next_in = (Bytef*)check.data();
         zs.avail_in = static_cast<uInt>(check.size());
@@ -210,7 +210,7 @@ public:
                 if(! BEAST_EXPECT(result == Z_OK))
                     continue;
                 std::string out;
-                out.resize(deflate_stream::deflateBound(&zs,
+                out.resize(zs.upper_bound(
                     static_cast<uLong>(check.size())));
                 if(j >= out.size())
                     break;

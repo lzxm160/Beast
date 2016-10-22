@@ -44,6 +44,19 @@
 namespace beast {
 namespace zlib {
 
+/** Returns the upper limit on the size of a compressed block.
+
+    This function makes a conservative estimate of the maximum number
+    of bytes needed to store the result of compressing a block of
+    data.
+
+    @param bytes The size of the uncompressed data.
+
+    @return The maximum number of resulting compressed bytes.
+*/
+std::size_t
+deflate_upper_bound(std::size_t bytes);
+
 /** Raw deflate compressor.
 
     This is a port of zlib's "deflate" functionality to C++.
@@ -112,7 +125,8 @@ public:
     int
     tune(int good_length, int max_lazy, int nice_length, int max_chain);
 
-    static std::size_t deflateBound (basic_deflate_stream* strm, std::size_t sourceLen);
+    std::size_t
+    upper_bound(std::size_t sourceLen) const;
     
     int
     pending(unsigned *pending, int *bits);
