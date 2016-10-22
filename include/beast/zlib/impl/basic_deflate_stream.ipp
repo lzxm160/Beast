@@ -378,16 +378,6 @@ init_block()
 
 
 
-/* ===========================================================================
- * Remove the smallest element from the heap and recreate the heap with
- * one less element. Updates heap and heap_len.
- */
-#define pqremove(s, tree, top) \
-{\
-    top = s->heap_[kSmallest]; \
-    s->heap_[kSmallest] = s->heap_[s->heap_len_--]; \
-    s->pqdownheap(tree, kSmallest); \
-}
 
 /* ===========================================================================
  * Compares to subtrees, using the tree depth as tie breaker when
@@ -407,7 +397,7 @@ template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 pqdownheap(
-    detail::ct_data *tree,  /* the tree to restore */
+    detail::ct_data const* tree,  /* the tree to restore */
     int k)               /* node to move down */
 {
     int v = heap_[k];
@@ -431,6 +421,21 @@ pqdownheap(
         j <<= 1;
     }
     heap_[k] = v;
+}
+
+/* ===========================================================================
+ * Remove the smallest element from the heap and recreate the heap with
+ * one less element. Updates heap and heap_len.
+ */
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+pqremove(detail::ct_data const* tree, int& top)
+{
+    top = heap_[kSmallest];
+    heap_[kSmallest] = heap_[heap_len_--];
+    pqdownheap(tree, kSmallest);
 }
 
 /* ===========================================================================
@@ -602,7 +607,7 @@ build_tree(tree_desc *desc)
     node = elems;              /* next internal node of the tree */
     do
     {
-        pqremove(this, tree, n);  /* n = node of least frequency */
+        pqremove(tree, n);  /* n = node of least frequency */
         m = heap_[kSmallest]; /* m = node of next least frequency */
 
         heap_[--(heap_max_)] = n; /* keep the nodes sorted by frequency */
