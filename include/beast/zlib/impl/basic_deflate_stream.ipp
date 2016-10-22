@@ -178,16 +178,6 @@ reset(
     s->dyn_ltree_[cc].fc++; \
     flush = (s->last_lit_ == s->lit_bufsize_-1); \
    }
-# define _tr_tally_dist(s, distance, length, flush) \
-  { std::uint8_t len = (length); \
-    std::uint16_t dist = (distance); \
-    s->d_buf_[s->last_lit_] = dist; \
-    s->l_buf_[s->last_lit_++] = len; \
-    dist--; \
-    s->dyn_ltree_[s->lut_.length_code[len]+limits::literals+1].fc++; \
-    s->dyn_dtree_[s->d_code(dist)].fc++; \
-    flush = (s->last_lit_ == s->lit_bufsize_-1); \
-  }
 
 /* To be used only when the state is known to be valid */
 #define ERR_RETURN(strm,err) \
@@ -1152,6 +1142,20 @@ tr_flush_block(
            compressed_len_-7*last));
 }
 
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
+{
+    d_buf_[last_lit_] = dist;
+    l_buf_[last_lit_++] = len;
+    dist--;
+    dyn_ltree_[lut_.length_code[len]+limits::literals+1].fc++;
+    dyn_dtree_[d_code(dist)].fc++;
+    flush = (last_lit_ == lit_bufsize_-1);
+}
+
 //------------------------------------------------------------------------------
 
 /*  Initialize the "longest match" routines for a new zlib stream
@@ -1936,20 +1940,22 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
     block_state
 {
     IPos hash_head;       /* head of the hash chain */
-    int bflush;           /* set if current block must be flushed */
+    bool bflush;           /* set if current block must be flushed */
 
-    for(;;) {
+    for(;;)
+    {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the next match, plus limits::minMatch bytes to insert the
          * string following the next match.
          */
-        if(s->lookahead_ < MIN_LOOKAHEAD) {
+        if(s->lookahead_ < MIN_LOOKAHEAD)
+        {
             s->fill_window();
-            if(s->lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
+            if(s->lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH)
                 return need_more;
-            }
-            if(s->lookahead_ == 0) break; /* flush the current block */
+            if(s->lookahead_ == 0)
+                break; /* flush the current block */
         }
 
         /* Insert the string window[strstart .. strstart+2] in the
@@ -1974,7 +1980,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
         if(s->match_length_ >= limits::minMatch) {
             check_match(s, s->strstart_, s->match_start_, s->match_length_);
 
-            _tr_tally_dist(s, s->strstart_ - s->match_start_,
+            s->tr_tally_dist(s->strstart_ - s->match_start_,
                            s->match_length_ - limits::minMatch, bflush);
 
             s->lookahead_ -= s->match_length_;
@@ -2034,10 +2040,11 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
     block_state
 {
     IPos hash_head;          /* head of hash chain */
-    int bflush;              /* set if current block must be flushed */
+    bool bflush;              /* set if current block must be flushed */
 
     /* Process the input block. */
-    for(;;) {
+    for(;;)
+    {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the next match, plus limits::minMatch bytes to insert the
@@ -2095,7 +2102,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
 
             check_match(s, s->strstart_-1, s->prev_match_, s->prev_length_);
 
-            _tr_tally_dist(s, s->strstart_ -1 - s->prev_match_,
+            s->tr_tally_dist(s->strstart_ -1 - s->prev_match_,
                            s->prev_length_ - limits::minMatch, bflush);
 
             /* Insert in hash table all strings up to the end of the match.
@@ -2165,11 +2172,12 @@ basic_deflate_stream<Allocator>::
 deflate_rle(basic_deflate_stream *s, int flush) ->
     block_state
 {
-    int bflush;             /* set if current block must be flushed */
+    bool bflush;             /* set if current block must be flushed */
     uInt prev;              /* byte at distance one to match */
     Byte *scan, *strend;   /* scan goes up to strend for length of run */
 
-    for(;;) {
+    for(;;)
+    {
         /* Make sure that we always have enough lookahead, except
          * at the end of the input file. We need limits::maxMatch bytes
          * for the longest run, plus one for the unrolled loop.
@@ -2206,7 +2214,7 @@ deflate_rle(basic_deflate_stream *s, int flush) ->
         if(s->match_length_ >= limits::minMatch) {
             check_match(s, s->strstart_, s->strstart_ - 1, s->match_length_);
 
-            _tr_tally_dist(s, 1, s->match_length_ - limits::minMatch, bflush);
+            s->tr_tally_dist(1, s->match_length_ - limits::minMatch, bflush);
 
             s->lookahead_ -= s->match_length_;
             s->strstart_ += s->match_length_;
