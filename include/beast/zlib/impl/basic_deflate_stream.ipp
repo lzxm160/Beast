@@ -1757,45 +1757,46 @@ lm_init()
 template<class Allocator>
 uInt
 basic_deflate_stream<Allocator>::
-longest_match(basic_deflate_stream *s, IPos cur_match)
+longest_match(IPos cur_match)
 {
-    unsigned chain_length = s->max_chain_length_;/* max hash chain length */
-    Byte *scan = s->window_ + s->strstart_; /* current string */
+    unsigned chain_length = max_chain_length_;/* max hash chain length */
+    Byte *scan = window_ + strstart_; /* current string */
     Byte *match;                       /* matched string */
     int len;                           /* length of current match */
-    int best_len = s->prev_length_;              /* best match length so far */
-    int nice_match = s->nice_match_;             /* stop if match long enough */
-    IPos limit = s->strstart_ > (IPos)MAX_DIST(s) ?
-        s->strstart_ - (IPos)MAX_DIST(s) : 0;
+    int best_len = prev_length_;              /* best match length so far */
+    int nice_match = nice_match_;             /* stop if match long enough */
+    IPos limit = strstart_ > (IPos)MAX_DIST(this) ?
+        strstart_ - (IPos)MAX_DIST(this) : 0;
     /* Stop when cur_match becomes <= limit. To simplify the code,
      * we prevent matches with the string of window index 0.
      */
-    std::uint16_t *prev = s->prev_;
-    uInt wmask = s->w_mask_;
+    std::uint16_t *prev = prev_;
+    uInt wmask = w_mask_;
 
-    Byte *strend = s->window_ + s->strstart_ + limits::maxMatch;
+    Byte *strend = window_ + strstart_ + limits::maxMatch;
     Byte scan_end1  = scan[best_len-1];
     Byte scan_end   = scan[best_len];
 
     /* The code is optimized for HASH_BITS >= 8 and limits::maxMatch-2 multiple of 16.
      * It is easy to get rid of this optimization if necessary.
      */
-    Assert(s->hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
+    Assert(hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
 
     /* Do not waste too much time if we already have a good match: */
-    if(s->prev_length_ >= s->good_match_) {
+    if(prev_length_ >= good_match_) {
         chain_length >>= 2;
     }
     /* Do not look for matches beyond the end of the input. This is necessary
      * to make deflate deterministic.
      */
-    if((uInt)nice_match > s->lookahead_) nice_match = s->lookahead_;
+    if((uInt)nice_match > lookahead_)
+        nice_match = lookahead_;
 
-    Assert((std::uint32_t)s->strstart_ <= s->window_size_-MIN_LOOKAHEAD, "need lookahead");
+    Assert((std::uint32_t)strstart_ <= window_size_-MIN_LOOKAHEAD, "need lookahead");
 
     do {
-        Assert(cur_match < s->strstart_, "no future");
-        match = s->window_ + cur_match;
+        Assert(cur_match < strstart_, "no future");
+        match = window_ + cur_match;
 
         /* Skip to next match if the match length cannot increase
          * or if the match length is less than 2.  Note that the checks below
@@ -1829,13 +1830,13 @@ longest_match(basic_deflate_stream *s, IPos cur_match)
                  *++scan == *++match && *++scan == *++match &&
                  scan < strend);
 
-        Assert(scan <= s->window_+(unsigned)(s->window_size_-1), "wild scan");
+        Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
 
         len = limits::maxMatch - (int)(strend - scan);
         scan = strend - limits::maxMatch;
 
         if(len > best_len) {
-            s->match_start_ = cur_match;
+            match_start_ = cur_match;
             best_len = len;
             if(len >= nice_match) break;
             scan_end1  = scan[best_len-1];
@@ -1844,8 +1845,9 @@ longest_match(basic_deflate_stream *s, IPos cur_match)
     } while ((cur_match = prev[cur_match & wmask]) > limit
              && --chain_length != 0);
 
-    if((uInt)best_len <= s->lookahead_) return (uInt)best_len;
-    return s->lookahead_;
+    if((uInt)best_len <= lookahead_)
+        return (uInt)best_len;
+    return lookahead_;
 }
 
 #  define check_match(s, start, match, length)
@@ -1986,7 +1988,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
              * of window index 0 (in particular we have to avoid a match
              * of the string with itself at the start of the input file).
              */
-            s->match_length_ = longest_match (s, hash_head);
+            s->match_length_ = s->longest_match (hash_head);
             /* longest_match() sets match_start */
         }
         if(s->match_length_ >= limits::minMatch) {
@@ -2088,7 +2090,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
              * of window index 0 (in particular we have to avoid a match
              * of the string with itself at the start of the input file).
              */
-            s->match_length_ = longest_match (s, hash_head);
+            s->match_length_ = s->longest_match(hash_head);
             /* longest_match() sets match_start */
 
             if(s->match_length_ <= 5 && (s->strategy_ == Z_FILTERED

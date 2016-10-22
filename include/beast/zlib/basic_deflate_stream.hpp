@@ -133,7 +133,7 @@ private:
     void lm_init();
     void flush_pending();
     int read_buf(Byte *buf, unsigned size);
-    static uInt longest_match  (basic_deflate_stream *s, IPos cur_match);
+    uInt longest_match(IPos cur_match);
 
     void init_block     ();
     void pqdownheap     (detail::ct_data *tree, int k);
