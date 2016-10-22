@@ -152,7 +152,7 @@ private:
     void tr_stored_block (char *bu, std::uint32_t stored_len, int last);
 
     void compress_block(detail::ct_data const* ltree, detail::ct_data const* dtree);
-    static int  detect_data_type (basic_deflate_stream *s);
+    int  detect_data_type();
     static void bi_flush       (basic_deflate_stream *s);
     static void bi_windup      (basic_deflate_stream *s);
     static void copy_block     (basic_deflate_stream *s, char *buf, unsigned len,

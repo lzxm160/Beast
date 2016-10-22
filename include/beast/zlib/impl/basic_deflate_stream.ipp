@@ -850,7 +850,7 @@ tr_flush_block(
     {
         // Check if the file is binary or text
         if(data_type == Z_UNKNOWN)
-            data_type = detect_data_type(this);
+            data_type = detect_data_type();
 
         // Construct the literal and distance trees
         build_tree((tree_desc *)(&(l_desc_)));
@@ -1065,7 +1065,7 @@ compress_block(
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-detect_data_type(basic_deflate_stream *s)
+detect_data_type()
 {
     /* black_mask is the bit mask of black-listed bytes
      * set bits 0..6, 14..25, and 28..31
@@ -1074,17 +1074,17 @@ detect_data_type(basic_deflate_stream *s)
     unsigned long black_mask = 0xf3ffc07fUL;
     int n;
 
-    /* Check for non-textual ("black-listed") bytes. */
+    // Check for non-textual ("black-listed") bytes.
     for(n = 0; n <= 31; n++, black_mask >>= 1)
-        if((black_mask & 1) && (s->dyn_ltree_[n].fc != 0))
+        if((black_mask & 1) && (dyn_ltree_[n].fc != 0))
             return Z_BINARY;
 
-    /* Check for textual ("white-listed") bytes. */
-    if(s->dyn_ltree_[9].fc != 0 || s->dyn_ltree_[10].fc != 0
-            || s->dyn_ltree_[13].fc != 0)
+    // Check for textual ("white-listed") bytes. */
+    if(dyn_ltree_[9].fc != 0 || dyn_ltree_[10].fc != 0
+            || dyn_ltree_[13].fc != 0)
         return Z_TEXT;
     for(n = 32; n < limits::literals; n++)
-        if(s->dyn_ltree_[n].fc != 0)
+        if(dyn_ltree_[n].fc != 0)
             return Z_TEXT;
 
     /* There are no "black-listed" or "white-listed" bytes:
