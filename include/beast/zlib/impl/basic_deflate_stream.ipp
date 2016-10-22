@@ -1587,36 +1587,30 @@ int
 basic_deflate_stream<Allocator>::
 deflate(int flush)
 {
-auto strm = this;
     int old_flush; /* value of flush param for previous deflate call */
 
-    if(strm == 0 || strm == 0 ||
-        flush > Z_BLOCK || flush < 0) {
-        return Z_STREAM_ERROR;
+    if(next_out == 0 ||
+        (next_in == 0 && avail_in != 0) ||
+        (status_ == FINISH_STATE && flush != Z_FINISH)) {
+        ERR_RETURN(this, Z_STREAM_ERROR);
     }
-    auto s = strm;
+    if(avail_out == 0)
+        ERR_RETURN(this, Z_BUF_ERROR);
 
-    if(strm->next_out == 0 ||
-        (strm->next_in == 0 && strm->avail_in != 0) ||
-        (s->status_ == FINISH_STATE && flush != Z_FINISH)) {
-        ERR_RETURN(strm, Z_STREAM_ERROR);
-    }
-    if(strm->avail_out == 0) ERR_RETURN(strm, Z_BUF_ERROR);
-
-    old_flush = s->last_flush_;
-    s->last_flush_ = flush;
+    old_flush = last_flush_;
+    last_flush_ = flush;
 
     /* Flush as much pending output as possible */
-    if(s->pending_ != 0) {
-        strm->flush_pending();
-        if(strm->avail_out == 0) {
+    if(pending_ != 0) {
+        flush_pending();
+        if(avail_out == 0) {
             /* Since avail_out is 0, deflate will be called again with
              * more output space, but possibly with both pending and
              * avail_in equal to zero. There won't be anything to do,
              * but this is not an error situation so make sure we
              * return OK instead of BUF_ERROR at next call of deflate:
              */
-            s->last_flush_ = -1;
+            last_flush_ = -1;
             return Z_OK;
         }
 
@@ -1624,32 +1618,32 @@ auto strm = this;
      * flushes. For repeated and useless calls with Z_FINISH, we keep
      * returning Z_STREAM_END instead of Z_BUF_ERROR.
      */
-    } else if(strm->avail_in == 0 && RANK(flush) <= RANK(old_flush) &&
+    } else if(avail_in == 0 && RANK(flush) <= RANK(old_flush) &&
                flush != Z_FINISH) {
-        ERR_RETURN(strm, Z_BUF_ERROR);
+        ERR_RETURN(this, Z_BUF_ERROR);
     }
 
     /* User must not provide more input after the first FINISH: */
-    if(s->status_ == FINISH_STATE && strm->avail_in != 0) {
-        ERR_RETURN(strm, Z_BUF_ERROR);
+    if(status_ == FINISH_STATE && avail_in != 0) {
+        ERR_RETURN(this, Z_BUF_ERROR);
     }
 
     /* Start a new block or continue the current one.
      */
-    if(strm->avail_in != 0 || s->lookahead_ != 0 ||
-        (flush != Z_NO_FLUSH && s->status_ != FINISH_STATE)) {
+    if(avail_in != 0 || lookahead_ != 0 ||
+        (flush != Z_NO_FLUSH && status_ != FINISH_STATE)) {
         block_state bstate;
 
-        bstate = s->strategy_ == Z_HUFFMAN_ONLY ? deflate_huff(s, flush) :
-                    (s->strategy_ == Z_RLE ? deflate_rle(s, flush) :
-                        (*(get_config(s->level_).func))(s, flush));
+        bstate = strategy_ == Z_HUFFMAN_ONLY ? deflate_huff(this, flush) :
+                    (strategy_ == Z_RLE ? deflate_rle(this, flush) :
+                        (*(get_config(level_).func))(this, flush));
 
         if(bstate == finish_started || bstate == finish_done) {
-            s->status_ = FINISH_STATE;
+            status_ = FINISH_STATE;
         }
         if(bstate == need_more || bstate == finish_started) {
-            if(strm->avail_out == 0) {
-                s->last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
+            if(avail_out == 0) {
+                last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
             }
             return Z_OK;
             /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
@@ -1662,31 +1656,32 @@ auto strm = this;
         }
         if(bstate == block_done) {
             if(flush == Z_PARTIAL_FLUSH) {
-                s->tr_align();
+                tr_align();
             } else if(flush != Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
-                s->tr_stored_block((char*)0, 0L, 0);
+                tr_stored_block((char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */
                 if(flush == Z_FULL_FLUSH) {
-                    CLEAR_HASH(s);             /* forget history */
-                    if(s->lookahead_ == 0) {
-                        s->strstart_ = 0;
-                        s->block_start_ = 0L;
-                        s->insert_ = 0;
+                    CLEAR_HASH(this);             /* forget history */
+                    if(lookahead_ == 0) {
+                        strstart_ = 0;
+                        block_start_ = 0L;
+                        insert_ = 0;
                     }
                 }
             }
-            strm->flush_pending();
-            if(strm->avail_out == 0) {
-              s->last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
+            flush_pending();
+            if(avail_out == 0) {
+              last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
               return Z_OK;
             }
         }
     }
-    Assert(strm->avail_out > 0, "bug2");
+    Assert(avail_out > 0, "bug2");
 
-    if(flush != Z_FINISH) return Z_OK;
+    if(flush != Z_FINISH)
+        return Z_OK;
     return Z_STREAM_END;
 }
 
