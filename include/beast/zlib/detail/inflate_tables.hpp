@@ -36,6 +36,7 @@
 #define BEAST_ZLIB_DETAIL_INFLATE_TABLES_HPP
 
 #include <beast/zlib/error.hpp>
+#include <algorithm>
 #include <cstdint>
 
 //------------------------------------------------------------------------------
@@ -149,19 +150,23 @@ inflate_table(
     int end;                        // use base and extra for symbol > end
     std::uint16_t count[15+1];      // number of codes of each length
     std::uint16_t offs[15+1];       // offsets in table for each length
+
     // Length codes 257..285 base
     static std::uint16_t constexpr lbase[31] = { 
         3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 15, 17, 19, 23, 27, 31,
         35, 43, 51, 59, 67, 83, 99, 115, 131, 163, 195, 227, 258, 0, 0};
+
     // Length codes 257..285 extra
     static std::uint16_t constexpr lext[31] = {
         16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 18, 18, 18, 18,
         19, 19, 19, 19, 20, 20, 20, 20, 21, 21, 21, 21, 16, 72, 78};
+
     // Distance codes 0..29 base
     static std::uint16_t constexpr dbase[32] = {
         1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193,
         257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145,
         8193, 12289, 16385, 24577, 0, 0};
+
     // Distance codes 0..29 extra
     static std::uint16_t constexpr dext[32] = {
         16, 16, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 22, 22,
@@ -420,13 +425,12 @@ inflate_table(
        maximum code length that was allowed to get this far is one bit) */
     if (huff != 0)
     {
-        here.op = (std::uint8_t)64;            /* invalid code marker */
+        here.op = 64;   // invalid code marker */
         here.bits = (std::uint8_t)(len - drop);
-        here.val = (std::uint16_t)0;
+        here.val = 0;
         next[huff] = here;
     }
 
-    /* set return parameters */
     *table += used;
     *bits = root;
 }
@@ -437,48 +441,48 @@ get_fixed_tables()
 {
     struct fixed_codes : codes
     {
-        code len[512];
-        code dist[32];
+        code len_[512];
+        code dist_[32];
 
         fixed_codes()
         {
-            lencode = len;
-            distcode = dist;
+            lencode = len_;
             lenbits = 9;
+            distcode = dist_;
             distbits = 5;
 
-            code* next;
-            unsigned sym;
             std::uint16_t lens[320];
             std::uint16_t work[288];
 
-            sym = 0;
-            while(sym < 144)
-                lens[sym++] = 8;
-            while(sym < 256)
-                lens[sym++] = 9;
-            while(sym < 280)
-                lens[sym++] = 7;
-            while(sym < 288)
-                lens[sym++] = 8;
-            next = &len[0];
-            error_code ec;
-            inflate_table(build::lens, lens, 288, &next, &lenbits, work, ec);
-            if(ec)
-                throw std::logic_error{ec.message()};
-            sym = 0;
-            while(sym < 32)
-                lens[sym++] = 5;
-            next = &dist[0];
-            inflate_table(build::dists, lens, 32, &next, &distbits, work, ec);
-            if(ec)
-                throw std::logic_error{ec.message()};
+            std::fill(&lens[  0], &lens[144], 8);
+            std::fill(&lens[144], &lens[256], 9);
+            std::fill(&lens[256], &lens[280], 7);
+            std::fill(&lens[280], &lens[288], 8);
 
-            // VFALCO These hacks work around a bug in Zlib
-            len[99].op = 64;
-            len[227].op = 64;
-            len[355].op = 64;
-            len[483].op = 64;
+            {
+                error_code ec;
+                auto next = &len_[0];
+                inflate_table(build::lens,
+                    lens, 288, &next, &lenbits, work, ec);
+                if(ec)
+                    throw std::logic_error{ec.message()};
+            }
+
+            // VFALCO These fixups work around a bug in Zlib
+            len_[ 99].op = 64;
+            len_[227].op = 64;
+            len_[355].op = 64;
+            len_[483].op = 64;
+
+            {
+                error_code ec;
+                auto next = &dist_[0];
+                std::fill(&lens[0], &lens[32], 5);
+                inflate_table(build::dists,
+                    lens, 32, &next, &distbits, work, ec);
+                if(ec)
+                    throw std::logic_error{ec.message()};
+            }
         }
     };
 
