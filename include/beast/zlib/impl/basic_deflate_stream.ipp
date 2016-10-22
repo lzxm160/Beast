@@ -997,38 +997,47 @@ compress_block(
     unsigned code;      /* the code to send */
     int extra;          /* number of extra bits to send */
 
-    if(s->last_lit_ != 0) do {
-        dist = s->d_buf_[lx];
-        lc = s->l_buf_[lx++];
-        if(dist == 0) {
-            s->send_code(lc, ltree); /* send a literal byte */
-            Tracecv(isgraph(lc), (stderr," '%c' ", lc));
-        } else {
-            /* Here, lc is the match length - limits::minMatch */
-            code = s->lut_.length_code[lc];
-            s->send_code(code+limits::literals+1, ltree); /* send the length code */
-            extra = s->lut_.extra_lbits[code];
-            if(extra != 0) {
-                lc -= s->lut_.base_length[code];
-                s->send_bits(lc, extra);       /* send the extra length bits */
+    if(s->last_lit_ != 0)
+    {
+        do
+        {
+            dist = s->d_buf_[lx];
+            lc = s->l_buf_[lx++];
+            if(dist == 0)
+            {
+                s->send_code(lc, ltree); /* send a literal byte */
+                Tracecv(isgraph(lc), (stderr," '%c' ", lc));
             }
-            dist--; /* dist is now the match distance - 1 */
-            code = s->d_code(dist);
-            Assert (code < limits::dCodes, "bad d_code");
+            else
+            {
+                /* Here, lc is the match length - limits::minMatch */
+                code = s->lut_.length_code[lc];
+                s->send_code(code+limits::literals+1, ltree); /* send the length code */
+                extra = s->lut_.extra_lbits[code];
+                if(extra != 0)
+                {
+                    lc -= s->lut_.base_length[code];
+                    s->send_bits(lc, extra);       /* send the extra length bits */
+                }
+                dist--; /* dist is now the match distance - 1 */
+                code = s->d_code(dist);
+                Assert (code < limits::dCodes, "bad d_code");
 
-            s->send_code(code, dtree);       /* send the distance code */
-            extra = s->lut_.extra_dbits[code];
-            if(extra != 0) {
-                dist -= s->lut_.base_dist[code];
-                s->send_bits(dist, extra);   /* send the extra distance bits */
-            }
-        } /* literal or match pair ? */
+                s->send_code(code, dtree);       /* send the distance code */
+                extra = s->lut_.extra_dbits[code];
+                if(extra != 0)
+                {
+                    dist -= s->lut_.base_dist[code];
+                    s->send_bits(dist, extra);   /* send the extra distance bits */
+                }
+            } /* literal or match pair ? */
 
-        /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
-        Assert((uInt)(s->pending_) < s->lit_bufsize_ + 2*lx,
+            /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+            Assert((uInt)(s->pending_) < s->lit_bufsize_ + 2*lx,
                "pendingBuf overflow");
-
-    } while (lx < s->last_lit_);
+        }
+        while(lx < s->last_lit_);
+    }
 
     s->send_code(END_BLOCK, ltree);
 }
