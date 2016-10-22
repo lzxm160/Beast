@@ -122,7 +122,7 @@ private:
     void send_code(int value, detail::ct_data const* tree);
     std::uint8_t d_code(unsigned dist);
 
-    static void fill_window(basic_deflate_stream *s);
+    void fill_window();
 
     static block_state deflate_stored(basic_deflate_stream *s, int flush);
     static block_state deflate_fast(basic_deflate_stream *s, int flush);

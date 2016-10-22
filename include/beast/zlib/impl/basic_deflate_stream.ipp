@@ -1174,21 +1174,21 @@ copy_block(
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-fill_window(basic_deflate_stream *s)
+fill_window()
 {
     unsigned n, m;
     std::uint16_t *p;
     unsigned more;    // Amount of free space at the end of the window.
-    uInt wsize = s->w_size_;
+    uInt wsize = w_size_;
 
-    Assert(s->lookahead_ < MIN_LOOKAHEAD, "already enough lookahead");
+    Assert(lookahead_ < MIN_LOOKAHEAD, "already enough lookahead");
 
     do {
-        more = (unsigned)(s->window_size_ -(std::uint32_t)s->lookahead_ -(std::uint32_t)s->strstart_);
+        more = (unsigned)(window_size_ -(std::uint32_t)lookahead_ -(std::uint32_t)strstart_);
 
         /* Deal with !@#$% 64K limit: */
         if(sizeof(int) <= 2) {
-            if(more == 0 && s->strstart_ == 0 && s->lookahead_ == 0) {
+            if(more == 0 && strstart_ == 0 && lookahead_ == 0) {
                 more = wsize;
 
             } else if(more == (unsigned)(-1)) {
@@ -1202,12 +1202,12 @@ fill_window(basic_deflate_stream *s)
         /* If the window is almost full and there is insufficient lookahead,
          * move the upper half to the lower one to make room in the upper half.
          */
-        if(s->strstart_ >= wsize+MAX_DIST(s)) {
+        if(strstart_ >= wsize+MAX_DIST(this)) {
 
-            std::memcpy(s->window_, s->window_+wsize, (unsigned)wsize);
-            s->match_start_ -= wsize;
-            s->strstart_    -= wsize; /* we now have strstart >= MAX_DIST */
-            s->block_start_ -= (long) wsize;
+            std::memcpy(window_, window_+wsize, (unsigned)wsize);
+            match_start_ -= wsize;
+            strstart_    -= wsize; /* we now have strstart >= MAX_DIST */
+            block_start_ -= (long) wsize;
 
             /* Slide the hash table (could be avoided with 32 bit values
                at the expense of memory usage). We slide even when level == 0
@@ -1215,15 +1215,15 @@ fill_window(basic_deflate_stream *s)
                later. (Using level 0 permanently is not an optimal usage of
                zlib, so we don't care about this pathological case.)
              */
-            n = s->hash_size_;
-            p = &s->head_[n];
+            n = hash_size_;
+            p = &head_[n];
             do {
                 m = *--p;
                 *p = (std::uint16_t)(m >= wsize ? m-wsize : 0);
             } while (--n);
 
             n = wsize;
-            p = &s->prev_[n];
+            p = &prev_[n];
             do {
                 m = *--p;
                 *p = (std::uint16_t)(m >= wsize ? m-wsize : 0);
@@ -1233,7 +1233,7 @@ fill_window(basic_deflate_stream *s)
             } while (--n);
             more += wsize;
         }
-        if(s->avail_in == 0) break;
+        if(avail_in == 0) break;
 
         /* If there was no sliding:
          *    strstart <= WSIZE+MAX_DIST-1 && lookahead <= MIN_LOOKAHEAD - 1 &&
@@ -1242,35 +1242,35 @@ fill_window(basic_deflate_stream *s)
          * => more >= window_size - 2*WSIZE + 2
          * In the BIG_MEM or MMAP case (not yet supported),
          *   window_size == input_size + MIN_LOOKAHEAD  &&
-         *   strstart + s->lookahead_ <= input_size => more >= MIN_LOOKAHEAD.
+         *   strstart + lookahead_ <= input_size => more >= MIN_LOOKAHEAD.
          * Otherwise, window_size == 2*WSIZE so more >= 2.
          * If there was sliding, more >= WSIZE. So in all cases, more >= 2.
          */
         Assert(more >= 2, "more < 2");
 
-        n = read_buf(s, s->window_ + s->strstart_ + s->lookahead_, more);
-        s->lookahead_ += n;
+        n = read_buf(this, window_ + strstart_ + lookahead_, more);
+        lookahead_ += n;
 
         /* Initialize the hash value now that we have some input: */
-        if(s->lookahead_ + s->insert_ >= limits::minMatch) {
-            uInt str = s->strstart_ - s->insert_;
-            s->ins_h_ = s->window_[str];
-            UPDATE_HASH(s, s->ins_h_, s->window_[str + 1]);
-            while (s->insert_) {
-                UPDATE_HASH(s, s->ins_h_, s->window_[str + limits::minMatch-1]);
-                s->prev_[str & s->w_mask_] = s->head_[s->ins_h_];
-                s->head_[s->ins_h_] = (std::uint16_t)str;
+        if(lookahead_ + insert_ >= limits::minMatch) {
+            uInt str = strstart_ - insert_;
+            ins_h_ = window_[str];
+            UPDATE_HASH(this, ins_h_, window_[str + 1]);
+            while (insert_) {
+                UPDATE_HASH(this, ins_h_, window_[str + limits::minMatch-1]);
+                prev_[str & w_mask_] = head_[ins_h_];
+                head_[ins_h_] = (std::uint16_t)str;
                 str++;
-                s->insert_--;
-                if(s->lookahead_ + s->insert_ < limits::minMatch)
+                insert_--;
+                if(lookahead_ + insert_ < limits::minMatch)
                     break;
             }
         }
         /* If the whole input has less than limits::minMatch bytes, ins_h is garbage,
          * but this is not important since only literal bytes will be emitted.
          */
-
-    } while (s->lookahead_ < MIN_LOOKAHEAD && s->avail_in != 0);
+    }
+    while (lookahead_ < MIN_LOOKAHEAD && avail_in != 0);
 
     /* If the WIN_INIT bytes after the end of the current data have never been
      * written, then zero those bytes in order to avoid memory check reports of
@@ -1279,34 +1279,34 @@ fill_window(basic_deflate_stream *s)
      * time through here.  WIN_INIT is set to limits::maxMatch since the longest match
      * routines allow scanning to strstart + limits::maxMatch, ignoring lookahead.
      */
-    if(s->high_water_ < s->window_size_) {
-        std::uint32_t curr = s->strstart_ + (std::uint32_t)(s->lookahead_);
+    if(high_water_ < window_size_) {
+        std::uint32_t curr = strstart_ + (std::uint32_t)(lookahead_);
         std::uint32_t init;
 
-        if(s->high_water_ < curr) {
+        if(high_water_ < curr) {
             /* Previous high water mark below current data -- zero WIN_INIT
              * bytes or up to end of window, whichever is less.
              */
-            init = s->window_size_ - curr;
+            init = window_size_ - curr;
             if(init > WIN_INIT)
                 init = WIN_INIT;
-            std::memset(s->window_ + curr, 0, (unsigned)init);
-            s->high_water_ = curr + init;
+            std::memset(window_ + curr, 0, (unsigned)init);
+            high_water_ = curr + init;
         }
-        else if(s->high_water_ < (std::uint32_t)curr + WIN_INIT) {
+        else if(high_water_ < (std::uint32_t)curr + WIN_INIT) {
             /* High water mark at or above current data, but below current data
              * plus WIN_INIT -- zero out to current data plus WIN_INIT, or up
              * to end of window, whichever is less.
              */
-            init = (std::uint32_t)curr + WIN_INIT - s->high_water_;
-            if(init > s->window_size_ - s->high_water_)
-                init = s->window_size_ - s->high_water_;
-            std::memset(s->window_ + s->high_water_, 0, (unsigned)init);
-            s->high_water_ += init;
+            init = (std::uint32_t)curr + WIN_INIT - high_water_;
+            if(init > window_size_ - high_water_)
+                init = window_size_ - high_water_;
+            std::memset(window_ + high_water_, 0, (unsigned)init);
+            high_water_ += init;
         }
     }
 
-    Assert((std::uint32_t)s->strstart_ <= s->window_size_ - MIN_LOOKAHEAD,
+    Assert((std::uint32_t)strstart_ <= window_size_ - MIN_LOOKAHEAD,
            "not enough room for search");
 }
 
@@ -1344,7 +1344,7 @@ auto strm = this;
     next = strm->next_in;
     strm->avail_in = dictLength;
     strm->next_in = (const Byte *)dictionary;
-    fill_window(s);
+    s->fill_window();
     while (s->lookahead_ >= limits::minMatch) {
         str = s->strstart_;
         n = s->lookahead_ - (limits::minMatch-1);
@@ -1356,7 +1356,7 @@ auto strm = this;
         } while (--n);
         s->strstart_ = str;
         s->lookahead_ = limits::minMatch-1;
-        fill_window(s);
+        s->fill_window();
     }
     s->strstart_ += s->lookahead_;
     s->block_start_ = (long)s->strstart_;
@@ -1911,8 +1911,9 @@ block_state
             Assert(s->strstart_ < s->w_size_+MAX_DIST(s) ||
                    s->block_start_ >= (long)s->w_size_, "slide too late");
 
-            fill_window(s);
-            if(s->lookahead_ == 0 && flush == Z_NO_FLUSH) return need_more;
+            s->fill_window();
+            if(s->lookahead_ == 0 && flush == Z_NO_FLUSH)
+                return need_more;
 
             if(s->lookahead_ == 0) break; /* flush the current block */
         }
@@ -1969,7 +1970,7 @@ deflate_fast(basic_deflate_stream *s, int flush) ->
          * string following the next match.
          */
         if(s->lookahead_ < MIN_LOOKAHEAD) {
-            fill_window(s);
+            s->fill_window();
             if(s->lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
                 return need_more;
             }
@@ -2068,7 +2069,7 @@ deflate_slow(basic_deflate_stream *s, int flush) ->
          * string following the next match.
          */
         if(s->lookahead_ < MIN_LOOKAHEAD) {
-            fill_window(s);
+            s->fill_window();
             if(s->lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
                 return need_more;
             }
@@ -2199,7 +2200,7 @@ deflate_rle(basic_deflate_stream *s, int flush) ->
          * for the longest run, plus one for the unrolled loop.
          */
         if(s->lookahead_ <= limits::maxMatch) {
-            fill_window(s);
+            s->fill_window();
             if(s->lookahead_ <= limits::maxMatch && flush == Z_NO_FLUSH) {
                 return need_more;
             }
@@ -2269,7 +2270,7 @@ deflate_huff(basic_deflate_stream *s, int flush) ->
     for(;;) {
         /* Make sure that we have a literal to write. */
         if(s->lookahead_ == 0) {
-            fill_window(s);
+            s->fill_window();
             if(s->lookahead_ == 0) {
                 if(flush == Z_NO_FLUSH)
                     return need_more;
