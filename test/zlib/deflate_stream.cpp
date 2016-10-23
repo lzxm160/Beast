@@ -96,7 +96,7 @@ public:
             bool progress = true;
             for(;;)
             {
-                result = zs.deflate(Z_FULL_FLUSH);
+                result = zs.deflate(zs, Z_FULL_FLUSH);
                 if( result == Z_BUF_ERROR ||
                     result == Z_STREAM_END) // per zlib FAQ
                     goto fin;
@@ -223,7 +223,7 @@ public:
                 for(;;)
                 {
                     int flush = bi ? Z_FULL_FLUSH : Z_NO_FLUSH;
-                    result = zs.deflate(flush);
+                    result = zs.deflate(zs, flush);
                     if( result == Z_BUF_ERROR ||
                         result == Z_STREAM_END) // per zlib FAQ
                         goto fin;

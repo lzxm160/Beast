@@ -255,7 +255,7 @@ prime(int bits, int value)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-params(int level, int strategy)
+params(z_params& zs, int level, int strategy)
 {
     compress_func func;
     int err = Z_OK;
@@ -270,7 +270,7 @@ params(int level, int strategy)
         total_in != 0)
     {
         // Flush the last buffer:
-        err = deflate(Z_BLOCK);
+        err = deflate(zs, Z_BLOCK);
         if(err == Z_BUF_ERROR && pending_ == 0)
             err = Z_OK;
     }
@@ -418,7 +418,7 @@ deflateSetDictionary (
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflate(int flush)
+deflate(z_params& zs, int flush)
 {
     // value of flush param for previous deflate call
     int old_flush;
@@ -476,14 +476,14 @@ deflate(int flush)
         switch(strategy_)
         {
         case Z_HUFFMAN_ONLY:
-            bstate = deflate_huff(*this, flush);
+            bstate = deflate_huff(zs, flush);
             break;
         case Z_RLE:
-            bstate = deflate_rle(*this, flush);
+            bstate = deflate_rle(zs, flush);
             break;
         default:
         {
-            bstate = (this->*(get_config(level_).func))(*this, flush);
+            bstate = (this->*(get_config(level_).func))(zs, flush);
             break;
         }
         }
@@ -531,7 +531,7 @@ deflate(int flush)
                     }
                 }
             }
-            flush_pending(*this);
+            flush_pending(zs);
             if(avail_out == 0)
             {
                 last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
@@ -962,10 +962,11 @@ longest_match(IPos cur_match)
          * However the length of the match is limited to the lookahead, so
          * the output of deflate is not affected by the uninitialized values.
          */
-        if(match[best_len]   != scan_end  ||
-            match[best_len-1] != scan_end1 ||
-            *match            != *scan     ||
-            *++match          != scan[1])      continue;
+        if(     match[best_len]   != scan_end  ||
+                match[best_len-1] != scan_end1 ||
+                *match            != *scan     ||
+                *++match          != scan[1])
+            continue;
 
         /* The check at best_len-1 can be removed because it will be made
          * again later. (This heuristic is not always a win.)
@@ -979,12 +980,14 @@ longest_match(IPos cur_match)
         /* We check for insufficient lookahead only every 8th comparison;
          * the 256th check will be made at strstart+258.
          */
-        do {
-        } while(*++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 *++scan == *++match && *++scan == *++match &&
-                 scan < strend);
+        do
+        {
+        }
+        while(  *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                scan < strend);
 
         Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
 
@@ -998,8 +1001,9 @@ longest_match(IPos cur_match)
             scan_end1  = scan[best_len-1];
             scan_end   = scan[best_len];
         }
-    } while((cur_match = prev[cur_match & wmask]) > limit
-             && --chain_length != 0);
+    }
+    while((cur_match = prev[cur_match & wmask]) > limit
+        && --chain_length != 0);
 
     if((uInt)best_len <= lookahead_)
         return (uInt)best_len;
