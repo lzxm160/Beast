@@ -112,6 +112,8 @@ private:
     void lm_init();
     void fill_window();
     void flush_pending();
+    void flush_block(bool last);
+
     int  read_buf(Byte *buf, unsigned size);
     uInt longest_match(IPos cur_match);
 

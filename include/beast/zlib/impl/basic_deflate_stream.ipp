@@ -49,8 +49,6 @@ namespace zlib {
 #define ERR_RETURN(strm,err) \
   return (strm->msg = "unspecified zlib error", (err))
 
-
-
 /*
  *  ALGORITHM
  *
@@ -475,6 +473,25 @@ flush_pending()
     pending_ -= len;
     if(pending_ == 0)
         pending_out_ = pending_buf_;
+}
+
+/*  Flush the current block, with given end-of-file flag.
+    IN assertion: strstart is set to the end of the current match.
+*/
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+flush_block(bool last)
+{
+    tr_flush_block(
+        (block_start_ >= 0L ?
+            (char *)&window_[(unsigned)block_start_] :
+            (char *)0),
+        (std::uint32_t)((long)strstart_ - block_start_),
+        last);
+   block_start_ = strstart_;
+   flush_pending();
 }
 
 /*  Read a new buffer from the current input stream, update the adler32
@@ -963,26 +980,6 @@ deflate(int flush)
     return Z_STREAM_END;
 }
 
-/* ===========================================================================
- * Flush the current block, with given end-of-file flag.
- * IN assertion: strstart is set to the end of the current match.
- */
-#define FLUSH_BLOCK_ONLY(last) { \
-   tr_flush_block((block_start_ >= 0L ? \
-                   (char *)&window_[(unsigned)block_start_] : \
-                   (char *)0), \
-                (std::uint32_t)((long)strstart_ - block_start_), \
-                (last)); \
-   block_start_ = strstart_; \
-   flush_pending(); \
-   Tracev((stderr,"[FLUSH]")); \
-}
-
-/* Same but force premature exit if necessary. */
-#define FLUSH_BLOCK(last) { \
-   FLUSH_BLOCK_ONLY(last); \
-   if(avail_out == 0) return (last) ? finish_started : need_more; \
-}
 
 /* ===========================================================================
  * Copy without compression as much as possible from the input stream, return
@@ -1034,22 +1031,33 @@ deflate_stored(int flush) ->
             /* strstart == 0 is possible when wraparound on 16-bit machine */
             lookahead_ = (uInt)(strstart_ - max_start);
             strstart_ = (uInt)max_start;
-            FLUSH_BLOCK(0);
+            flush_block(false);
+            if(avail_out == 0)
+                return need_more;
         }
         /* Flush if we may have to slide, otherwise block_start may become
          * negative and the data will be gone:
          */
         if(strstart_ - (uInt)block_start_ >= max_dist()) {
-            FLUSH_BLOCK(0);
+            flush_block(false);
+            if(avail_out == 0)
+                return need_more;
         }
     }
     insert_ = 0;
-    if(flush == Z_FINISH) {
-        FLUSH_BLOCK(1);
+    if(flush == Z_FINISH)
+    {
+        flush_block(true);
+        if(avail_out == 0)
+            return finish_started;
         return finish_done;
     }
     if((long)strstart_ > block_start_)
-        FLUSH_BLOCK(0);
+    {
+        flush_block(false);
+        if(avail_out == 0)
+            return need_more;
+    }
     return block_done;
 }
 
@@ -1141,15 +1149,27 @@ deflate_fast(int flush) ->
             lookahead_--;
             strstart_++;
         }
-        if(bflush) FLUSH_BLOCK(0);
+        if(bflush)
+        {
+            flush_block(false);
+            if(avail_out == 0)
+                return need_more;
+        }
     }
     insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
-    if(flush == Z_FINISH) {
-        FLUSH_BLOCK(1);
+    if(flush == Z_FINISH)
+    {
+        flush_block(true);
+        if(avail_out == 0)
+            return finish_started;
         return finish_done;
     }
     if(last_lit_)
-        FLUSH_BLOCK(0);
+    {
+        flush_block(false);
+        if(avail_out == 0)
+            return need_more;
+    }
     return block_done;
 }
 
@@ -1242,7 +1262,12 @@ deflate_slow(int flush) ->
             match_length_ = limits::minMatch-1;
             strstart_++;
 
-            if(bflush) FLUSH_BLOCK(0);
+            if(bflush)
+            {
+                flush_block(false);
+                if(avail_out == 0)
+                    return need_more;
+            }
 
         } else if(match_available_) {
             /* If there was no match at the previous position, output a
@@ -1252,7 +1277,7 @@ deflate_slow(int flush) ->
             Tracevv((stderr,"%c", window_[strstart_-1]));
             tr_tally_lit(window_[strstart_-1], bflush);
             if(bflush) {
-                FLUSH_BLOCK_ONLY(0);
+                flush_block(false);
             }
             strstart_++;
             lookahead_--;
@@ -1273,12 +1298,19 @@ deflate_slow(int flush) ->
         match_available_ = 0;
     }
     insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
-    if(flush == Z_FINISH) {
-        FLUSH_BLOCK(1);
+    if(flush == Z_FINISH)
+    {
+        flush_block(true);
+        if(avail_out == 0)
+            return finish_started;
         return finish_done;
     }
     if(last_lit_)
-        FLUSH_BLOCK(0);
+    {
+        flush_block(false);
+        if(avail_out == 0)
+            return need_more;
+    }
     return block_done;
 }
 
@@ -1345,15 +1377,27 @@ deflate_rle(int flush) ->
             lookahead_--;
             strstart_++;
         }
-        if(bflush) FLUSH_BLOCK(0);
+        if(bflush)
+        {
+            flush_block(false);
+            if(avail_out == 0)
+                return need_more;
+        }
     }
     insert_ = 0;
-    if(flush == Z_FINISH) {
-        FLUSH_BLOCK(1);
+    if(flush == Z_FINISH)
+    {
+        flush_block(true);
+        if(avail_out == 0)
+            return finish_started;
         return finish_done;
     }
     if(last_lit_)
-        FLUSH_BLOCK(0);
+    {
+        flush_block(false);
+        if(avail_out == 0)
+            return need_more;
+    }
     return block_done;
 }
 
@@ -1390,16 +1434,26 @@ deflate_huff(int flush) ->
         lookahead_--;
         strstart_++;
         if(bflush)
-            FLUSH_BLOCK(0);
+        {
+            flush_block(false);
+            if(avail_out == 0)
+                return need_more;
+        }
     }
     insert_ = 0;
     if(flush == Z_FINISH)
     {
-        FLUSH_BLOCK(1);
+        flush_block(true);
+        if(avail_out == 0)
+            return finish_started;
         return finish_done;
     }
     if(last_lit_)
-        FLUSH_BLOCK(0);
+    {
+        flush_block(false);
+        if(avail_out == 0)
+            return need_more;
+    }
     return block_done;
 }
 
