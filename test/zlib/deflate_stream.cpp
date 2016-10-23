@@ -97,10 +97,13 @@ public:
             bool progress = true;
             for(;;)
             {
-                result = ds.write(zs, Flush::full);
-                if( result == Z_BUF_ERROR ||
-                    result == Z_STREAM_END) // per zlib FAQ
+                error_code ec;
+                ds.write(zs, Flush::full, ec);
+                if( ec == error::need_buffers ||
+                    ec == error::end_of_stream) // per zlib FAQ
                     goto fin;
+                if(! BEAST_EXPECTS(! ec, ec.message()))
+                    goto err;
                 if(! BEAST_EXPECT(progress))
                     goto err;
                 progress = false;
@@ -224,13 +227,13 @@ public:
                 bool bo = false;
                 for(;;)
                 {
-                    auto const flush =
-                        bi ? Flush::full : Flush::none;
-                    result = ds.write(zs, flush);
-                    if( result == Z_BUF_ERROR ||
-                        result == Z_STREAM_END) // per zlib FAQ
+                    error_code ec;
+                    ds.write(zs,
+                        bi ? Flush::full : Flush::none, ec);
+                    if( ec == error::need_buffers ||
+                        ec == error::end_of_stream) // per zlib FAQ
                         goto fin;
-                    if(! BEAST_EXPECT(result == Z_OK))
+                    if(! BEAST_EXPECTS(! ec, ec.message()))
                         goto err;
                     if(zs.avail_in == 0 && ! bi)
                     {

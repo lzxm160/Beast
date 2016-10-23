@@ -86,7 +86,7 @@ public:
             {
                 error_code ec;
                 is.write(zs, Flush::sync, ec);
-                if( ec == error::no_progress ||
+                if( ec == error::need_buffers ||
                     ec == error::end_of_stream) // per zlib FAQ
                     goto fin;
                 if(! BEAST_EXPECTS(! ec, ec.message()))
@@ -177,7 +177,7 @@ public:
             {
                 error_code ec;
                 is.write(zs, Flush::block, ec);
-                if( ec == error::no_progress ||
+                if( ec == error::need_buffers ||
                     ec == error::end_of_stream) // per zlib FAQ
                     goto fin;
                 if(! BEAST_EXPECTS(! ec, ec.message()))
@@ -271,7 +271,7 @@ public:
             {
                 error_code ec;
                 is.write(zs, Flush::trees, ec);
-                if( ec == error::no_progress ||
+                if( ec == error::need_buffers ||
                     ec == error::end_of_stream) // per zlib FAQ
                     goto fin;
                 if(! BEAST_EXPECTS(! ec, ec.message()))
@@ -380,7 +380,7 @@ public:
                 {
                     error_code ec;
                     is.write(zs, Flush::sync, ec);
-                    if( ec == error::no_progress ||
+                    if( ec == error::need_buffers ||
                         ec == error::end_of_stream) // per zlib FAQ
                         goto fin;
                     if(! BEAST_EXPECTS(! ec, ec.message()))

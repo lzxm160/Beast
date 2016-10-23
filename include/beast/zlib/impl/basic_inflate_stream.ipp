@@ -136,7 +136,7 @@ write(z_params& zs, Flush flush, error_code& ec)
 
             if(((! r.in.used() && ! r.out.used()) ||
                     flush == Flush::finish) && ! ec)
-                ec = error::no_progress;
+                ec = error::need_buffers;
         };
     auto const err =
         [&](error e)

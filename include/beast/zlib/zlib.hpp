@@ -54,48 +54,60 @@ enum z_Type
     Z_UNKNOWN   = 2
 };
 
-/** 
+/** Deflate codec parameters.
+
+    Objects of this type are filled in by callers and provided to the
+    deflate codec to define the input and output areas for the next
+    compress or decompress operation.
+
     The application must update next_in and avail_in when avail_in has dropped
-   to zero.  It must update next_out and avail_out when avail_out has dropped
-   to zero.  The application must initialize zalloc, zfree and opaque before
-   calling the init function.  All other fields are set by the compression
-   library and must not be updated by the application.
+    to zero.  It must update next_out and avail_out when avail_out has dropped
+    to zero.  The application must initialize zalloc, zfree and opaque before
+    calling the init function.  All other fields are set by the compression
+    library and must not be updated by the application.
 
-     The opaque value provided by the application will be passed as the first
-   parameter for calls of zalloc and zfree.  This can be useful for custom
-   memory management.  The compression library attaches no meaning to the
-   opaque value.
-
-     zalloc must return 0 if there is not enough memory for the object.
-   If zlib is used in a multi-threaded application, zalloc and zfree must be
-   thread safe.
-
-     On 16-bit systems, the functions zalloc and zfree must be able to allocate
-   exactly 65536 bytes, but will not be required to allocate more than this if
-   the symbol MAXSEG_64K is defined (see zconf.hpp).  To reduce memory requirements
-   and avoid any allocation of 64K objects, at the expense of compression ratio,
-   compile the library with -DMAX_WBITS=14 (see zconf.hpp).
-
-     The fields total_in and total_out can be used for statistics or progress
-   reports.  After compression, total_in holds the total size of the
-   uncompressed data and may be saved for use in the decompressor (particularly
-   if the decompressor wants to decompress everything in a single step).
+    The fields total_in and total_out can be used for statistics or progress
+    reports.  After compression, total_in holds the total size of the
+    uncompressed data and may be saved for use in the decompressor (particularly
+    if the decompressor wants to decompress everything in a single step).
 */
 struct z_params
 {
-    void const*   next_in;      // next input byte
-    std::size_t   avail_in;     // number of bytes available at next_in
-    std::size_t   total_in = 0; // total number of input bytes read so far
+    /** A pointer to the next input byte.
 
-    void*         next_out;     // next output byte should be put there
-    std::size_t   avail_out;    // remaining free space at next_out
-    std::size_t   total_out = 0;// total number of bytes output so far
+        If there is no more input, this may be set to `nullptr`.
+    */
+    void const* next_in;
+
+    /** The number of bytes of input available at `next_in`.
+
+        If there is no more input, this should be set to zero.
+    */
+    std::size_t avail_in;
+
+    /** The total number of input bytes read so far.
+    */
+    std::size_t total_in = 0;
+
+    /** A pointer to the next output byte.
+    */
+    void* next_out;
+
+    /** The remaining bytes of space at `next_out`.
+    */
+    std::size_t avail_out;
+
+    /** The total number of bytes output so far.
+    */
+    std::size_t total_out = 0;
 
     char const* msg = nullptr;  // last error message, NULL if no error
 
     int data_type = Z_UNKNOWN;  // best guess about the data type: binary or text
 };
 
+/** Flush option.
+*/
 enum class Flush
 {
     // order matters

@@ -35,6 +35,7 @@
 #ifndef BEAST_ZLIB_BASIC_DEFLATE_STREAM_HPP
 #define BEAST_ZLIB_BASIC_DEFLATE_STREAM_HPP
 
+#include <beast/zlib/error.hpp>
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
 #include <beast/zlib/detail/deflate_stream_base.hpp>
@@ -73,8 +74,8 @@ public:
     int
     reset(int level, int windowBits, int memLevel, int strategy);
 
-    int
-    write(z_params& zs, Flush flush);
+    void
+    write(z_params& zs, Flush flush, error_code& ec);
 
     int
     dictionary(const Byte *dictionary, uInt  dictLength);

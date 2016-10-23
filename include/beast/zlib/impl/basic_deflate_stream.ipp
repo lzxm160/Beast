@@ -416,9 +416,9 @@ dictionary(
 /* ========================================================================= */
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
-write(z_params& zs, Flush flush)
+write(z_params& zs, Flush flush, error_code& ec)
 {
     // value of flush param for previous deflate call
     boost::optional<Flush> old_flush;
@@ -426,10 +426,14 @@ write(z_params& zs, Flush flush)
     if(zs.next_out == 0 || (zs.next_in == 0 && zs.avail_in != 0) ||
         (status_ == FINISH_STATE && flush != Flush::finish))
     {
-        ERR_RETURN(zs, Z_STREAM_ERROR);
+        ec = error::stream_error;
+        return;
     }
     if(zs.avail_out == 0)
-        ERR_RETURN(zs, Z_BUF_ERROR);
+    {
+        ec = error::need_buffers;
+        return;
+    }
 
     old_flush = last_flush_;
     last_flush_ = flush;
@@ -447,23 +451,25 @@ write(z_params& zs, Flush flush)
              * return OK instead of BUF_ERROR at next call of deflate:
              */
             last_flush_ = boost::none;
-            return Z_OK;
+            return;
         }
-    /* Make sure there is something to do and avoid duplicate consecutive
-     * flushes. For repeated and useless calls with Flush::finish, we keep
-     * returning Z_STREAM_END instead of Z_BUF_ERROR.
-     */
     }
     else if(zs.avail_in == 0 && flush <= old_flush &&
         flush != Flush::finish)
     {
-        ERR_RETURN(zs, Z_BUF_ERROR);
+        /* Make sure there is something to do and avoid duplicate consecutive
+         * flushes. For repeated and useless calls with Flush::finish, we keep
+         * returning Z_STREAM_END instead of Z_BUF_ERROR.
+         */
+        ec = error::need_buffers;
+        return;
     }
 
     // User must not provide more input after the first FINISH:
     if(status_ == FINISH_STATE && zs.avail_in != 0)
     {
-        ERR_RETURN(zs, Z_BUF_ERROR);
+        ec = error::need_buffers;
+        return;
     }
 
     /* Start a new block or continue the current one.
@@ -498,14 +504,14 @@ write(z_params& zs, Flush flush)
             {
                 last_flush_ = boost::none; /* avoid BUF_ERROR next call, see above */
             }
-            return Z_OK;
-            /* If flush != Flush::none && avail_out == 0, the next call
-             * of deflate should use the same flush parameter to make sure
-             * that the flush is complete. So we don't have to output an
-             * empty block here, this will be done at next call. This also
-             * ensures that for a very small output buffer, we emit at most
-             * one empty block.
-             */
+            return;
+            /*  If flush != Flush::none && avail_out == 0, the next call
+                of deflate should use the same flush parameter to make sure
+                that the flush is complete. So we don't have to output an
+                empty block here, this will be done at next call. This also
+                ensures that for a very small output buffer, we emit at most
+                one empty block.
+            */
         }
         if(bstate == block_done)
         {
@@ -522,7 +528,7 @@ write(z_params& zs, Flush flush)
                  */
                 if(flush == Flush::full)
                 {
-                    clear_hash();             // forget history
+                    clear_hash(); // forget history
                     if(lookahead_ == 0)
                     {
                         strstart_ = 0;
@@ -535,14 +541,16 @@ write(z_params& zs, Flush flush)
             if(zs.avail_out == 0)
             {
                 last_flush_ = boost::none; /* avoid BUF_ERROR at next call, see above */
-                return Z_OK;
+                return;
             }
         }
     }
 
-    if(flush != Flush::finish)
-        return Z_OK;
-    return Z_STREAM_END;
+    if(flush == Flush::finish)
+    {
+        ec = error::end_of_stream;
+        return;
+    }
 }
 
 //------------------------------------------------------------------------------

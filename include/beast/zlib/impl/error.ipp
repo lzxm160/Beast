@@ -66,8 +66,9 @@ public:
     {
         switch(static_cast<error>(ev))
         {
-        case error::no_progress: return "no progress";
+        case error::need_buffers: return "need buffers";
         case error::end_of_stream: return "end of stream";
+        case error::stream_error: return "stream error";
 
         case error::invalid_block_type: return "invalid block type";
         case error::invalid_stored_length: return "invalid stored block length";
