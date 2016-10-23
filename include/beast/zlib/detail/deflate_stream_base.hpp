@@ -61,6 +61,9 @@ protected:
     // size of bit buffer in bi_buf
     static std::uint8_t constexpr Buf_size = 16;
 
+    // Matches of length 3 are discarded if their distance exceeds kTooFar
+    static std::size_t constexpr kTooFar = 4096;
+
     // VFALCO This might not be needed, e.g. for zip/gzip
     enum StreamStatus
     {

@@ -175,11 +175,6 @@ reset(
 #define ERR_RETURN(strm,err) \
   return (strm->msg = "unspecified zlib error", (err))
 
-/* Matches of length 3 are discarded if their distance exceeds TOO_FAR */
-#ifndef TOO_FAR
-#  define TOO_FAR 4096
-#endif
-
 /* Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
  * For deflate_fast() (levels <= 3) good is ignored and lazy has a different
  * meaning.
@@ -1991,10 +1986,8 @@ deflate_slow(int flush) ->
             /* longest_match() sets match_start */
 
             if(match_length_ <= 5 && (strategy_ == Z_FILTERED
-#if TOO_FAR <= 32767
                 || (match_length_ == limits::minMatch &&
-                    strstart_ - match_start_ > TOO_FAR)
-#endif
+                    strstart_ - match_start_ > kTooFar)
                 )) {
 
                 /* If prev_match is also limits::minMatch, match_start is garbage
