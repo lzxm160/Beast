@@ -239,20 +239,6 @@ init_block()
     matches_ = 0;
 }
 
-/*  Compares two subtrees, using the tree depth as tie breaker when
-    the subtrees have equal frequency. This minimizes the worst case length.
-*/
-template<class Allocator>
-inline
-bool
-basic_deflate_stream<Allocator>::
-smaller(detail::ct_data const* tree, int n, int m)
-{
-    return tree[n].fc < tree[m].fc ||
-        (tree[n].fc == tree[m].fc &&
-            depth_[n] <= depth_[m]);
-}
-
 /*  Restore the heap property by moving down the tree starting at node k,
     exchanging a node with the smallest of its two sons if necessary,
     stopping when the heap property is re-established (each father smaller

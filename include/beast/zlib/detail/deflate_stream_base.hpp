@@ -50,7 +50,7 @@ class deflate_stream_base
 {
 protected:
     deflate_stream_base()
-        :  lut_(detail::get_deflate_tables())
+        :  lut_(get_deflate_tables())
     {
     }
 
@@ -73,9 +73,9 @@ protected:
 
     struct tree_desc
     {
-        detail::ct_data *dyn_tree;           /* the dynamic tree */
+        ct_data *dyn_tree;           /* the dynamic tree */
         int     max_code;            /* largest code with non zero frequency */
-        detail::static_tree_desc const* stat_desc; /* the corresponding static tree */
+        static_tree_desc const* stat_desc; /* the corresponding static tree */
     };
 
     /* A std::uint16_t is an index in the character window. We use short instead of int to
@@ -91,7 +91,7 @@ protected:
         finish_done     /* finish done, accept no more input or output */
     };
 
-    detail::deflate_tables const& lut_;
+    deflate_tables const& lut_;
 
     std::unique_ptr<std::uint8_t[]> buf_;
 
@@ -183,11 +183,11 @@ protected:
 
     int nice_match_;                // Stop searching when current match exceeds this
 
-    detail::ct_data dyn_ltree_[
+    ct_data dyn_ltree_[
         HEAP_SIZE];                 // literal and length tree
-    detail::ct_data dyn_dtree_[
+    ct_data dyn_dtree_[
         2*limits::dCodes+1];        // distance tree */
-    detail::ct_data bl_tree_[
+    ct_data bl_tree_[
         2*limits::blCodes+1];       // Huffman tree for bit lengths
 
     tree_desc l_desc_;              // desc. for literal tree
@@ -265,10 +265,11 @@ protected:
     void put_byte           (std::uint8_t c);
     void put_short          (std::uint16_t w);
     void send_bits          (int value, int length);
-    void send_code          (int value, detail::ct_data const* tree);
+    void send_code          (int value, ct_data const* tree);
     std::uint8_t d_code     (unsigned dist);
     void update_hash        (uInt& h, std::uint8_t c);
     void clear_hash         ();
+    bool smaller            (ct_data const* tree, int n, int m);
 };
 
 //------------------------------------------------------------------------------
@@ -316,7 +317,7 @@ send_bits(int value, int length)
 inline
 void
 deflate_stream_base::
-send_code(int value, detail::ct_data const* tree)
+send_code(int value, ct_data const* tree)
 {
     send_bits(tree[value].fc, tree[value].dl);
 }
@@ -359,6 +360,19 @@ clear_hash()
     head_[hash_size_-1] = 0;
     std::memset((Byte *)head_, 0,
         (unsigned)(hash_size_-1)*sizeof(*head_));
+}
+
+/*  Compares two subtrees, using the tree depth as tie breaker when
+    the subtrees have equal frequency. This minimizes the worst case length.
+*/
+inline
+bool
+deflate_stream_base::
+smaller(ct_data const* tree, int n, int m)
+{
+    return tree[n].fc < tree[m].fc ||
+        (tree[n].fc == tree[m].fc &&
+            depth_[n] <= depth_[m]);
 }
 
 } // detail
