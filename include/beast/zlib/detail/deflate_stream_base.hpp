@@ -48,7 +48,6 @@ namespace beast {
 namespace zlib {
 namespace detail {
 
-template<class = void>
 class deflate_stream_base
 {
 protected:
@@ -289,7 +288,6 @@ protected:
     /*  In order to simplify the code, particularly on 16 bit machines, match
         distances are limited to MAX_DIST instead of WSIZE.
     */
-    inline
     std::size_t
     max_dist() const
     {
@@ -403,43 +401,43 @@ protected:
 
     //--------------------------------------------------------------------------
 
-    void init_block         ();
-    void pqdownheap         (detail::ct_data const* tree, int k);
-    void pqremove           (detail::ct_data const* tree, int& top);
-    void gen_bitlen         (tree_desc *desc);
-    void build_tree         (tree_desc *desc);
-    void scan_tree          (detail::ct_data *tree, int max_code);
-    void send_tree          (detail::ct_data *tree, int max_code);
-    int  build_bl_tree      ();
-    void send_all_trees     (int lcodes, int dcodes, int blcodes);
-    void compress_block     (detail::ct_data const* ltree, detail::ct_data const* dtree);
-    int  detect_data_type   ();
-    void bi_windup          ();
-    void bi_flush           ();
-    void copy_block         (char *buf, unsigned len, int header);
+    template<class = void> void init_block          ();
+    template<class = void> void pqdownheap          (detail::ct_data const* tree, int k);
+    template<class = void> void pqremove            (detail::ct_data const* tree, int& top);
+    template<class = void> void gen_bitlen          (tree_desc *desc);
+    template<class = void> void build_tree          (tree_desc *desc);
+    template<class = void> void scan_tree           (detail::ct_data *tree, int max_code);
+    template<class = void> void send_tree           (detail::ct_data *tree, int max_code);
+    template<class = void> int  build_bl_tree       ();
+    template<class = void> void send_all_trees      (int lcodes, int dcodes, int blcodes);
+    template<class = void> void compress_block      (detail::ct_data const* ltree, detail::ct_data const* dtree);
+    template<class = void> int  detect_data_type    ();
+    template<class = void> void bi_windup           ();
+    template<class = void> void bi_flush            ();
+    template<class = void> void copy_block          (char *buf, unsigned len, int header);
 
-    void tr_init            ();
-    void tr_align           ();
-    void tr_flush_bits      ();
-    void tr_stored_block    (char *bu, std::uint32_t stored_len, int last);
-    void tr_tally_dist      (std::uint16_t dist, std::uint8_t len, bool& flush);
-    void tr_tally_lit       (std::uint8_t c, bool& flush);
+    template<class = void> void tr_init             ();
+    template<class = void> void tr_align            ();
+    template<class = void> void tr_flush_bits       ();
+    template<class = void> void tr_stored_block     (char *bu, std::uint32_t stored_len, int last);
+    template<class = void> void tr_tally_dist       (std::uint16_t dist, std::uint8_t len, bool& flush);
+    template<class = void> void tr_tally_lit        (std::uint8_t c, bool& flush);
 
-    void tr_flush_block (z_params& zs, char *buf, std::uint32_t stored_len, int last);
-    void fill_window    (z_params& zs);
-    void flush_pending  (z_params& zs);
-    void flush_block    (z_params& zs, bool last);
-    int  read_buf       (z_params& zs, Byte *buf, unsigned size);
-    uInt longest_match  (IPos cur_match);
+    template<class = void> void tr_flush_block      (z_params& zs, char *buf, std::uint32_t stored_len, int last);
+    template<class = void> void fill_window         (z_params& zs);
+    template<class = void> void flush_pending       (z_params& zs);
+    template<class = void> void flush_block         (z_params& zs, bool last);
+    template<class = void> int  read_buf            (z_params& zs, Byte *buf, unsigned size);
+    template<class = void> uInt longest_match       (IPos cur_match);
 };
 
 //--------------------------------------------------------------------------
 
 // Initialize a new block.
 //
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 init_block()
 {
     for(int n = 0; n < limits::lCodes;  n++)
@@ -460,9 +458,9 @@ init_block()
     stopping when the heap property is re-established (each father smaller
     than its two sons).
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 pqdownheap(
     detail::ct_data const* tree,    // the tree to restore
     int k)                          // node to move down
@@ -493,10 +491,10 @@ pqdownheap(
 /*  Remove the smallest element from the heap and recreate the heap
     with one less element. Updates heap and heap_len.
 */
-template<class _>
+template<class>
 inline
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 pqremove(detail::ct_data const* tree, int& top)
 {
     top = heap_[kSmallest];
@@ -513,9 +511,9 @@ pqremove(detail::ct_data const* tree, int& top)
         The length opt_len is updated; static_len is also updated if stree is
         not null.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 gen_bitlen(tree_desc *desc)
 {
     detail::ct_data *tree           = desc->dyn_tree;
@@ -610,9 +608,9 @@ gen_bitlen(tree_desc *desc)
         and corresponding code. The length opt_len is updated; static_len is
         also updated if stree is not null. The field max_code is set.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 build_tree(tree_desc *desc)
 {
     detail::ct_data *tree         = desc->dyn_tree;
@@ -703,9 +701,9 @@ build_tree(tree_desc *desc)
 /*  Scan a literal or distance tree to determine the frequencies
     of the codes in the bit length tree.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 scan_tree(
     detail::ct_data *tree,      // the tree to be scanned
     int max_code)               // and its largest code of non zero frequency
@@ -772,9 +770,9 @@ scan_tree(
 /*  Send a literal or distance tree in compressed form,
     using the codes in bl_tree.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 send_tree(
     detail::ct_data *tree,      // the tree to be scanned
     int max_code)               // and its largest code of non zero frequency
@@ -854,9 +852,9 @@ send_tree(
 /*  Construct the Huffman tree for the bit lengths and return
     the index in bl_order of the last bit length code to send.
 */
-template<class _>
+template<class>
 int
-deflate_stream_base<_>::
+deflate_stream_base::
 build_bl_tree()
 {
     int max_blindex;  // index of last bit length code of non zero freq
@@ -892,9 +890,9 @@ build_bl_tree()
     tree.
     IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 send_all_trees(
     int lcodes,
     int dcodes,
@@ -925,9 +923,9 @@ send_all_trees(
 
 /*  Send the block data compressed using the given Huffman trees
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 compress_block(
     detail::ct_data const* ltree, // literal tree
     detail::ct_data const* dtree) // distance tree
@@ -995,9 +993,9 @@ compress_block(
         (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
     IN assertion: the fields fc of dyn_ltree are set.
 */
-template<class _>
+template<class>
 int
-deflate_stream_base<_>::
+deflate_stream_base::
 detect_data_type()
 {
     /* black_mask is the bit mask of black-listed bytes
@@ -1028,9 +1026,9 @@ detect_data_type()
 
 /*  Flush the bit buffer and align the output on a byte boundary
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 bi_windup()
 {
     if(bi_valid_ > 8)
@@ -1043,9 +1041,9 @@ bi_windup()
 
 /*  Flush the bit buffer, keeping at most 7 bits in it.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 bi_flush()
 {
     if(bi_valid_ == 16)
@@ -1065,9 +1063,9 @@ bi_flush()
 /*  Copy a stored block, storing first the length and its
     one's complement if requested.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 copy_block(
     char    *buf,       // the input data
     unsigned len,       // its length
@@ -1089,9 +1087,9 @@ copy_block(
 
 /* Initialize the tree data structures for a new zlib stream.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_init()
 {
     l_desc_.dyn_tree = dyn_ltree_;
@@ -1113,9 +1111,9 @@ tr_init()
 /*  Send one empty static block to give enough lookahead for inflate.
     This takes 10 bits, of which 7 may remain in the bit buffer.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_align()
 {
     send_bits(STATIC_TREES<<1, 3);
@@ -1125,9 +1123,9 @@ tr_align()
 
 /* Flush the bits in the bit buffer to pending output (leaves at most 7 bits)
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_flush_bits()
 {
     bi_flush();
@@ -1135,9 +1133,9 @@ tr_flush_bits()
 
 /* Send a stored block
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_stored_block(
     char *buf,                  // input block
     std::uint32_t stored_len,   // length of input block
@@ -1147,10 +1145,10 @@ tr_stored_block(
     copy_block(buf, (unsigned)stored_len, 1);   // with header
 }
 
-template<class _>
+template<class>
 inline
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
 {
     d_buf_[last_lit_] = dist;
@@ -1161,10 +1159,10 @@ tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
     flush = (last_lit_ == lit_bufsize_-1);
 }
 
-template<class _>
+template<class>
 inline
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_tally_lit(std::uint8_t c, bool& flush)
 {
     d_buf_[last_lit_] = 0;
@@ -1178,9 +1176,9 @@ tr_tally_lit(std::uint8_t c, bool& flush)
 /*  Determine the best encoding for the current block: dynamic trees,
     static trees or store, and output the encoded block to the zip file.
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 tr_flush_block(
     z_params& zs,
     char *buf,                  // input block, or NULL if too old
@@ -1278,9 +1276,9 @@ tr_flush_block(
            compressed_len_-7*last));
 }
 
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 fill_window(z_params& zs)
 {
     unsigned n, m;
@@ -1430,9 +1428,9 @@ fill_window(z_params& zs)
     to avoid allocating a large strm->next_out buffer and copying into it.
     (See also read_buf()).
 */
-template<class _>
+template<class>
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 flush_pending(z_params& zs)
 {
     tr_flush_bits();
@@ -1456,10 +1454,10 @@ flush_pending(z_params& zs)
 /*  Flush the current block, with given end-of-file flag.
     IN assertion: strstart is set to the end of the current match.
 */
-template<class _>
+template<class>
 inline
 void
-deflate_stream_base<_>::
+deflate_stream_base::
 flush_block(z_params& zs, bool last)
 {
     tr_flush_block(zs,
@@ -1478,9 +1476,9 @@ flush_block(z_params& zs, bool last)
     allocating a large strm->next_in buffer and copying from it.
     (See also flush_pending()).
 */
-template<class _>
+template<class>
 int
-deflate_stream_base<_>::
+deflate_stream_base::
 read_buf(z_params& zs, Byte *buf, unsigned size)
 {
     unsigned len = zs.avail_in;
@@ -1510,9 +1508,9 @@ read_buf(z_params& zs, Byte *buf, unsigned size)
     For 80x86 and 680x0, an optimized version will be provided in match.asm or
     match.S. The code will be functionally equivalent.
 */
-template<class _>
+template<class>
 uInt
-deflate_stream_base<_>::
+deflate_stream_base::
 longest_match(IPos cur_match)
 {
     unsigned chain_length = max_chain_length_;/* max hash chain length */

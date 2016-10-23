@@ -66,7 +66,7 @@ deflate_upper_bound(std::size_t bytes);
 */
 template<class Allocator>
 class basic_deflate_stream
-    : private detail::deflate_stream_base<>
+    : private detail::deflate_stream_base
 {
 public:
     basic_deflate_stream();
