@@ -46,6 +46,14 @@ typedef unsigned char  Byte;  /* 8 bits */
 #endif
 typedef unsigned int   uInt;  /* 16 bits or more */
 
+/* Possible values of the data_type field (though see inflate()) */
+enum z_Type
+{
+    Z_BINARY    = 0,
+    Z_TEXT      = 1,
+    Z_UNKNOWN   = 2
+};
+
 /*
      The application must update next_in and avail_in when avail_in has dropped
    to zero.  It must update next_out and avail_out when avail_out has dropped
@@ -83,9 +91,9 @@ struct z_params
     std::size_t   avail_out;    // remaining free space at next_out
     std::size_t   total_out = 0;// total number of bytes output so far
 
-    const char *msg = nullptr;  // last error message, NULL if no error
+    char const* msg = nullptr;  // last error message, NULL if no error
 
-    int     data_type;          // best guess about the data type: binary or text
+    int data_type = Z_UNKNOWN;  // best guess about the data type: binary or text
 };
 
 enum class Flush
@@ -143,14 +151,6 @@ enum z_Strategy
     Z_RLE               = 3,
     Z_FIXED             = 4,
     Z_DEFAULT_STRATEGY  = 0
-};
-
-/* Possible values of the data_type field (though see inflate()) */
-enum z_Type
-{
-    Z_BINARY    = 0,
-    Z_TEXT      = 1,
-    Z_UNKNOWN   = 2
 };
 
 } // zlib
