@@ -284,7 +284,7 @@ params(z_params& zs, int level, int strategy, error_code& ec)
 /* ========================================================================= */
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
 tune(
     int good_length,
@@ -293,10 +293,9 @@ tune(
     int max_chain)
 {
     good_match_ = good_length;
-    max_lazy_match_ = max_lazy;
     nice_match_ = nice_length;
+    max_lazy_match_ = max_lazy;
     max_chain_length_ = max_chain;
-    return Z_OK;
 }
 
 /* =========================================================================

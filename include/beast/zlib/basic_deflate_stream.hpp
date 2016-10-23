@@ -71,6 +71,19 @@ class basic_deflate_stream
 public:
     basic_deflate_stream();
 
+    /** Fine tune internal compression parameters.
+
+        Compression parameters should only be tuned by someone who
+        understands the algorithm used by zlib's deflate for searching
+        for the best matching string, and even then only by the most
+        fanatic optimizer trying to squeeze out the last compressed bit
+        for their specific input data. Read the deflate.c source code
+        (ZLib) for the meaning of the max_lazy, good_length, nice_length,
+        and max_chain parameters.
+    */
+    void
+    tune(int good_length, int max_lazy, int nice_length, int max_chain);
+
     int
     reset(int level, int windowBits, int memLevel, int strategy);
 
@@ -78,7 +91,7 @@ public:
     write(z_params& zs, Flush flush, error_code& ec);
 
     int
-    dictionary(const Byte *dictionary, uInt  dictLength);
+    dictionary(Byte const* dictionary, uInt dictLength);
 
     int
     deflateResetKeep();
@@ -88,9 +101,6 @@ public:
 
     void
     params(z_params& zs, int level, int strategy, error_code& ec);
-    
-    int
-    tune(int good_length, int max_lazy, int nice_length, int max_chain);
 
     std::size_t
     upper_bound(std::size_t sourceLen) const;
