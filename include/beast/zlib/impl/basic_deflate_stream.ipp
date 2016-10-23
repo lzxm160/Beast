@@ -1650,10 +1650,10 @@ params(int level, int strategy)
     func = get_config(level_).func;
 
     if((strategy != strategy_ || func != get_config(level).func) &&
-        strm->total_in != 0)
+        total_in != 0)
     {
         // Flush the last buffer:
-        err = strm->deflate(Z_BLOCK);
+        err = deflate(Z_BLOCK);
         if(err == Z_BUF_ERROR && pending_ == 0)
             err = Z_OK;
     }
