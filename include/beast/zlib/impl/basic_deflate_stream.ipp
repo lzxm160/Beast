@@ -247,26 +247,28 @@ prime(int bits, int value)
 /* ========================================================================= */
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
-params(z_params& zs, int level, int strategy)
+params(z_params& zs, int level, int strategy, error_code& ec)
 {
     compress_func func;
-    int err = Z_OK;
 
     if(level == Z_DEFAULT_COMPRESSION)
         level = 6;
     if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
-        return Z_STREAM_ERROR;
+    {
+        ec = error::stream_error;
+        return;
+    }
     func = get_config(level_).func;
 
     if((strategy != strategy_ || func != get_config(level).func) &&
-        total_in != 0)
+        zs.total_in != 0)
     {
         // Flush the last buffer:
-        err = deflate(zs, Flush::block);
-        if(err == Z_BUF_ERROR && pending_ == 0)
-            err = Z_OK;
+        write(zs, Flush::block, ec);
+        if(ec == error::need_buffers && pending_ == 0)
+            ec = {};
     }
     if(level_ != level)
     {
@@ -277,7 +279,6 @@ params(z_params& zs, int level, int strategy)
         max_chain_length_ = get_config(level).max_chain;
     }
     strategy_ = strategy;
-    return err;
 }
 
 /* ========================================================================= */
@@ -353,8 +354,7 @@ upper_bound(std::size_t sourceLen) const
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-dictionary(
-    Byte const* dict, uInt dictLength)
+dictionary(Byte const* dict, uInt dictLength)
 {
     uInt str, n;
     unsigned avail;
@@ -375,12 +375,14 @@ dictionary(
     }
 
     /* insert dict into window and hash */
-    avail = avail_in;
-    next = next_in;
-    avail_in = dictLength;
-    next_in = (const Byte *)dict;
+    z_params zs;
+    zs.avail_in = dictLength;
+    zs.next_in = (const Byte *)dict;
+    zs.avail_out = 0;
+    zs.next_out = 0;
     fill_window(zs);
-    while(lookahead_ >= limits::minMatch) {
+    while(lookahead_ >= limits::minMatch)
+    {
         str = strstart_;
         n = lookahead_ - (limits::minMatch-1);
         do
@@ -401,8 +403,6 @@ dictionary(
     lookahead_ = 0;
     match_length_ = prev_length_ = limits::minMatch-1;
     match_available_ = 0;
-    next_in = next;
-    avail_in = avail;
     return Z_OK;
 }
 

@@ -86,8 +86,8 @@ public:
     int
     deflateReset();
 
-    int
-    params(z_params& zs, int level, int strategy);
+    void
+    params(z_params& zs, int level, int strategy, error_code& ec);
     
     int
     tune(int good_length, int max_lazy, int nice_length, int max_chain);
