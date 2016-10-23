@@ -106,7 +106,7 @@ private:
     void fill_window    (z_params& zs);
     void flush_pending  (z_params& zs);
     void flush_block    (bool last);
-    int  read_buf       (Byte *buf, unsigned size);
+    int  read_buf       (z_params& zs, Byte *buf, unsigned size);
     uInt longest_match  (IPos cur_match);
 
     block_state deflate_stored(z_params& zs, int flush);

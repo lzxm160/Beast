@@ -761,7 +761,7 @@ fill_window(z_params& zs)
             Otherwise, window_size == 2*WSIZE so more >= 2.
             If there was sliding, more >= WSIZE. So in all cases, more >= 2.
         */
-        n = read_buf(window_ + strstart_ + lookahead_, more);
+        n = read_buf(zs, window_ + strstart_ + lookahead_, more);
         lookahead_ += n;
 
         // Initialize the hash value now that we have some input:
@@ -881,21 +881,21 @@ flush_block(bool last)
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-read_buf(Byte *buf, unsigned size)
+read_buf(z_params& zs, Byte *buf, unsigned size)
 {
-    unsigned len = avail_in;
+    unsigned len = zs.avail_in;
 
     if(len > size)
         len = size;
     if(len == 0)
         return 0;
 
-    avail_in  -= len;
+    zs.avail_in  -= len;
 
-    std::memcpy(buf, next_in, len);
+    std::memcpy(buf, zs.next_in, len);
     next_in = static_cast<
-        std::uint8_t const*>(next_in) + len;
-    total_in += len;
+        std::uint8_t const*>(zs.next_in) + len;
+    zs.total_in += len;
     return (int)len;
 }
 
