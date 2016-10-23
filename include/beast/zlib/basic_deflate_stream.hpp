@@ -265,7 +265,7 @@ public:
     void
     pending(unsigned *value, int *bits)
     {
-        doPending(pending, bits);
+        doPending(value, bits);
     }
 
     /** Insert bits into the compressed output stream.
