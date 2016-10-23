@@ -101,21 +101,19 @@ public:
     prime(int bits, int value);
 
 private:
-    void tr_flush_block     (char *buf, std::uint32_t stored_len, int last);
+    void tr_flush_block (char *buf, std::uint32_t stored_len, int last);
+    void lm_init        ();
+    void fill_window    ();
+    void flush_pending  ();
+    void flush_block    (bool last);
+    int  read_buf       (Byte *buf, unsigned size);
+    uInt longest_match  (IPos cur_match);
 
     block_state deflate_stored(int flush);
     block_state deflate_fast  (int flush);
     block_state deflate_slow  (int flush);
     block_state deflate_rle   (int flush);
     block_state deflate_huff  (int flush);
-
-    void lm_init();
-    void fill_window();
-    void flush_pending();
-    void flush_block(bool last);
-
-    int  read_buf(Byte *buf, unsigned size);
-    uInt longest_match(IPos cur_match);
 
     using self = basic_deflate_stream;
     typedef block_state(self::*compress_func)(int flush);

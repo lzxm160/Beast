@@ -174,6 +174,321 @@ reset(
     return deflateReset();
 }
 
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+deflateResetKeep()
+{
+    total_in = 0;
+    total_out = 0;
+    msg = 0;
+    data_type = Z_UNKNOWN;
+
+    pending_ = 0;
+    pending_out_ = pending_buf_;
+
+    status_ = BUSY_STATE;
+    last_flush_ = Z_NO_FLUSH;
+
+    tr_init();
+
+    return Z_OK;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+deflateReset()
+{
+    int ret = deflateResetKeep();
+    if(ret == Z_OK)
+        lm_init();
+    return ret;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+pending(unsigned *pending, int *bits)
+{
+    if(pending != 0)
+        *pending = pending_;
+    if(bits != 0)
+        *bits = bi_valid_;
+    return Z_OK;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+prime(int bits, int value)
+{
+    int put;
+
+    if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
+        return Z_BUF_ERROR;
+    do
+    {
+        put = Buf_size - bi_valid_;
+        if(put > bits)
+            put = bits;
+        bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
+        bi_valid_ += put;
+        tr_flush_bits();
+        value >>= put;
+        bits -= put;
+    }
+    while(bits);
+    return Z_OK;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+params(int level, int strategy)
+{
+    compress_func func;
+    int err = Z_OK;
+
+    if(level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+    if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
+        return Z_STREAM_ERROR;
+    func = get_config(level_).func;
+
+    if((strategy != strategy_ || func != get_config(level).func) &&
+        total_in != 0)
+    {
+        // Flush the last buffer:
+        err = deflate(Z_BLOCK);
+        if(err == Z_BUF_ERROR && pending_ == 0)
+            err = Z_OK;
+    }
+    if(level_ != level)
+    {
+        level_ = level;
+        max_lazy_match_   = get_config(level).max_lazy;
+        good_match_       = get_config(level).good_length;
+        nice_match_       = get_config(level).nice_length;
+        max_chain_length_ = get_config(level).max_chain;
+    }
+    strategy_ = strategy;
+    return err;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+tune(
+    int good_length,
+    int max_lazy,
+    int nice_length,
+    int max_chain)
+{
+    good_match_ = good_length;
+    max_lazy_match_ = max_lazy;
+    nice_match_ = nice_length;
+    max_chain_length_ = max_chain;
+    return Z_OK;
+}
+
+/* =========================================================================
+ * For the default windowBits of 15 and memLevel of 8, this function returns
+ * a close to exact, as well as small, upper bound on the compressed size.
+ * They are coded as constants here for a reason--if the #define's are
+ * changed, then this function needs to be changed as well.  The return
+ * value for 15 and 8 only works for those exact settings.
+ *
+ * For any setting other than those defaults for windowBits and memLevel,
+ * the value returned is a conservative worst case for the maximum expansion
+ * resulting from using fixed blocks instead of stored blocks, which deflate
+ * can emit on compressed data for some combinations of the parameters.
+ *
+ * This function could be more sophisticated to provide closer upper bounds for
+ * every combination of windowBits and memLevel.  But even the conservative
+ * upper bound of about 14% expansion does not seem onerous for output buffer
+ * allocation.
+ */
+
+inline
+std::size_t
+deflate_upper_bound(std::size_t bytes)
+{
+    return bytes +
+        ((bytes + 7) >> 3) +
+        ((bytes + 63) >> 6) + 5 +
+        6;
+}
+
+template<class Allocator>
+std::size_t
+basic_deflate_stream<Allocator>::
+upper_bound(std::size_t sourceLen) const
+{
+    std::size_t complen;
+    std::size_t wraplen;
+
+    /* conservative upper bound for compressed data */
+    complen = sourceLen +
+              ((sourceLen + 7) >> 3) + ((sourceLen + 63) >> 6) + 5;
+
+    /* compute wrapper length */
+    wraplen = 0;
+
+    /* if not default parameters, return conservative bound */
+    if(w_bits_ != 15 || hash_bits_ != 8 + 7)
+        return complen + wraplen;
+
+    /* default settings: return tight bound for that case */
+    return sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
+           (sourceLen >> 25) + 13 - 6 + wraplen;
+}
+
+/* ========================================================================= */
+
+template<class Allocator>
+int
+basic_deflate_stream<Allocator>::
+deflate(int flush)
+{
+    // value of flush param for previous deflate call
+    int old_flush;
+
+    if(next_out == 0 || (next_in == 0 && avail_in != 0) ||
+        (status_ == FINISH_STATE && flush != Z_FINISH))
+    {
+        ERR_RETURN(this, Z_STREAM_ERROR);
+    }
+    if(avail_out == 0)
+        ERR_RETURN(this, Z_BUF_ERROR);
+
+    old_flush = last_flush_;
+    last_flush_ = flush;
+
+    // Flush as much pending output as possible
+    if(pending_ != 0)
+    {
+        flush_pending();
+        if(avail_out == 0)
+        {
+            /* Since avail_out is 0, deflate will be called again with
+             * more output space, but possibly with both pending and
+             * avail_in equal to zero. There won't be anything to do,
+             * but this is not an error situation so make sure we
+             * return OK instead of BUF_ERROR at next call of deflate:
+             */
+            last_flush_ = -1;
+            return Z_OK;
+        }
+    /* Make sure there is something to do and avoid duplicate consecutive
+     * flushes. For repeated and useless calls with Z_FINISH, we keep
+     * returning Z_STREAM_END instead of Z_BUF_ERROR.
+     */
+    }
+    else if(avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
+               flush != Z_FINISH)
+    {
+        ERR_RETURN(this, Z_BUF_ERROR);
+    }
+
+    // User must not provide more input after the first FINISH:
+    if(status_ == FINISH_STATE && avail_in != 0)
+    {
+        ERR_RETURN(this, Z_BUF_ERROR);
+    }
+
+    /* Start a new block or continue the current one.
+     */
+    if(avail_in != 0 || lookahead_ != 0 ||
+        (flush != Z_NO_FLUSH && status_ != FINISH_STATE))
+    {
+        block_state bstate;
+
+        switch(strategy_)
+        {
+        case Z_HUFFMAN_ONLY:
+            bstate = deflate_huff(flush);
+            break;
+        case Z_RLE:
+            bstate = deflate_rle(flush);
+            break;
+        default:
+        {
+            bstate = (this->*(get_config(level_).func))(flush);
+            break;
+        }
+        }
+
+        if(bstate == finish_started || bstate == finish_done)
+        {
+            status_ = FINISH_STATE;
+        }
+        if(bstate == need_more || bstate == finish_started)
+        {
+            if(avail_out == 0)
+            {
+                last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
+            }
+            return Z_OK;
+            /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
+             * of deflate should use the same flush parameter to make sure
+             * that the flush is complete. So we don't have to output an
+             * empty block here, this will be done at next call. This also
+             * ensures that for a very small output buffer, we emit at most
+             * one empty block.
+             */
+        }
+        if(bstate == block_done)
+        {
+            if(flush == Z_PARTIAL_FLUSH)
+            {
+                tr_align();
+            }
+            else if(flush != Z_BLOCK)
+            {
+                /* FULL_FLUSH or SYNC_FLUSH */
+                tr_stored_block((char*)0, 0L, 0);
+                /* For a full flush, this empty block will be recognized
+                 * as a special marker by inflate_sync().
+                 */
+                if(flush == Z_FULL_FLUSH)
+                {
+                    clear_hash();             // forget history
+                    if(lookahead_ == 0)
+                    {
+                        strstart_ = 0;
+                        block_start_ = 0L;
+                        insert_ = 0;
+                    }
+                }
+            }
+            flush_pending();
+            if(avail_out == 0)
+            {
+                last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
+                return Z_OK;
+            }
+        }
+    }
+    Assert(avail_out > 0, "bug2");
+
+    if(flush != Z_FINISH)
+        return Z_OK;
+    return Z_STREAM_END;
+}
+
 //------------------------------------------------------------------------------
 
 /*  Determine the best encoding for the current block: dynamic trees,
@@ -277,8 +592,6 @@ tr_flush_block(
     Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
            compressed_len_-7*last));
 }
-
-//------------------------------------------------------------------------------
 
 /*  Initialize the "longest match" routines for a new zlib stream
 */
@@ -628,7 +941,7 @@ longest_match(IPos cur_match)
     return lookahead_;
 }
 
-/* ========================================================================= */
+//------------------------------------------------------------------------------
 
 template<class Allocator>
 int
@@ -690,320 +1003,7 @@ auto strm = this;
     return Z_OK;
 }
 
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-deflateResetKeep()
-{
-    total_in = 0;
-    total_out = 0;
-    msg = 0;
-    data_type = Z_UNKNOWN;
-
-    pending_ = 0;
-    pending_out_ = pending_buf_;
-
-    status_ = BUSY_STATE;
-    last_flush_ = Z_NO_FLUSH;
-
-    tr_init();
-
-    return Z_OK;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-deflateReset()
-{
-    int ret = deflateResetKeep();
-    if(ret == Z_OK)
-        lm_init();
-    return ret;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-pending(unsigned *pending, int *bits)
-{
-    if(pending != 0)
-        *pending = pending_;
-    if(bits != 0)
-        *bits = bi_valid_;
-    return Z_OK;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-prime(int bits, int value)
-{
-    int put;
-
-    if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
-        return Z_BUF_ERROR;
-    do
-    {
-        put = Buf_size - bi_valid_;
-        if(put > bits)
-            put = bits;
-        bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
-        bi_valid_ += put;
-        tr_flush_bits();
-        value >>= put;
-        bits -= put;
-    }
-    while(bits);
-    return Z_OK;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-params(int level, int strategy)
-{
-    compress_func func;
-    int err = Z_OK;
-
-    if(level == Z_DEFAULT_COMPRESSION)
-        level = 6;
-    if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
-        return Z_STREAM_ERROR;
-    func = get_config(level_).func;
-
-    if((strategy != strategy_ || func != get_config(level).func) &&
-        total_in != 0)
-    {
-        // Flush the last buffer:
-        err = deflate(Z_BLOCK);
-        if(err == Z_BUF_ERROR && pending_ == 0)
-            err = Z_OK;
-    }
-    if(level_ != level)
-    {
-        level_ = level;
-        max_lazy_match_   = get_config(level).max_lazy;
-        good_match_       = get_config(level).good_length;
-        nice_match_       = get_config(level).nice_length;
-        max_chain_length_ = get_config(level).max_chain;
-    }
-    strategy_ = strategy;
-    return err;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-tune(
-    int good_length,
-    int max_lazy,
-    int nice_length,
-    int max_chain)
-{
-    good_match_ = good_length;
-    max_lazy_match_ = max_lazy;
-    nice_match_ = nice_length;
-    max_chain_length_ = max_chain;
-    return Z_OK;
-}
-
-/* =========================================================================
- * For the default windowBits of 15 and memLevel of 8, this function returns
- * a close to exact, as well as small, upper bound on the compressed size.
- * They are coded as constants here for a reason--if the #define's are
- * changed, then this function needs to be changed as well.  The return
- * value for 15 and 8 only works for those exact settings.
- *
- * For any setting other than those defaults for windowBits and memLevel,
- * the value returned is a conservative worst case for the maximum expansion
- * resulting from using fixed blocks instead of stored blocks, which deflate
- * can emit on compressed data for some combinations of the parameters.
- *
- * This function could be more sophisticated to provide closer upper bounds for
- * every combination of windowBits and memLevel.  But even the conservative
- * upper bound of about 14% expansion does not seem onerous for output buffer
- * allocation.
- */
-
-inline
-std::size_t
-deflate_upper_bound(std::size_t bytes)
-{
-    return bytes +
-        ((bytes + 7) >> 3) +
-        ((bytes + 63) >> 6) + 5 +
-        6;
-}
-
-template<class Allocator>
-std::size_t
-basic_deflate_stream<Allocator>::
-upper_bound(std::size_t sourceLen) const
-{
-    std::size_t complen;
-    std::size_t wraplen;
-
-    /* conservative upper bound for compressed data */
-    complen = sourceLen +
-              ((sourceLen + 7) >> 3) + ((sourceLen + 63) >> 6) + 5;
-
-    /* compute wrapper length */
-    wraplen = 0;
-
-    /* if not default parameters, return conservative bound */
-    if(w_bits_ != 15 || hash_bits_ != 8 + 7)
-        return complen + wraplen;
-
-    /* default settings: return tight bound for that case */
-    return sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
-           (sourceLen >> 25) + 13 - 6 + wraplen;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-deflate(int flush)
-{
-    // value of flush param for previous deflate call
-    int old_flush;
-
-    if(next_out == 0 || (next_in == 0 && avail_in != 0) ||
-        (status_ == FINISH_STATE && flush != Z_FINISH))
-    {
-        ERR_RETURN(this, Z_STREAM_ERROR);
-    }
-    if(avail_out == 0)
-        ERR_RETURN(this, Z_BUF_ERROR);
-
-    old_flush = last_flush_;
-    last_flush_ = flush;
-
-    // Flush as much pending output as possible
-    if(pending_ != 0)
-    {
-        flush_pending();
-        if(avail_out == 0)
-        {
-            /* Since avail_out is 0, deflate will be called again with
-             * more output space, but possibly with both pending and
-             * avail_in equal to zero. There won't be anything to do,
-             * but this is not an error situation so make sure we
-             * return OK instead of BUF_ERROR at next call of deflate:
-             */
-            last_flush_ = -1;
-            return Z_OK;
-        }
-    /* Make sure there is something to do and avoid duplicate consecutive
-     * flushes. For repeated and useless calls with Z_FINISH, we keep
-     * returning Z_STREAM_END instead of Z_BUF_ERROR.
-     */
-    }
-    else if(avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
-               flush != Z_FINISH)
-    {
-        ERR_RETURN(this, Z_BUF_ERROR);
-    }
-
-    // User must not provide more input after the first FINISH:
-    if(status_ == FINISH_STATE && avail_in != 0)
-    {
-        ERR_RETURN(this, Z_BUF_ERROR);
-    }
-
-    /* Start a new block or continue the current one.
-     */
-    if(avail_in != 0 || lookahead_ != 0 ||
-        (flush != Z_NO_FLUSH && status_ != FINISH_STATE))
-    {
-        block_state bstate;
-
-        switch(strategy_)
-        {
-        case Z_HUFFMAN_ONLY:
-            bstate = deflate_huff(flush);
-            break;
-        case Z_RLE:
-            bstate = deflate_rle(flush);
-            break;
-        default:
-        {
-            bstate = (this->*(get_config(level_).func))(flush);
-            break;
-        }
-        }
-
-        if(bstate == finish_started || bstate == finish_done)
-        {
-            status_ = FINISH_STATE;
-        }
-        if(bstate == need_more || bstate == finish_started)
-        {
-            if(avail_out == 0)
-            {
-                last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
-            }
-            return Z_OK;
-            /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
-             * of deflate should use the same flush parameter to make sure
-             * that the flush is complete. So we don't have to output an
-             * empty block here, this will be done at next call. This also
-             * ensures that for a very small output buffer, we emit at most
-             * one empty block.
-             */
-        }
-        if(bstate == block_done)
-        {
-            if(flush == Z_PARTIAL_FLUSH)
-            {
-                tr_align();
-            }
-            else if(flush != Z_BLOCK)
-            {
-                /* FULL_FLUSH or SYNC_FLUSH */
-                tr_stored_block((char*)0, 0L, 0);
-                /* For a full flush, this empty block will be recognized
-                 * as a special marker by inflate_sync().
-                 */
-                if(flush == Z_FULL_FLUSH)
-                {
-                    clear_hash();             // forget history
-                    if(lookahead_ == 0)
-                    {
-                        strstart_ = 0;
-                        block_start_ = 0L;
-                        insert_ = 0;
-                    }
-                }
-            }
-            flush_pending();
-            if(avail_out == 0)
-            {
-                last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
-                return Z_OK;
-            }
-        }
-    }
-    Assert(avail_out > 0, "bug2");
-
-    if(flush != Z_FINISH)
-        return Z_OK;
-    return Z_STREAM_END;
-}
+//------------------------------------------------------------------------------
 
 /* ===========================================================================
  * Copy without compression as much as possible from the input stream, return
