@@ -879,11 +879,12 @@ int
 basic_deflate_stream<Allocator>::
 deflate(int flush)
 {
-    int old_flush; /* value of flush param for previous deflate call */
+    // value of flush param for previous deflate call
+    int old_flush;
 
-    if(next_out == 0 ||
-        (next_in == 0 && avail_in != 0) ||
-        (status_ == FINISH_STATE && flush != Z_FINISH)) {
+    if(next_out == 0 || (next_in == 0 && avail_in != 0) ||
+        (status_ == FINISH_STATE && flush != Z_FINISH))
+    {
         ERR_RETURN(this, Z_STREAM_ERROR);
     }
     if(avail_out == 0)
@@ -892,10 +893,12 @@ deflate(int flush)
     old_flush = last_flush_;
     last_flush_ = flush;
 
-    /* Flush as much pending output as possible */
-    if(pending_ != 0) {
+    // Flush as much pending output as possible
+    if(pending_ != 0)
+    {
         flush_pending();
-        if(avail_out == 0) {
+        if(avail_out == 0)
+        {
             /* Since avail_out is 0, deflate will be called again with
              * more output space, but possibly with both pending and
              * avail_in equal to zero. There won't be anything to do,
@@ -905,37 +908,53 @@ deflate(int flush)
             last_flush_ = -1;
             return Z_OK;
         }
-
     /* Make sure there is something to do and avoid duplicate consecutive
      * flushes. For repeated and useless calls with Z_FINISH, we keep
      * returning Z_STREAM_END instead of Z_BUF_ERROR.
      */
-    } else if(avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
-               flush != Z_FINISH) {
+    }
+    else if(avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
+               flush != Z_FINISH)
+    {
         ERR_RETURN(this, Z_BUF_ERROR);
     }
 
-    /* User must not provide more input after the first FINISH: */
-    if(status_ == FINISH_STATE && avail_in != 0) {
+    // User must not provide more input after the first FINISH:
+    if(status_ == FINISH_STATE && avail_in != 0)
+    {
         ERR_RETURN(this, Z_BUF_ERROR);
     }
 
     /* Start a new block or continue the current one.
      */
     if(avail_in != 0 || lookahead_ != 0 ||
-        (flush != Z_NO_FLUSH && status_ != FINISH_STATE)) {
+        (flush != Z_NO_FLUSH && status_ != FINISH_STATE))
+    {
         block_state bstate;
 
-        auto const func = get_config(level_).func;
-        bstate = strategy_ == Z_HUFFMAN_ONLY ? deflate_huff(flush) :
-                    (strategy_ == Z_RLE ? deflate_rle(flush) :
-                        (this->*func)(flush));
+        switch(strategy_)
+        {
+        case Z_HUFFMAN_ONLY:
+            bstate = deflate_huff(flush);
+            break;
+        case Z_RLE:
+            bstate = deflate_rle(flush);
+            break;
+        default:
+        {
+            bstate = (this->*(get_config(level_).func))(flush);
+            break;
+        }
+        }
 
-        if(bstate == finish_started || bstate == finish_done) {
+        if(bstate == finish_started || bstate == finish_done)
+        {
             status_ = FINISH_STATE;
         }
-        if(bstate == need_more || bstate == finish_started) {
-            if(avail_out == 0) {
+        if(bstate == need_more || bstate == finish_started)
+        {
+            if(avail_out == 0)
+            {
                 last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
             }
             return Z_OK;
@@ -947,10 +966,15 @@ deflate(int flush)
              * one empty block.
              */
         }
-        if(bstate == block_done) {
-            if(flush == Z_PARTIAL_FLUSH) {
+        if(bstate == block_done)
+        {
+            if(flush == Z_PARTIAL_FLUSH)
+            {
                 tr_align();
-            } else if(flush != Z_BLOCK) { /* FULL_FLUSH or SYNC_FLUSH */
+            }
+            else if(flush != Z_BLOCK)
+            {
+                /* FULL_FLUSH or SYNC_FLUSH */
                 tr_stored_block((char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
@@ -967,9 +991,10 @@ deflate(int flush)
                 }
             }
             flush_pending();
-            if(avail_out == 0) {
-              last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
-              return Z_OK;
+            if(avail_out == 0)
+            {
+                last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
+                return Z_OK;
             }
         }
     }
@@ -979,7 +1004,6 @@ deflate(int flush)
         return Z_OK;
     return Z_STREAM_END;
 }
-
 
 /* ===========================================================================
  * Copy without compression as much as possible from the input stream, return
