@@ -72,7 +72,7 @@ class basic_deflate_stream
 public:
     basic_deflate_stream();
 
-    int
+    void
     reset(int level, int windowBits, int memLevel, Strategy strategy);
 
     /** Fine tune internal compression parameters.
@@ -237,10 +237,10 @@ public:
         return doDictionary(dict, dictLength);
     }
 
-    int
+    void
     deflateResetKeep();
     
-    int
+    void
     deflateReset();
 
     void

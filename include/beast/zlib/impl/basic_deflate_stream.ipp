@@ -47,7 +47,7 @@ basic_deflate_stream()
 }
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
 reset(
     int  level,
@@ -114,13 +114,13 @@ reset(
     level_ = level;
     strategy_ = strategy;
 
-    return deflateReset();
+    deflateReset();
 }
 
 /* ========================================================================= */
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
 deflateResetKeep()
 {
@@ -137,21 +137,17 @@ deflateResetKeep()
     last_flush_ = Flush::none;
 
     tr_init();
-
-    return Z_OK;
 }
 
 /* ========================================================================= */
 
 template<class Allocator>
-int
+void
 basic_deflate_stream<Allocator>::
 deflateReset()
 {
-    int ret = deflateResetKeep();
-    if(ret == Z_OK)
-        lm_init();
-    return ret;
+    deflateResetKeep();
+    lm_init();
 }
 
 /* ========================================================================= */

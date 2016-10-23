@@ -91,17 +91,14 @@ public:
         int level, int windowBits, int strategy,
             std::string const& check)
     {
-        int result;
         std::string out;
         z_params zs;
         deflate_stream ds;
-        result = ds.reset(
+        ds.reset(
             level,
             windowBits,
             8,
             toStrategy(strategy));
-        if(! BEAST_EXPECT(result == Z_OK))
-            goto err;
         out.resize(ds.upper_bound(
             static_cast<uLong>(check.size())));
         zs.next_in = (Bytef*)check.data();
@@ -219,16 +216,13 @@ public:
         {
             for(std::size_t j = 1;; ++j)
             {
-                int result;
                 z_params zs;
                 deflate_stream ds;
-                result = ds.reset(
+                ds.reset(
                     level,
                     windowBits,
                     8,
                     toStrategy(strategy));
-                if(! BEAST_EXPECT(result == Z_OK))
-                    continue;
                 std::string out;
                 out.resize(ds.upper_bound(
                     static_cast<uLong>(check.size())));
