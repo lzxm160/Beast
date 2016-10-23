@@ -504,6 +504,7 @@ protected:
     }
 
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
+    template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
 
     template<class = void> void lm_init             ();
     template<class = void> void init_block          ();
@@ -710,6 +711,61 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
         ec = error::end_of_stream;
         return;
     }
+}
+
+template<class>
+int
+deflate_stream_base::
+doDictionary(Byte const* dict, uInt dictLength)
+{
+    uInt str, n;
+    unsigned avail;
+    const unsigned char *next;
+
+    if(lookahead_)
+        return Z_STREAM_ERROR;
+
+    /* if dict would fill window, just replace the history */
+    if(dictLength >= w_size_)
+    {
+        clear_hash();
+        strstart_ = 0;
+        block_start_ = 0L;
+        insert_ = 0;
+        dict += dictLength - w_size_;  /* use the tail */
+        dictLength = w_size_;
+    }
+
+    /* insert dict into window and hash */
+    z_params zs;
+    zs.avail_in = dictLength;
+    zs.next_in = (const Byte *)dict;
+    zs.avail_out = 0;
+    zs.next_out = 0;
+    fill_window(zs);
+    while(lookahead_ >= limits::minMatch)
+    {
+        str = strstart_;
+        n = lookahead_ - (limits::minMatch-1);
+        do
+        {
+            update_hash(ins_h_, window_[str + limits::minMatch-1]);
+            prev_[str & w_mask_] = head_[ins_h_];
+            head_[ins_h_] = (std::uint16_t)str;
+            str++;
+        }
+        while(--n);
+        strstart_ = str;
+        lookahead_ = limits::minMatch-1;
+        fill_window(zs);
+    }
+    strstart_ += lookahead_;
+    block_start_ = (long)strstart_;
+    insert_ = lookahead_;
+    lookahead_ = 0;
+    match_length_ = prev_length_ = limits::minMatch-1;
+    match_available_ = 0;
+    return Z_OK;
 }
 
 //--------------------------------------------------------------------------
