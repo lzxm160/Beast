@@ -44,11 +44,6 @@
 namespace beast {
 namespace zlib {
 
-// VFALCO REMOVE
-/* To be used only when the state is known to be valid */
-#define ERR_RETURN(zs,err) \
-  return (zs.msg = "unspecified zlib error", (err))
-
 /*
  *  ALGORITHM
  *
@@ -120,8 +115,6 @@ reset(
      * output size for (length,distance) codes is <= 24 bits.
      */
     std::uint16_t* overlay;
-
-    //strm->msg = 0;
 
     if(level == Z_DEFAULT_COMPRESSION)
         level = 6;

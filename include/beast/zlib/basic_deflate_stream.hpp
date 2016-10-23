@@ -102,7 +102,7 @@ public:
     prime(int bits, int value);
 
 private:
-    void lm_init        ();
+    void lm_init();
 
     block_state deflate_stored(z_params& zs, Flush flush);
     block_state deflate_fast  (z_params& zs, Flush flush);
