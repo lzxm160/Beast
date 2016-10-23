@@ -48,6 +48,56 @@ namespace beast {
 namespace zlib {
 namespace detail {
 
+/*
+ *  ALGORITHM
+ *
+ *      The "deflation" process depends on being able to identify portions
+ *      of the input text which are identical to earlier input (within a
+ *      sliding window trailing behind the input currently being processed).
+ *
+ *      Each code tree is stored in a compressed form which is itself
+ *      a Huffman encoding of the lengths of all the code strings (in
+ *      ascending order by source values).  The actual code strings are
+ *      reconstructed from the lengths in the inflate process, as described
+ *      in the deflate specification.
+ *
+ *      The most straightforward technique turns out to be the fastest for
+ *      most input files: try all possible matches and select the longest.
+ *      The key feature of this algorithm is that insertions into the string
+ *      dictionary are very simple and thus fast, and deletions are avoided
+ *      completely. Insertions are performed at each input character, whereas
+ *      string matches are performed only when the previous match ends. So it
+ *      is preferable to spend more time in matches to allow very fast string
+ *      insertions and avoid deletions. The matching algorithm for small
+ *      strings is inspired from that of Rabin & Karp. A brute force approach
+ *      is used to find longer strings when a small match has been found.
+ *      A similar algorithm is used in comic (by Jan-Mark Wams) and freeze
+ *      (by Leonid Broukhis).
+ *         A previous version of this file used a more sophisticated algorithm
+ *      (by Fiala and Greene) which is guaranteed to run in linear amortized
+ *      time, but has a larger average cost, uses more memory and is patented.
+ *      However the F&G algorithm may be faster for some highly redundant
+ *      files if the parameter max_chain_length (described below) is too large.
+ *
+ *  ACKNOWLEDGEMENTS
+ *
+ *      The idea of lazy evaluation of matches is due to Jan-Mark Wams, and
+ *      I found it in 'freeze' written by Leonid Broukhis.
+ *      Thanks to many people for bug reports and testing.
+ *
+ *  REFERENCES
+ *
+ *      Deutsch, L.P.,"DEFLATE Compressed Data Format Specification".
+ *      Available in http://tools.ietf.org/html/rfc1951
+ *
+ *      A description of the Rabin and Karp algorithm is given in the book
+ *         "Algorithms" by R. Sedgewick, Addison-Wesley, p252.
+ *
+ *      Fiala,E.R., and Greene,D.H.
+ *         Data Compression with Finite Windows, Comm.ACM, 32,4 (1989) 490-595
+ *
+ */
+
 class deflate_stream_base
 {
 protected:
@@ -55,6 +105,17 @@ protected:
         :  lut_(get_deflate_tables())
     {
     }
+
+    enum block_state
+    {
+        need_more,      /* block not completed, need more input or more output */
+        block_done,     /* block flush performed */
+        finish_started, /* finish started, need only more output at next deflate */
+        finish_done     /* finish done, accept no more input or output */
+    };
+
+    using self = deflate_stream_base;
+    typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
 
     /*  Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
         For deflate_fast() (levels <= 3) good is ignored and lazy has a different
@@ -102,14 +163,6 @@ protected:
      * save space in the various tables. IPos is used only for parameter passing.
      */
     using IPos = unsigned;
-
-    enum block_state
-    {
-        need_more,      /* block not completed, need more input or more output */
-        block_done,     /* block flush performed */
-        finish_started, /* finish started, need only more output at next deflate */
-        finish_done     /* finish done, accept no more input or output */
-    };
 
     deflate_tables const& lut_;
 
@@ -401,6 +454,58 @@ protected:
 
     //--------------------------------------------------------------------------
 
+    /* Values for max_lazy_match, good_match and max_chain_length, depending on
+     * the desired pack level (0..9). The values given below have been tuned to
+     * exclude worst case performance for pathological files. Better values may be
+     * found for specific files.
+     */
+    struct config
+    {
+       std::uint16_t good_length; /* reduce lazy search above this match length */
+       std::uint16_t max_lazy;    /* do not perform lazy search above this match length */
+       std::uint16_t nice_length; /* quit search above this match length */
+       std::uint16_t max_chain;
+       compress_func func;
+
+       config(
+               std::uint16_t good_length_,
+               std::uint16_t max_lazy_,
+               std::uint16_t nice_length_,
+               std::uint16_t max_chain_,
+               compress_func func_)
+           : good_length(good_length_)
+           , max_lazy(max_lazy_)
+           , nice_length(nice_length_)
+           , max_chain(max_chain_)
+           , func(func_)
+       {
+       }
+    };
+
+    static
+    config
+    get_config(std::size_t level)
+    {
+        switch(level)
+        {
+        //              good lazy nice chain
+        case 0: return {  0,   0,   0,    0, &self::deflate_stored}; // store only
+        case 1: return {  4,   4,   8,    4, &self::deflate_fast};   // max speed, no lazy matches
+        case 2: return {  4,   5,  16,    8, &self::deflate_fast};
+        case 3: return {  4,   6,  32,   32, &self::deflate_fast};
+        case 4: return {  4,   4,  16,   16, &self::deflate_slow};   // lazy matches
+        case 5: return {  8,  16,  32,   32, &self::deflate_slow};
+        case 6: return {  8,  16, 128,  128, &self::deflate_slow};
+        case 7: return {  8,  32, 128,  256, &self::deflate_slow};
+        case 8: return { 32, 128, 258, 1024, &self::deflate_slow};
+        default:
+        case 9: return { 32, 258, 258, 4096, &self::deflate_slow};    // max compression
+        }
+    }
+
+    template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
+
+    template<class = void> void lm_init             ();
     template<class = void> void init_block          ();
     template<class = void> void pqdownheap          (detail::ct_data const* tree, int k);
     template<class = void> void pqremove            (detail::ct_data const* tree, int& top);
@@ -468,6 +573,174 @@ protected:
 };
 
 //--------------------------------------------------------------------------
+
+template<class>
+void
+deflate_stream_base::
+doWrite(z_params& zs, Flush flush, error_code& ec)
+{
+    // value of flush param for previous deflate call
+    boost::optional<Flush> old_flush;
+
+    if(zs.next_out == 0 || (zs.next_in == 0 && zs.avail_in != 0) ||
+        (status_ == FINISH_STATE && flush != Flush::finish))
+    {
+        ec = error::stream_error;
+        return;
+    }
+    if(zs.avail_out == 0)
+    {
+        ec = error::need_buffers;
+        return;
+    }
+
+    old_flush = last_flush_;
+    last_flush_ = flush;
+
+    // Flush as much pending output as possible
+    if(pending_ != 0)
+    {
+        flush_pending(zs);
+        if(zs.avail_out == 0)
+        {
+            /* Since avail_out is 0, deflate will be called again with
+             * more output space, but possibly with both pending and
+             * avail_in equal to zero. There won't be anything to do,
+             * but this is not an error situation so make sure we
+             * return OK instead of BUF_ERROR at next call of deflate:
+             */
+            last_flush_ = boost::none;
+            return;
+        }
+    }
+    else if(zs.avail_in == 0 && flush <= old_flush &&
+        flush != Flush::finish)
+    {
+        /* Make sure there is something to do and avoid duplicate consecutive
+         * flushes. For repeated and useless calls with Flush::finish, we keep
+         * returning Z_STREAM_END instead of Z_BUF_ERROR.
+         */
+        ec = error::need_buffers;
+        return;
+    }
+
+    // User must not provide more input after the first FINISH:
+    if(status_ == FINISH_STATE && zs.avail_in != 0)
+    {
+        ec = error::need_buffers;
+        return;
+    }
+
+    /* Start a new block or continue the current one.
+     */
+    if(zs.avail_in != 0 || lookahead_ != 0 ||
+        (flush != Flush::none && status_ != FINISH_STATE))
+    {
+        block_state bstate;
+
+        switch(strategy_)
+        {
+        case Strategy::huffman:
+            bstate = deflate_huff(zs, flush);
+            break;
+        case Strategy::rle:
+            bstate = deflate_rle(zs, flush);
+            break;
+        default:
+        {
+            bstate = (this->*(get_config(level_).func))(zs, flush);
+            break;
+        }
+        }
+
+        if(bstate == finish_started || bstate == finish_done)
+        {
+            status_ = FINISH_STATE;
+        }
+        if(bstate == need_more || bstate == finish_started)
+        {
+            if(zs.avail_out == 0)
+            {
+                last_flush_ = boost::none; /* avoid BUF_ERROR next call, see above */
+            }
+            return;
+            /*  If flush != Flush::none && avail_out == 0, the next call
+                of deflate should use the same flush parameter to make sure
+                that the flush is complete. So we don't have to output an
+                empty block here, this will be done at next call. This also
+                ensures that for a very small output buffer, we emit at most
+                one empty block.
+            */
+        }
+        if(bstate == block_done)
+        {
+            if(flush == Flush::partial)
+            {
+                tr_align();
+            }
+            else if(flush != Flush::block)
+            {
+                /* FULL_FLUSH or SYNC_FLUSH */
+                tr_stored_block((char*)0, 0L, 0);
+                /* For a full flush, this empty block will be recognized
+                 * as a special marker by inflate_sync().
+                 */
+                if(flush == Flush::full)
+                {
+                    clear_hash(); // forget history
+                    if(lookahead_ == 0)
+                    {
+                        strstart_ = 0;
+                        block_start_ = 0L;
+                        insert_ = 0;
+                    }
+                }
+            }
+            flush_pending(zs);
+            if(zs.avail_out == 0)
+            {
+                last_flush_ = boost::none; /* avoid BUF_ERROR at next call, see above */
+                return;
+            }
+        }
+    }
+
+    if(flush == Flush::finish)
+    {
+        ec = error::end_of_stream;
+        return;
+    }
+}
+
+//--------------------------------------------------------------------------
+
+/*  Initialize the "longest match" routines for a new zlib stream
+*/
+template<class>
+void
+deflate_stream_base::
+lm_init()
+{
+    window_size_ = (std::uint32_t)2L*w_size_;
+
+    clear_hash();
+
+    /* Set the default configuration parameters:
+     */
+    // VFALCO TODO just copy the config struct
+    max_lazy_match_   = get_config(level_).max_lazy;
+    good_match_       = get_config(level_).good_length;
+    nice_match_       = get_config(level_).nice_length;
+    max_chain_length_ = get_config(level_).max_chain;
+
+    strstart_ = 0;
+    block_start_ = 0L;
+    lookahead_ = 0;
+    insert_ = 0;
+    match_length_ = prev_length_ = limits::minMatch-1;
+    match_available_ = 0;
+    ins_h_ = 0;
+}
 
 // Initialize a new block.
 //

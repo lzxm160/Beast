@@ -88,8 +88,121 @@ public:
     int
     reset(int level, int windowBits, int memLevel, Strategy strategy);
 
+    /** Compress input and write output.
+
+        This function compresses as much data as possible, and stops when
+        the input buffer becomes empty or the output buffer becomes full.
+        It may introduce some output latency (reading input without
+        producing any output) except when forced to flush.
+        
+        In each call, one or both of these actions are performed:
+
+        @li Compress more input starting at `zs.next_in` and update
+        `zs.next_in` and `zs.avail_in` accordingly. If not all
+        input can be processed (because there is not enough room in
+        the output buffer), `zs.next_in` and `zs.avail_in` are updated
+        and processing will resume at this point for the next call.
+
+        @li Provide more output starting at `zs.next_out` and update
+        `zs.next_out` and `zs.avail_out` accordingly. This action is
+        forced if the parameter flush is not `Flush::none`. Forcing
+        flush frequently degrades the compression ratio, so this parameter
+        should be set only when necessary (in interactive applications).
+        Some output may be provided even if flush is not set.
+
+        Before the call, the application must ensure that at least one
+        of the actions is possible, by providing more input and/or
+        consuming more output, and updating `zs.avail_in` or `zs.avail_out`
+        accordingly; `zs.avail_out` should never be zero before the call.
+        The application can consume the compressed output when it wants,
+        for example when the output buffer is full (`zs.avail_out == 0`),
+        or after each call of `write`. If `write` returns no error
+        with zero `zs.avail_out`, it must be called again after making
+        room in the output buffer because there might be more output
+        pending.
+
+        Normally the parameter flush is set to `Flush::none`, which allows
+        deflate to decide how much data to accumulate before producing
+        output, in order to maximize compression.
+
+        If the parameter flush is set to `Flush::sync`, all pending output
+        is flushed to the output buffer and the output is aligned on a
+        byte boundary, so that the decompressor can get all input data
+        available so far. In particular `zs.avail_in` is zero after the
+        call if enough output space has been provided before the call.
+        Flushing may degrade compression for some compression algorithms
+        and so it should be used only when necessary. This completes the
+        current deflate block and follows it with an empty stored block
+        that is three bits plus filler bits to the next byte, followed
+        by the four bytes `{ 0x00, 0x00 0xff 0xff }`.
+
+        If flush is set to `Flush::partial`, all pending output is flushed
+        to the output buffer, but the output is not aligned to a byte
+        boundary. All of the input data so far will be available to the
+        decompressor, as for Z_SYNC_FLUSH. This completes the current
+        deflate block and follows it with an empty fixed codes block that
+        is 10 bits long. This assures that enough bytes are output in order
+        for the decompressor to finish the block before the empty fixed
+        code block.
+
+        If flush is set to `Flush::block`, a deflate block is completed
+        and emitted, as for `Flush::sync`, but the output is not aligned
+        on a byte boundary, and up to seven bits of the current block are
+        held to be written as the next byte after the next deflate block
+        is completed. In this case, the decompressor may not be provided
+        enough bits at this point in order to complete decompression of
+        the data provided so far to the compressor. It may need to wait
+        for the next block to be emitted. This is for advanced applications
+        that need to control the emission of deflate blocks.
+
+        If flush is set to `Flush::full`, all output is flushed as with
+        `Flush::sync`, and the compression state is reset so that
+        decompression can restart from this point if previous compressed
+        data has been damaged or if random access is desired. Using
+        `Flush::full` too often can seriously degrade compression.
+
+        If `write` returns with `zs.avail_out == 0`, this function must
+        be called again with the same value of the flush parameter and
+        more output space (updated `zs.avail_out`), until the flush is
+        complete (`write` returns with non-zero `zs.avail_out`). In the
+        case of a `Flush::full`or `Flush::sync`, make sure that
+        `zs.avail_out` is greater than six to avoid repeated flush markers
+        due to `zs.avail_out == 0` on return.
+
+        If the parameter flush is set to `Flush::finish`, pending input
+        is processed, pending output is flushed and deflate returns the
+        error `error::end_of_stream` if there was enough output space;
+        if deflate returns with no error, this function must be called
+        again with `Flush::finish` and more output space (updated
+        `zs.avail_out`) but no more input data, until it returns the
+        error `error::end_of_stream` or another error. After `write` has
+        returned the `error::end_of_stream` error, the only possible
+        operations on the stream are to reset or destroy.
+
+        `Flush::finish` can be used immediately after initialization
+        if all the compression is to be done in a single step. In this
+        case, `zs.avail_out` must be at least value returned by
+        `upper_bound` (see below). Then `write` is guaranteed to return
+        the `error::end_of_stream` error. If not enough output space
+        is provided, deflate will not return `error::end_of_stream`,
+        and it must be called again as described above.
+
+        `write` returns no error if some progress has been made (more
+        input processed or more output produced), `error::end_of_stream`
+        if all input has been consumed and all output has been produced
+        (only when flush is set to `Flush::finish`), `error::stream_error`
+        if the stream state was inconsistent (for example if `zs.next_in`
+        or `zs.next_out` was `nullptr`), `error::need_buffers` if no
+        progress is possible (for example `zs.avail_in` or `zs.avail_out`
+        was zero). Note that `error::need_buffers` is not fatal, and
+        `write` can be called again with more input and more output space
+        to continue compressing.
+    */
     void
-    write(z_params& zs, Flush flush, error_code& ec);
+    write(z_params& zs, Flush flush, error_code& ec)
+    {
+        doWrite(zs, flush, ec);
+    }
 
     int
     dictionary(Byte const* dictionary, uInt dictLength);
@@ -111,61 +224,6 @@ public:
 
     int
     prime(int bits, int value);
-
-private:
-    void lm_init();
-
-    using self = basic_deflate_stream;
-    typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
-
-    /* Values for max_lazy_match, good_match and max_chain_length, depending on
-     * the desired pack level (0..9). The values given below have been tuned to
-     * exclude worst case performance for pathological files. Better values may be
-     * found for specific files.
-     */
-    struct config
-    {
-       std::uint16_t good_length; /* reduce lazy search above this match length */
-       std::uint16_t max_lazy;    /* do not perform lazy search above this match length */
-       std::uint16_t nice_length; /* quit search above this match length */
-       std::uint16_t max_chain;
-       compress_func func;
-
-       config(
-               std::uint16_t good_length_,
-               std::uint16_t max_lazy_,
-               std::uint16_t nice_length_,
-               std::uint16_t max_chain_,
-               compress_func func_)
-           : good_length(good_length_)
-           , max_lazy(max_lazy_)
-           , nice_length(nice_length_)
-           , max_chain(max_chain_)
-           , func(func_)
-       {
-       }
-    };
-
-    static
-    config
-    get_config(std::size_t level)
-    {
-        switch(level)
-        {
-        //              good lazy nice chain
-        case 0: return {  0,   0,   0,    0, &self::deflate_stored}; // store only
-        case 1: return {  4,   4,   8,    4, &self::deflate_fast};   // max speed, no lazy matches
-        case 2: return {  4,   5,  16,    8, &self::deflate_fast};
-        case 3: return {  4,   6,  32,   32, &self::deflate_fast};
-        case 4: return {  4,   4,  16,   16, &self::deflate_slow};   // lazy matches
-        case 5: return {  8,  16,  32,   32, &self::deflate_slow};
-        case 6: return {  8,  16, 128,  128, &self::deflate_slow};
-        case 7: return {  8,  32, 128,  256, &self::deflate_slow};
-        case 8: return { 32, 128, 258, 1024, &self::deflate_slow};
-        default:
-        case 9: return { 32, 258, 258, 4096, &self::deflate_slow};    // max compression
-        }
-    }
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
