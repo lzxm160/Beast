@@ -175,11 +175,6 @@ reset(
 #define ERR_RETURN(strm,err) \
   return (strm->msg = "unspecified zlib error", (err))
 
-/* Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
- * For deflate_fast() (levels <= 3) good is ignored and lazy has a different
- * meaning.
- */
-
 /* ===========================================================================
  * Insert string str in the dictionary and set match_head to the previous head
  * of the hash chain (the most recent string with same hash key). Return
@@ -1851,7 +1846,7 @@ deflate_fast(int flush) ->
          */
         hash_head = 0;
         if(lookahead_ >= limits::minMatch) {
-            INSERT_STRING(strstart_, hash_head);
+            insert_string(hash_head);
         }
 
         /* Find the longest match, discarding those <= prev_length.
@@ -1881,7 +1876,7 @@ deflate_fast(int flush) ->
                 match_length_--; /* string at strstart already in table */
                 do {
                     strstart_++;
-                    INSERT_STRING(strstart_, hash_head);
+                    insert_string(hash_head);
                     /* strstart never exceeds WSIZE-limits::maxMatch, so there are
                      * always limits::minMatch bytes ahead.
                      */
@@ -1951,7 +1946,7 @@ deflate_slow(int flush) ->
          */
         hash_head = 0;
         if(lookahead_ >= limits::minMatch) {
-            INSERT_STRING(strstart_, hash_head);
+            insert_string(hash_head);
         }
 
         /* Find the longest match, discarding those <= prev_length.
@@ -2000,7 +1995,7 @@ deflate_slow(int flush) ->
             prev_length_ -= 2;
             do {
                 if(++strstart_ <= max_insert) {
-                    INSERT_STRING(strstart_, hash_head);
+                    insert_string(hash_head);
                 }
             } while (--prev_length_ != 0);
             match_available_ = 0;

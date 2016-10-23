@@ -55,6 +55,11 @@ protected:
     {
     }
 
+    /*  Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
+        For deflate_fast() (levels <= 3) good is ignored and lazy has a different
+        meaning.
+    */
+
     // maximum heap size
     static std::uint16_t constexpr HEAP_SIZE = 2 * limits::lCodes + 1;
 
@@ -381,6 +386,24 @@ protected:
         return tree[n].fc < tree[m].fc ||
             (tree[n].fc == tree[m].fc &&
                 depth_[n] <= depth_[m]);
+    }
+
+    /*  Insert string str in the dictionary and set match_head to the
+        previous head of the hash chain (the most recent string with
+        same hash key). Return the previous length of the hash chain.
+        If this file is compiled with -DFASTEST, the compression level
+        is forced to 1, and no hash chains are maintained.
+        IN  assertion: all calls to to INSERT_STRING are made with
+            consecutive input characters and the first limits::minMatch
+            bytes of str are valid (except for the last limits::minMatch-1
+            bytes of the input file).
+    */
+    void
+    insert_string(IPos& hash_head)
+    {
+        update_hash(ins_h_, window_[strstart_ + (limits::minMatch-1)]);
+        hash_head = prev_[strstart_ & w_mask_] = head_[ins_h_];
+        head_[ins_h_] = (std::uint16_t)strstart_;
     }
 };
 
