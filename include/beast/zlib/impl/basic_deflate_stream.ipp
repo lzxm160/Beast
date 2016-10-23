@@ -380,7 +380,7 @@ deflate(int flush)
     // Flush as much pending output as possible
     if(pending_ != 0)
     {
-        flush_pending();
+        flush_pending(*this);
         if(avail_out == 0)
         {
             /* Since avail_out is 0, deflate will be called again with
@@ -474,7 +474,7 @@ deflate(int flush)
                     }
                 }
             }
-            flush_pending();
+            flush_pending(*this);
             if(avail_out == 0)
             {
                 last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
@@ -769,20 +769,21 @@ fill_window()
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-flush_pending()
+flush_pending(z_params& zs)
 {
     tr_flush_bits();
     unsigned len = pending_;
-    if(len > avail_out)
-        len = avail_out;
-    if(len == 0) return;
+    if(len > zs.avail_out)
+        len = zs.avail_out;
+    if(len == 0)
+        return;
 
-    std::memcpy(next_out, pending_out_, len);
-    next_out = static_cast<std::uint8_t*>(
-        next_out) + len;
+    std::memcpy(zs.next_out, pending_out_, len);
+    zs.next_out =
+        static_cast<std::uint8_t*>(zs.next_out) + len;
     pending_out_  += len;
-    total_out += len;
-    avail_out  -= len;
+    zs.total_out += len;
+    zs.avail_out  -= len;
     pending_ -= len;
     if(pending_ == 0)
         pending_out_ = pending_buf_;
@@ -804,7 +805,7 @@ flush_block(bool last)
         (std::uint32_t)((long)strstart_ - block_start_),
         last);
    block_start_ = strstart_;
-   flush_pending();
+   flush_pending(*this);
 }
 
 /*  Read a new buffer from the current input stream, update the adler32
