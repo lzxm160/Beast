@@ -78,15 +78,16 @@ public:
     {
         int result;
         std::string out;
-        deflate_stream zs;
-        result = zs.reset(
+        z_params zs;
+        deflate_stream ds;
+        result = ds.reset(
             level,
             windowBits,
             8,
             strategy);
         if(! BEAST_EXPECT(result == Z_OK))
             goto err;
-        out.resize(zs.upper_bound(
+        out.resize(ds.upper_bound(
             static_cast<uLong>(check.size())));
         zs.next_in = (Bytef*)check.data();
         zs.avail_in = static_cast<uInt>(check.size());
@@ -96,7 +97,7 @@ public:
             bool progress = true;
             for(;;)
             {
-                result = zs.write(zs, Z_FULL_FLUSH);
+                result = ds.write(zs, Z_FULL_FLUSH);
                 if( result == Z_BUF_ERROR ||
                     result == Z_STREAM_END) // per zlib FAQ
                     goto fin;
@@ -201,8 +202,9 @@ public:
             for(std::size_t j = 1;; ++j)
             {
                 int result;
-                deflate_stream zs;
-                result = zs.reset(
+                z_params zs;
+                deflate_stream ds;
+                result = ds.reset(
                     level,
                     windowBits,
                     8,
@@ -210,7 +212,7 @@ public:
                 if(! BEAST_EXPECT(result == Z_OK))
                     continue;
                 std::string out;
-                out.resize(zs.upper_bound(
+                out.resize(ds.upper_bound(
                     static_cast<uLong>(check.size())));
                 if(j >= out.size())
                     break;
@@ -223,7 +225,7 @@ public:
                 for(;;)
                 {
                     int flush = bi ? Z_FULL_FLUSH : Z_NO_FLUSH;
-                    result = zs.write(zs, flush);
+                    result = ds.write(zs, flush);
                     if( result == Z_BUF_ERROR ||
                         result == Z_STREAM_END) // per zlib FAQ
                         goto fin;

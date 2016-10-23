@@ -65,7 +65,6 @@ deflate_upper_bound(std::size_t bytes);
 template<class Allocator>
 class basic_deflate_stream
     : private detail::deflate_stream_base<>
-    , public z_params
 {
 public:
     basic_deflate_stream();
@@ -101,11 +100,11 @@ public:
     prime(int bits, int value);
 
 private:
-    void tr_flush_block (char *buf, std::uint32_t stored_len, int last);
     void lm_init        ();
+    void tr_flush_block (z_params& zs, char *buf, std::uint32_t stored_len, int last);
     void fill_window    (z_params& zs);
     void flush_pending  (z_params& zs);
-    void flush_block    (bool last);
+    void flush_block    (z_params& zs, bool last);
     int  read_buf       (z_params& zs, Byte *buf, unsigned size);
     uInt longest_match  (IPos cur_match);
 
