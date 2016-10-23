@@ -292,14 +292,12 @@ protected:
     }
 
     void
-    deflate_stream_base::
     put_byte(std::uint8_t c)
     {
         pending_buf_[pending_++] = c;
     }
 
     void
-    deflate_stream_base::
     put_short(std::uint16_t w)
     {
         put_byte(w & 0xff);
@@ -310,7 +308,6 @@ protected:
         IN assertion: length <= 16 and value fits in length bits.
     */
     void
-    deflate_stream_base::
     send_bits(int value, int length)
     {
         if(bi_valid_ > (int)Buf_size - length)
@@ -329,7 +326,6 @@ protected:
 
     // Send a code of the given tree
     void
-    deflate_stream_base::
     send_code(int value, ct_data const* tree)
     {
         send_bits(tree[value].fc, tree[value].dl);
@@ -340,7 +336,6 @@ protected:
         and _dist_code[257] are never used.
     */
     std::uint8_t
-    deflate_stream_base::
     d_code(unsigned dist)
     {
         if(dist < 256)
@@ -355,7 +350,6 @@ protected:
             complete recalculation each time.
     */
     void
-    deflate_stream_base::
     update_hash(uInt& h, std::uint8_t c)
     {
         h = ((h << hash_shift_) ^ c) & hash_mask_;
@@ -365,7 +359,6 @@ protected:
         bit systems). prev[] will be initialized on the fly.
     */
     void
-    deflate_stream_base::
     clear_hash()
     {
         head_[hash_size_-1] = 0;
@@ -378,7 +371,6 @@ protected:
         worst case length.
     */
     bool
-    deflate_stream_base::
     smaller(ct_data const* tree, int n, int m)
     {
         return tree[n].fc < tree[m].fc ||
