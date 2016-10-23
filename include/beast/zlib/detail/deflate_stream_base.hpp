@@ -198,7 +198,7 @@ protected:
     uInt max_lazy_match_;
 
     int level_;                     // compression level (1..9)
-    int strategy_;                  // favor or force Huffman coding
+    Strategy strategy_;             // favor or force Huffman coding
 
     // Use a faster search when the previous match is longer than this
     uInt good_match_;
@@ -1252,7 +1252,7 @@ tr_flush_block(
         // force static trees
 #else
     }
-    else if(strategy_ == Z_FIXED || static_lenb == opt_lenb)
+    else if(strategy_ == Strategy::fixed || static_lenb == opt_lenb)
     {
 #endif
         send_bits((STATIC_TREES<<1)+last, 3);

@@ -85,7 +85,7 @@ public:
     tune(int good_length, int max_lazy, int nice_length, int max_chain);
 
     int
-    reset(int level, int windowBits, int memLevel, int strategy);
+    reset(int level, int windowBits, int memLevel, Strategy strategy);
 
     void
     write(z_params& zs, Flush flush, error_code& ec);

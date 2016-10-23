@@ -99,7 +99,7 @@ basic_deflate_stream<Allocator>::
 basic_deflate_stream()
 {
     // default level 6
-    //reset(this, 6, 15, DEF_MEM_LEVEL, Z_DEFAULT_STRATEGY);
+    //reset(this, 6, 15, DEF_MEM_LEVEL, Strategy::normal);
 }
 
 template<class Allocator>
@@ -109,7 +109,7 @@ reset(
     int  level,
     int  windowBits,
     int  memLevel,
-    int  strategy)
+    Strategy  strategy)
 {
     /* We overlay pending_buf and d_buf+l_buf. This works since the average
      * output size for (length,distance) codes is <= 24 bits.
@@ -121,8 +121,8 @@ reset(
 
     BOOST_ASSERT(windowBits >= 0);
     if(memLevel < 1 || memLevel > MAX_MEM_LEVEL ||
-        windowBits < 8 || windowBits > 15 || level < 0 || level > 9 ||
-        strategy < 0 || strategy > Z_FIXED) {
+        windowBits < 8 || windowBits > 15 || level < 0 || level > 9)
+    {
         return Z_STREAM_ERROR;
     }
     if(windowBits == 8)
@@ -255,7 +255,7 @@ params(z_params& zs, int level, int strategy, error_code& ec)
 
     if(level == Z_DEFAULT_COMPRESSION)
         level = 6;
-    if(level < 0 || level > 9 || strategy < 0 || strategy > Z_FIXED)
+    if(level < 0 || level > 9 || strategy < 0 || strategy > Strategy::fixed)
     {
         ec = error::stream_error;
         return;
@@ -473,10 +473,10 @@ write(z_params& zs, Flush flush, error_code& ec)
 
         switch(strategy_)
         {
-        case Z_HUFFMAN_ONLY:
+        case Strategy::huffman:
             bstate = deflate_huff(zs, flush);
             break;
-        case Z_RLE:
+        case Strategy::rle:
             bstate = deflate_rle(zs, flush);
             break;
         default:
@@ -821,7 +821,7 @@ deflate_slow(z_params& zs, Flush flush) ->
             match_length_ = longest_match(hash_head);
             /* longest_match() sets match_start */
 
-            if(match_length_ <= 5 && (strategy_ == Z_FILTERED
+            if(match_length_ <= 5 && (strategy_ == Strategy::filtered
                 || (match_length_ == limits::minMatch &&
                     strstart_ - match_start_ > kTooFar)
                 )) {
@@ -911,9 +911,9 @@ deflate_slow(z_params& zs, Flush flush) ->
 }
 
 /* ===========================================================================
- * For Z_RLE, simply look for runs of bytes, generate matches only of distance
+ * For Strategy::rle, simply look for runs of bytes, generate matches only of distance
  * one.  Do not maintain a hash table.  (It will be regenerated if this run of
- * deflate switches away from Z_RLE.)
+ * deflate switches away from Strategy::rle.)
  */
 template<class Allocator>
 auto
@@ -998,7 +998,7 @@ deflate_rle(z_params& zs, Flush flush) ->
 }
 
 /* ===========================================================================
- * For Z_HUFFMAN_ONLY, do not look for matches.  Do not maintain a hash table.
+ * For Strategy::huffman, do not look for matches.  Do not maintain a hash table.
  * (It will be regenerated if this run of deflate switches away from Huffman.)
  */
 template<class Allocator>

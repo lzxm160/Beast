@@ -22,6 +22,21 @@ public:
         int level, int windowBits, int strategy,
             std::string const&);
 
+    static
+    Strategy
+    toStrategy(int strategy)
+    {
+        switch(strategy)
+        {
+        default:
+        case 0: return Strategy::normal;
+        case 1: return Strategy::filtered;
+        case 2: return Strategy::huffman;
+        case 3: return Strategy::rle;
+        case 4: return Strategy::fixed;
+        }
+    }
+
     void
     doDeflate1_zlib(
         int level, int windowBits, int strategy,
@@ -84,7 +99,7 @@ public:
             level,
             windowBits,
             8,
-            strategy);
+            toStrategy(strategy));
         if(! BEAST_EXPECT(result == Z_OK))
             goto err;
         out.resize(ds.upper_bound(
@@ -211,7 +226,7 @@ public:
                     level,
                     windowBits,
                     8,
-                    strategy);
+                    toStrategy(strategy));
                 if(! BEAST_EXPECT(result == Z_OK))
                     continue;
                 std::string out;

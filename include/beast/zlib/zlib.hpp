@@ -146,14 +146,47 @@ enum z_Compression
     Z_DEFAULT_COMPRESSION   = -1
 };
 
-/* compression strategy; see deflateInit2() below for details */
-enum z_Strategy
+/** Compression strategy.
+
+    These are used when compressing streams.
+*/
+enum class Strategy
 {
-    Z_FILTERED          = 1,
-    Z_HUFFMAN_ONLY      = 2,
-    Z_RLE               = 3,
-    Z_FIXED             = 4,
-    Z_DEFAULT_STRATEGY  = 0
+    /** Default strategy.
+
+        This is suitable for general purpose compression, and works
+        well in the majority of cases.
+    */
+    normal,
+
+    /** Filtered strategy.
+
+        This strategy should be used when the data be compressed
+        is produced by a filter or predictor.
+    */
+    filtered,
+
+    /** Huffman-only strategy.
+        
+        This strategy only performs Huffman encoding, without doing
+        any string matching.
+    */
+    huffman,
+
+    /** Run Length Encoding strategy.
+
+        This strategy limits match distances to one, making it
+        equivalent to run length encoding. This can give better
+        performance for things like PNG image data.
+    */
+    rle,
+
+    /** Fixed table strategy.
+
+        This strategy prevents the use of dynamic Huffman codes,
+        allowing for a simpler decoder for special applications.
+    */
+    fixed
 };
 
 } // zlib
