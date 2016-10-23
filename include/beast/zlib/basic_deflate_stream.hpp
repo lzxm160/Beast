@@ -101,13 +101,7 @@ public:
     prime(int bits, int value);
 
 private:
-    void tr_init            ();
-    void tr_align           ();
-    void tr_flush_bits      ();
-    void tr_stored_block    (char *bu, std::uint32_t stored_len, int last);
     void tr_flush_block     (char *buf, std::uint32_t stored_len, int last);
-    void tr_tally_dist      (std::uint16_t dist, std::uint8_t len, bool& flush);
-    void tr_tally_lit       (std::uint8_t c, bool& flush);
 
     block_state deflate_stored(int flush);
     block_state deflate_fast  (int flush);

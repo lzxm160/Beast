@@ -178,66 +178,6 @@ reset(
 
 //------------------------------------------------------------------------------
 
-/* Initialize the tree data structures for a new zlib stream.
-*/
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tr_init()
-{
-    l_desc_.dyn_tree = dyn_ltree_;
-    l_desc_.stat_desc = &lut_.l_desc;
-
-    d_desc_.dyn_tree = dyn_dtree_;
-    d_desc_.stat_desc = &lut_.d_desc;
-
-    bl_desc_.dyn_tree = bl_tree_;
-    bl_desc_.stat_desc = &lut_.bl_desc;
-
-    bi_buf_ = 0;
-    bi_valid_ = 0;
-
-    /* Initialize the first block of the first file: */
-    init_block();
-}
-
-/*  Send one empty static block to give enough lookahead for inflate.
-    This takes 10 bits, of which 7 may remain in the bit buffer.
-*/
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tr_align()
-{
-    send_bits(STATIC_TREES<<1, 3);
-    send_code(END_BLOCK, lut_.ltree);
-    bi_flush();
-}
-
-/* Flush the bits in the bit buffer to pending output (leaves at most 7 bits)
-*/
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tr_flush_bits()
-{
-    bi_flush();
-}
-
-/* Send a stored block
-*/
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tr_stored_block(
-    char *buf,                  // input block
-    std::uint32_t stored_len,   // length of input block
-    int last)                   // one if this is the last block for a file
-{
-    send_bits((STORED_BLOCK<<1)+last, 3);       // send block type
-    copy_block(buf, (unsigned)stored_len, 1);   // with header
-}
-
 /*  Determine the best encoding for the current block: dynamic trees,
     static trees or store, and output the encoded block to the zip file.
 */
@@ -338,32 +278,6 @@ tr_flush_block(
         bi_windup();
     Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
            compressed_len_-7*last));
-}
-
-template<class Allocator>
-inline
-void
-basic_deflate_stream<Allocator>::
-tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
-{
-    d_buf_[last_lit_] = dist;
-    l_buf_[last_lit_++] = len;
-    dist--;
-    dyn_ltree_[lut_.length_code[len]+limits::literals+1].fc++;
-    dyn_dtree_[d_code(dist)].fc++;
-    flush = (last_lit_ == lit_bufsize_-1);
-}
-
-template<class Allocator>
-inline
-void
-basic_deflate_stream<Allocator>::
-tr_tally_lit(std::uint8_t c, bool& flush)
-{
-    d_buf_[last_lit_] = 0;
-    l_buf_[last_lit_++] = c;
-    dyn_ltree_[c].fc++;
-    flush = (last_lit_ == lit_bufsize_-1);
 }
 
 //------------------------------------------------------------------------------
