@@ -69,6 +69,11 @@ protected:
     */
     static std::size_t constexpr kMinLookahead = limits::maxMatch + limits::minMatch+1;
 
+    /*  Number of bytes after end of data in window to initialize in order
+        to avoid memory checker errors from longest match routines
+    */
+    static std::size_t constexpr kWinInit = limits::maxMatch;
+
     // VFALCO This might not be needed, e.g. for zip/gzip
     enum StreamStatus
     {

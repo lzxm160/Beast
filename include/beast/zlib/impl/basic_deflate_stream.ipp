@@ -195,10 +195,6 @@ reset(
     match_head = prev_[(str) & w_mask_] = head_[ins_h_], \
     head_[ins_h_] = (std::uint16_t)(str))
 
-#define WIN_INIT limits::maxMatch
-/* Number of bytes after end of data in window to initialize in order to avoid
-   memory checker errors from longest match routines */
-
 //------------------------------------------------------------------------------
 
 // Initialize a new block.
@@ -1173,11 +1169,11 @@ fill_window()
     }
     while (lookahead_ < kMinLookahead && avail_in != 0);
 
-    /* If the WIN_INIT bytes after the end of the current data have never been
+    /* If the kWinInit bytes after the end of the current data have never been
      * written, then zero those bytes in order to avoid memory check reports of
      * the use of uninitialized (or uninitialised as Julian writes) bytes by
      * the longest match routines.  Update the high water mark for the next
-     * time through here.  WIN_INIT is set to limits::maxMatch since the longest match
+     * time through here.  kWinInit is set to limits::maxMatch since the longest match
      * routines allow scanning to strstart + limits::maxMatch, ignoring lookahead.
      */
     if(high_water_ < window_size_) {
@@ -1185,21 +1181,21 @@ fill_window()
         std::uint32_t init;
 
         if(high_water_ < curr) {
-            /* Previous high water mark below current data -- zero WIN_INIT
+            /* Previous high water mark below current data -- zero kWinInit
              * bytes or up to end of window, whichever is less.
              */
             init = window_size_ - curr;
-            if(init > WIN_INIT)
-                init = WIN_INIT;
+            if(init > kWinInit)
+                init = kWinInit;
             std::memset(window_ + curr, 0, (unsigned)init);
             high_water_ = curr + init;
         }
-        else if(high_water_ < (std::uint32_t)curr + WIN_INIT) {
+        else if(high_water_ < (std::uint32_t)curr + kWinInit) {
             /* High water mark at or above current data, but below current data
-             * plus WIN_INIT -- zero out to current data plus WIN_INIT, or up
+             * plus kWinInit -- zero out to current data plus kWinInit, or up
              * to end of window, whichever is less.
              */
-            init = (std::uint32_t)curr + WIN_INIT - high_water_;
+            init = (std::uint32_t)curr + kWinInit - high_water_;
             if(init > window_size_ - high_water_)
                 init = window_size_ - high_water_;
             std::memset(window_ + high_water_, 0, (unsigned)init);
