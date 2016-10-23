@@ -37,7 +37,9 @@
 
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 
 namespace beast {
@@ -259,7 +261,105 @@ protected:
         then updated to the new high water mark.
     */
     std::uint32_t high_water_;
+
+    void put_byte           (std::uint8_t c);
+    void put_short          (std::uint16_t w);
+    void send_bits          (int value, int length);
+    void send_code          (int value, detail::ct_data const* tree);
+    std::uint8_t d_code     (unsigned dist);
+    void update_hash        (uInt& h, std::uint8_t c);
+    void clear_hash         ();
 };
+
+//------------------------------------------------------------------------------
+
+inline
+void
+deflate_stream_base::
+put_byte(std::uint8_t c)
+{
+    pending_buf_[pending_++] = c;
+}
+
+inline
+void
+deflate_stream_base::
+put_short(std::uint16_t w)
+{
+    put_byte(w & 0xff);
+    put_byte(w >> 8);
+}
+
+// Send a value on a given number of bits.
+// IN assertion: length <= 16 and value fits in length bits.
+//
+inline
+void
+deflate_stream_base::
+send_bits(int value, int length)
+{
+    if(bi_valid_ > (int)Buf_size - length)
+    {
+        bi_buf_ |= (std::uint16_t)value << bi_valid_;
+        put_short(bi_buf_);
+        bi_buf_ = (std::uint16_t)value >> (Buf_size - bi_valid_);
+        bi_valid_ += length - Buf_size;
+    }
+    else
+    {
+        bi_buf_ |= (std::uint16_t)(value) << bi_valid_;
+        bi_valid_ += length;
+    }
+}
+
+// Send a code of the given tree
+inline
+void
+deflate_stream_base::
+send_code(int value, detail::ct_data const* tree)
+{
+    send_bits(tree[value].fc, tree[value].dl);
+}
+
+/*  Mapping from a distance to a distance code. dist is the
+    distance - 1 and must not have side effects. _dist_code[256]
+    and _dist_code[257] are never used.
+*/
+inline
+std::uint8_t
+deflate_stream_base::
+d_code(unsigned dist)
+{
+    if(dist < 256)
+        return lut_.dist_code[dist];
+    return lut_.dist_code[256+(dist>>7)];
+}
+
+/*  Update a hash value with the given input byte
+    IN  assertion: all calls to to update_hash are made with consecutive
+        input characters, so that a running hash key can be computed from
+        the previous key instead of complete recalculation each time.
+*/
+inline
+void
+deflate_stream_base::
+update_hash(uInt& h, std::uint8_t c)
+{
+    h = ((h << hash_shift_) ^ c) & hash_mask_;
+}
+
+/*  Initialize the hash table (avoiding 64K overflow for 16 bit systems).
+    prev[] will be initialized on the fly.
+*/
+inline
+void
+deflate_stream_base::
+clear_hash()
+{
+    head_[hash_size_-1] = 0;
+    std::memset((Byte *)head_, 0,
+        (unsigned)(hash_size_-1)*sizeof(*head_));
+}
 
 } // detail
 } // zlib

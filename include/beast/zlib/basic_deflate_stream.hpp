@@ -101,14 +101,6 @@ public:
     prime(int bits, int value);
 
 private:
-    void put_byte           (std::uint8_t c);
-    void put_short          (std::uint16_t w);
-    void send_bits          (int value, int length);
-    void send_code          (int value, detail::ct_data const* tree);
-    std::uint8_t d_code     (unsigned dist);
-    void update_hash        (uInt& h, std::uint8_t c);
-    void clear_hash         ();
-
     void init_block         ();
     bool smaller            (detail::ct_data const* tree, int n, int m);
     void pqdownheap         (detail::ct_data const* tree, int k);

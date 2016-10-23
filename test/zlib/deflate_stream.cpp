@@ -293,12 +293,12 @@ public:
         doMatrix("2.zlib  ", "Hello, world!", &self::doDeflate2_zlib);
         doMatrix("2.beast ", "Hello, world!", &self::doDeflate2_beast);
         {
-            auto const s = corpus1(30);
+            auto const s = corpus1(56);
             doMatrix("3.zlib  ", s, &self::doDeflate2_zlib);
             doMatrix("3.beast ", s, &self::doDeflate2_beast);
         }
         {
-            auto const s = corpus1(100000);
+            auto const s = corpus1(512 * 1024);
             doMatrix("4.zlib  ", s, &self::doDeflate1_zlib);
             doMatrix("4.beast ", s, &self::doDeflate1_beast);
         }
