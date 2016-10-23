@@ -180,9 +180,6 @@ reset(
  * meaning.
  */
 
-/* rank Z_BLOCK between Z_NO_FLUSH and Z_PARTIAL_FLUSH */
-#define RANK(f) (((f) << 1) - ((f) > 4 ? 9 : 0))
-
 /* ===========================================================================
  * Insert string str in the dictionary and set match_head to the previous head
  * of the hash chain (the most recent string with same hash key). Return
@@ -1667,7 +1664,7 @@ deflate(int flush)
      * flushes. For repeated and useless calls with Z_FINISH, we keep
      * returning Z_STREAM_END instead of Z_BUF_ERROR.
      */
-    } else if(avail_in == 0 && RANK(flush) <= RANK(old_flush) &&
+    } else if(avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
                flush != Z_FINISH) {
         ERR_RETURN(this, Z_BUF_ERROR);
     }

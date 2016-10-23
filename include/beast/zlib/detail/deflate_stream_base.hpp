@@ -268,6 +268,14 @@ protected:
 
     //--------------------------------------------------------------------------
 
+    // rank Z_BLOCK between Z_NO_FLUSH and Z_PARTIAL_FLUSH
+    static
+    int
+    flushRank(int flush)
+    {
+        return (flush << 1) - (flush > 4 ? 9 : 0);
+    }
+
     void
     deflate_stream_base::
     put_byte(std::uint8_t c)
