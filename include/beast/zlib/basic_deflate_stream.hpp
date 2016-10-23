@@ -132,11 +132,11 @@ private:
     void tr_tally_dist      (std::uint16_t dist, std::uint8_t len, bool& flush);
     void tr_tally_lit       (std::uint8_t c, bool& flush);
 
-    static block_state deflate_stored(basic_deflate_stream *s, int flush);
-    static block_state deflate_fast(basic_deflate_stream *s, int flush);
-    static block_state deflate_slow(basic_deflate_stream *s, int flush);
-    static block_state deflate_rle(basic_deflate_stream *s, int flush);
-    static block_state deflate_huff(basic_deflate_stream *s, int flush);
+    block_state deflate_stored(int flush);
+    block_state deflate_fast  (int flush);
+    block_state deflate_slow  (int flush);
+    block_state deflate_rle   (int flush);
+    block_state deflate_huff  (int flush);
 
     void lm_init();
     void fill_window();
@@ -144,7 +144,8 @@ private:
     int  read_buf(Byte *buf, unsigned size);
     uInt longest_match(IPos cur_match);
 
-    using compress_func = block_state(*)(basic_deflate_stream*, int flush);
+    using self = basic_deflate_stream;
+    typedef block_state(self::*compress_func)(int flush);
 
     /* Values for max_lazy_match, good_match and max_chain_length, depending on
      * the desired pack level (0..9). The values given below have been tuned to
@@ -181,17 +182,17 @@ private:
         switch(level)
         {
         //              good lazy nice chain
-        case 0: return {  0,   0,   0,    0, &deflate_stored}; // store only
-        case 1: return {  4,   4,   8,    4, &deflate_fast};   // max speed, no lazy matches
-        case 2: return {  4,   5,  16,    8, &deflate_fast};
-        case 3: return {  4,   6,  32,   32, &deflate_fast};
-        case 4: return {  4,   4,  16,   16, &deflate_slow};   // lazy matches
-        case 5: return {  8,  16,  32,   32, &deflate_slow};
-        case 6: return {  8,  16, 128,  128, &deflate_slow};
-        case 7: return {  8,  32, 128,  256, &deflate_slow};
-        case 8: return { 32, 128, 258, 1024, &deflate_slow};
+        case 0: return {  0,   0,   0,    0, &self::deflate_stored}; // store only
+        case 1: return {  4,   4,   8,    4, &self::deflate_fast};   // max speed, no lazy matches
+        case 2: return {  4,   5,  16,    8, &self::deflate_fast};
+        case 3: return {  4,   6,  32,   32, &self::deflate_fast};
+        case 4: return {  4,   4,  16,   16, &self::deflate_slow};   // lazy matches
+        case 5: return {  8,  16,  32,   32, &self::deflate_slow};
+        case 6: return {  8,  16, 128,  128, &self::deflate_slow};
+        case 7: return {  8,  32, 128,  256, &self::deflate_slow};
+        case 8: return { 32, 128, 258, 1024, &self::deflate_slow};
         default:
-        case 9: return { 32, 258, 258, 4096, &deflate_slow};    // max compression
+        case 9: return { 32, 258, 258, 4096, &self::deflate_slow};    // max compression
         }
     }
 };
