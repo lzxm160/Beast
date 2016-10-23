@@ -109,14 +109,14 @@ private:
     int  read_buf       (Byte *buf, unsigned size);
     uInt longest_match  (IPos cur_match);
 
-    block_state deflate_stored(int flush);
-    block_state deflate_fast  (int flush);
-    block_state deflate_slow  (int flush);
-    block_state deflate_rle   (int flush);
-    block_state deflate_huff  (int flush);
+    block_state deflate_stored(z_params& zs, int flush);
+    block_state deflate_fast  (z_params& zs, int flush);
+    block_state deflate_slow  (z_params& zs, int flush);
+    block_state deflate_rle   (z_params& zs, int flush);
+    block_state deflate_huff  (z_params& zs, int flush);
 
     using self = basic_deflate_stream;
-    typedef block_state(self::*compress_func)(int flush);
+    typedef block_state(self::*compress_func)(z_params& zs, int flush);
 
     /* Values for max_lazy_match, good_match and max_chain_length, depending on
      * the desired pack level (0..9). The values given below have been tuned to

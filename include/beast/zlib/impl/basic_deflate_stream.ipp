@@ -419,14 +419,14 @@ deflate(int flush)
         switch(strategy_)
         {
         case Z_HUFFMAN_ONLY:
-            bstate = deflate_huff(flush);
+            bstate = deflate_huff(*this, flush);
             break;
         case Z_RLE:
-            bstate = deflate_rle(flush);
+            bstate = deflate_rle(*this, flush);
             break;
         default:
         {
-            bstate = (this->*(get_config(level_).func))(flush);
+            bstate = (this->*(get_config(level_).func))(*this, flush);
             break;
         }
         }
@@ -1018,7 +1018,7 @@ auto strm = this;
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_stored(int flush) ->
+deflate_stored(z_params& zs, int flush) ->
     block_state
 {
     /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
@@ -1096,7 +1096,7 @@ deflate_stored(int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_fast(int flush) ->
+deflate_fast(z_params& zs, int flush) ->
     block_state
 {
     IPos hash_head;       /* head of the hash chain */
@@ -1206,7 +1206,7 @@ deflate_fast(int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_slow(int flush) ->
+deflate_slow(z_params& zs, int flush) ->
     block_state
 {
     IPos hash_head;          /* head of hash chain */
@@ -1347,7 +1347,7 @@ deflate_slow(int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_rle(int flush) ->
+deflate_rle(z_params& zs, int flush) ->
     block_state
 {
     bool bflush;             /* set if current block must be flushed */
@@ -1433,7 +1433,7 @@ deflate_rle(int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_huff(int flush) ->
+deflate_huff(z_params& zs, int flush) ->
     block_state
 {
     bool bflush;             // set if current block must be flushed
