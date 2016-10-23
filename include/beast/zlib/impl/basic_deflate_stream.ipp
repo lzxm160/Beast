@@ -963,10 +963,6 @@ deflate(int flush)
     return Z_STREAM_END;
 }
 
-
-
-#  define check_match(s, start, match, length)
-
 /* ===========================================================================
  * Flush the current block, with given end-of-file flag.
  * IN assertion: strstart is set to the end of the current match.
@@ -1109,8 +1105,6 @@ deflate_fast(int flush) ->
             /* longest_match() sets match_start */
         }
         if(match_length_ >= limits::minMatch) {
-            check_match(s, strstart_, match_start_, match_length_);
-
             tr_tally_dist(strstart_ - match_start_,
                            match_length_ - limits::minMatch, bflush);
 
@@ -1229,8 +1223,6 @@ deflate_slow(int flush) ->
             uInt max_insert = strstart_ + lookahead_ - limits::minMatch;
             /* Do not insert strings in hash table beyond this. */
 
-            check_match(s, strstart_-1, prev_match_, prev_length_);
-
             tr_tally_dist(strstart_ -1 - prev_match_,
                            prev_length_ - limits::minMatch, bflush);
 
@@ -1341,8 +1333,6 @@ deflate_rle(int flush) ->
 
         /* Emit match if have run of limits::minMatch or longer, else emit literal */
         if(match_length_ >= limits::minMatch) {
-            check_match(s, strstart_, strstart_ - 1, match_length_);
-
             tr_tally_dist(1, match_length_ - limits::minMatch, bflush);
 
             lookahead_ -= match_length_;
