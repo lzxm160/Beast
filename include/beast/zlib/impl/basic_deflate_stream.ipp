@@ -195,16 +195,6 @@ reset(
     match_head = prev_[(str) & w_mask_] = head_[ins_h_], \
     head_[ins_h_] = (std::uint16_t)(str))
 
-#define MIN_LOOKAHEAD (limits::maxMatch+limits::minMatch+1)
-/* Minimum amount of lookahead, except at the end of the input file.
- * See deflate.c for comments about the limits::minMatch+1.
- */
-
-#define MAX_DIST()  (w_size_-MIN_LOOKAHEAD)
-/* In order to simplify the code, particularly on 16 bit machines, match
- * distances are limited to MAX_DIST instead of WSIZE.
- */
-
 #define WIN_INIT limits::maxMatch
 /* Number of bytes after end of data in window to initialize in order to avoid
    memory checker errors from longest match routines */
@@ -1091,7 +1081,7 @@ fill_window()
     unsigned more;    // Amount of free space at the end of the window.
     uInt wsize = w_size_;
 
-    Assert(lookahead_ < MIN_LOOKAHEAD, "already enough lookahead");
+    Assert(lookahead_ < kMinLookahead, "already enough lookahead");
 
     do {
         more = (unsigned)(window_size_ -(std::uint32_t)lookahead_ -(std::uint32_t)strstart_);
@@ -1112,11 +1102,11 @@ fill_window()
         /* If the window is almost full and there is insufficient lookahead,
          * move the upper half to the lower one to make room in the upper half.
          */
-        if(strstart_ >= wsize+MAX_DIST()) {
+        if(strstart_ >= wsize+max_dist()) {
 
             std::memcpy(window_, window_+wsize, (unsigned)wsize);
             match_start_ -= wsize;
-            strstart_    -= wsize; /* we now have strstart >= MAX_DIST */
+            strstart_    -= wsize; /* we now have strstart >= max_dist */
             block_start_ -= (long) wsize;
 
             /* Slide the hash table (could be avoided with 32 bit values
@@ -1146,13 +1136,13 @@ fill_window()
         if(avail_in == 0) break;
 
         /* If there was no sliding:
-         *    strstart <= WSIZE+MAX_DIST-1 && lookahead <= MIN_LOOKAHEAD - 1 &&
+         *    strstart <= WSIZE+max_dist-1 && lookahead <= kMinLookahead - 1 &&
          *    more == window_size - lookahead - strstart
-         * => more >= window_size - (MIN_LOOKAHEAD-1 + WSIZE + MAX_DIST-1)
+         * => more >= window_size - (kMinLookahead-1 + WSIZE + max_dist-1)
          * => more >= window_size - 2*WSIZE + 2
          * In the BIG_MEM or MMAP case (not yet supported),
-         *   window_size == input_size + MIN_LOOKAHEAD  &&
-         *   strstart + lookahead_ <= input_size => more >= MIN_LOOKAHEAD.
+         *   window_size == input_size + kMinLookahead  &&
+         *   strstart + lookahead_ <= input_size => more >= kMinLookahead.
          * Otherwise, window_size == 2*WSIZE so more >= 2.
          * If there was sliding, more >= WSIZE. So in all cases, more >= 2.
          */
@@ -1181,7 +1171,7 @@ fill_window()
          * but this is not important since only literal bytes will be emitted.
          */
     }
-    while (lookahead_ < MIN_LOOKAHEAD && avail_in != 0);
+    while (lookahead_ < kMinLookahead && avail_in != 0);
 
     /* If the WIN_INIT bytes after the end of the current data have never been
      * written, then zero those bytes in order to avoid memory check reports of
@@ -1217,7 +1207,7 @@ fill_window()
         }
     }
 
-    Assert((std::uint32_t)strstart_ <= window_size_ - MIN_LOOKAHEAD,
+    Assert((std::uint32_t)strstart_ <= window_size_ - kMinLookahead,
            "not enough room for search");
 }
 
@@ -1280,7 +1270,7 @@ read_buf(Byte *buf, unsigned size)
     in which case the result is equal to prev_length and match_start is
     garbage.
     IN assertions: cur_match is the head of the hash chain for the current
-        string (strstart) and its distance is <= MAX_DIST, and prev_length >= 1
+        string (strstart) and its distance is <= max_dist, and prev_length >= 1
     OUT assertion: the match length is not greater than s->lookahead_.
 
     For 80x86 and 680x0, an optimized version will be provided in match.asm or
@@ -1297,8 +1287,8 @@ longest_match(IPos cur_match)
     int len;                           /* length of current match */
     int best_len = prev_length_;              /* best match length so far */
     int nice_match = nice_match_;             /* stop if match long enough */
-    IPos limit = strstart_ > (IPos)MAX_DIST() ?
-        strstart_ - (IPos)MAX_DIST() : 0;
+    IPos limit = strstart_ > (IPos)max_dist() ?
+        strstart_ - (IPos)max_dist() : 0;
     /* Stop when cur_match becomes <= limit. To simplify the code,
      * we prevent matches with the string of window index 0.
      */
@@ -1324,7 +1314,7 @@ longest_match(IPos cur_match)
     if((uInt)nice_match > lookahead_)
         nice_match = lookahead_;
 
-    Assert((std::uint32_t)strstart_ <= window_size_-MIN_LOOKAHEAD, "need lookahead");
+    Assert((std::uint32_t)strstart_ <= window_size_-kMinLookahead, "need lookahead");
 
     do {
         Assert(cur_match < strstart_, "no future");
@@ -1789,7 +1779,7 @@ deflate_stored(int flush) ->
         /* Fill the window as much as possible: */
         if(lookahead_ <= 1) {
 
-            Assert(strstart_ < w_size_+MAX_DIST() ||
+            Assert(strstart_ < w_size_+max_dist() ||
                    block_start_ >= (long)w_size_, "slide too late");
 
             fill_window();
@@ -1814,7 +1804,7 @@ deflate_stored(int flush) ->
         /* Flush if we may have to slide, otherwise block_start may become
          * negative and the data will be gone:
          */
-        if(strstart_ - (uInt)block_start_ >= MAX_DIST()) {
+        if(strstart_ - (uInt)block_start_ >= max_dist()) {
             FLUSH_BLOCK(0);
         }
     }
@@ -1851,10 +1841,10 @@ deflate_fast(int flush) ->
          * for the next match, plus limits::minMatch bytes to insert the
          * string following the next match.
          */
-        if(lookahead_ < MIN_LOOKAHEAD)
+        if(lookahead_ < kMinLookahead)
         {
             fill_window();
-            if(lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH)
+            if(lookahead_ < kMinLookahead && flush == Z_NO_FLUSH)
                 return need_more;
             if(lookahead_ == 0)
                 break; /* flush the current block */
@@ -1871,7 +1861,7 @@ deflate_fast(int flush) ->
         /* Find the longest match, discarding those <= prev_length.
          * At this point we have always match_length < limits::minMatch
          */
-        if(hash_head != 0 && strstart_ - hash_head <= MAX_DIST()) {
+        if(hash_head != 0 && strstart_ - hash_head <= max_dist()) {
             /* To simplify the code, we prevent matches with the string
              * of window index 0 (in particular we have to avoid a match
              * of the string with itself at the start of the input file).
@@ -1952,9 +1942,9 @@ deflate_slow(int flush) ->
          * for the next match, plus limits::minMatch bytes to insert the
          * string following the next match.
          */
-        if(lookahead_ < MIN_LOOKAHEAD) {
+        if(lookahead_ < kMinLookahead) {
             fill_window();
-            if(lookahead_ < MIN_LOOKAHEAD && flush == Z_NO_FLUSH) {
+            if(lookahead_ < kMinLookahead && flush == Z_NO_FLUSH) {
                 return need_more;
             }
             if(lookahead_ == 0) break; /* flush the current block */
@@ -1974,7 +1964,7 @@ deflate_slow(int flush) ->
         match_length_ = limits::minMatch-1;
 
         if(hash_head != 0 && prev_length_ < max_lazy_match_ &&
-            strstart_ - hash_head <= MAX_DIST()) {
+            strstart_ - hash_head <= max_dist()) {
             /* To simplify the code, we prevent matches with the string
              * of window index 0 (in particular we have to avoid a match
              * of the string with itself at the start of the input file).

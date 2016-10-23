@@ -64,6 +64,11 @@ protected:
     // Matches of length 3 are discarded if their distance exceeds kTooFar
     static std::size_t constexpr kTooFar = 4096;
 
+    /*  Minimum amount of lookahead, except at the end of the input file.
+        See deflate.c for comments about the limits::minMatch+1.
+    */
+    static std::size_t constexpr kMinLookahead = limits::maxMatch + limits::minMatch+1;
+
     // VFALCO This might not be needed, e.g. for zip/gzip
     enum StreamStatus
     {
@@ -274,6 +279,16 @@ protected:
     flushRank(int flush)
     {
         return (flush << 1) - (flush > 4 ? 9 : 0);
+    }
+
+    /*  In order to simplify the code, particularly on 16 bit machines, match
+        distances are limited to MAX_DIST instead of WSIZE.
+    */
+    inline
+    std::size_t
+    max_dist() const
+    {
+        return w_size_ - kMinLookahead;
     }
 
     void
