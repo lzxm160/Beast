@@ -44,6 +44,13 @@
 namespace beast {
 namespace zlib {
 
+// VFALCO REMOVE
+/* To be used only when the state is known to be valid */
+#define ERR_RETURN(strm,err) \
+  return (strm->msg = "unspecified zlib error", (err))
+
+
+
 /*
  *  ALGORITHM
  *
@@ -168,27 +175,6 @@ reset(
 
     return deflateReset();
 }
-
-//------------------------------------------------------------------------------
-
-/* To be used only when the state is known to be valid */
-#define ERR_RETURN(strm,err) \
-  return (strm->msg = "unspecified zlib error", (err))
-
-/* ===========================================================================
- * Insert string str in the dictionary and set match_head to the previous head
- * of the hash chain (the most recent string with same hash key). Return
- * the previous length of the hash chain.
- * If this file is compiled with -DFASTEST, the compression level is forced
- * to 1, and no hash chains are maintained.
- * IN  assertion: all calls to to INSERT_STRING are made with consecutive
- *    input characters and the first limits::minMatch bytes of str are valid
- *    (except for the last limits::minMatch-1 bytes of the input file).
- */
-#define INSERT_STRING(str, match_head) \
-   (update_hash(ins_h_, window_[(str) + (limits::minMatch-1)]), \
-    match_head = prev_[(str) & w_mask_] = head_[ins_h_], \
-    head_[ins_h_] = (std::uint16_t)(str))
 
 //------------------------------------------------------------------------------
 
