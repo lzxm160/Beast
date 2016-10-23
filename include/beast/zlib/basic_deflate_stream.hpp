@@ -74,7 +74,7 @@ public:
     reset(int level, int windowBits, int memLevel, int strategy);
 
     int
-    deflate(z_params& zs, int flush);
+    write(z_params& zs, int flush);
 
     int
     deflateSetDictionary(const Byte *dictionary, uInt  dictLength);

@@ -418,7 +418,7 @@ deflateSetDictionary (
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflate(z_params& zs, int flush)
+write(z_params& zs, int flush)
 {
     // value of flush param for previous deflate call
     int old_flush;
@@ -825,7 +825,7 @@ fill_window(z_params& zs)
     }
 }
 
-/*  Flush as much pending output as possible. All deflate() output goes
+/*  Flush as much pending output as possible. All write() output goes
     through this function so some applications may wish to modify it
     to avoid allocating a large strm->next_out buffer and copying into it.
     (See also read_buf()).
@@ -873,7 +873,7 @@ flush_block(bool last)
 }
 
 /*  Read a new buffer from the current input stream, update the adler32
-    and total number of bytes read.  All deflate() input goes through
+    and total number of bytes read.  All write() input goes through
     this function so some applications may wish to modify it to avoid
     allocating a large strm->next_in buffer and copying from it.
     (See also flush_pending()).
