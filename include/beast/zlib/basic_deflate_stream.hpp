@@ -41,6 +41,7 @@
 #include <beast/zlib/detail/deflate_stream_base.hpp>
 #include <algorithm>
 #include <cstdlib>
+#include <cstdint>
 #include <cstring>
 #include <memory>
 
@@ -113,12 +114,6 @@ public:
 
 private:
     void lm_init();
-
-    block_state deflate_stored(z_params& zs, Flush flush);
-    block_state deflate_fast  (z_params& zs, Flush flush);
-    block_state deflate_slow  (z_params& zs, Flush flush);
-    block_state deflate_rle   (z_params& zs, Flush flush);
-    block_state deflate_huff  (z_params& zs, Flush flush);
 
     using self = basic_deflate_stream;
     typedef block_state(self::*compress_func)(z_params& zs, Flush flush);

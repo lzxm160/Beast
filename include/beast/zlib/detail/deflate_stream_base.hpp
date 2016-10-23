@@ -429,6 +429,42 @@ protected:
     template<class = void> void flush_block         (z_params& zs, bool last);
     template<class = void> int  read_buf            (z_params& zs, Byte *buf, unsigned size);
     template<class = void> uInt longest_match       (IPos cur_match);
+
+    template<class = void> block_state f_stored     (z_params& zs, Flush flush);
+    template<class = void> block_state f_fast       (z_params& zs, Flush flush);
+    template<class = void> block_state f_slow       (z_params& zs, Flush flush);
+    template<class = void> block_state f_rle        (z_params& zs, Flush flush);
+    template<class = void> block_state f_huff       (z_params& zs, Flush flush);
+
+    block_state
+    deflate_stored(z_params& zs, Flush flush)
+    {
+        return f_stored(zs, flush);
+    }
+
+    block_state
+    deflate_fast(z_params& zs, Flush flush)
+    {
+        return f_fast(zs, flush);
+    }
+
+    block_state
+    deflate_slow(z_params& zs, Flush flush)
+    {
+        return f_slow(zs, flush);
+    }
+
+    block_state
+    deflate_rle(z_params& zs, Flush flush)
+    {
+        return f_rle(zs, flush);
+    }
+
+    block_state
+    deflate_huff(z_params& zs, Flush flush)
+    {
+        return f_huff(zs, flush);
+    }
 };
 
 //--------------------------------------------------------------------------
@@ -1609,6 +1645,478 @@ longest_match(IPos cur_match)
 }
 
 //------------------------------------------------------------------------------
+
+/*  Copy without compression as much as possible from the input stream, return
+    the current block state.
+    This function does not insert new strings in the dictionary since
+    uncompressible data is probably not useful. This function is used
+    only for the level=0 compression option.
+    NOTE: this function should be optimized to avoid extra copying from
+    window to pending_buf.
+*/
+template<class>
+auto
+deflate_stream_base::
+f_stored(z_params& zs, Flush flush) ->
+    block_state
+{
+    /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
+     * to pending_buf_size, and each stored block has a 5 byte header:
+     */
+    std::uint32_t max_block_size = 0xffff;
+    std::uint32_t max_start;
+
+    if(max_block_size > pending_buf_size_ - 5) {
+        max_block_size = pending_buf_size_ - 5;
+    }
+
+    /* Copy as much as possible from input to output: */
+    for(;;) {
+        /* Fill the window as much as possible: */
+        if(lookahead_ <= 1) {
+
+            Assert(strstart_ < w_size_+max_dist() ||
+                   block_start_ >= (long)w_size_, "slide too late");
+
+            fill_window(zs);
+            if(lookahead_ == 0 && flush == Flush::none)
+                return need_more;
+
+            if(lookahead_ == 0) break; /* flush the current block */
+        }
+        Assert(block_start_ >= 0L, "block gone");
+
+        strstart_ += lookahead_;
+        lookahead_ = 0;
+
+        /* Emit a stored block if pending_buf will be full: */
+        max_start = block_start_ + max_block_size;
+        if(strstart_ == 0 || (std::uint32_t)strstart_ >= max_start) {
+            /* strstart == 0 is possible when wraparound on 16-bit machine */
+            lookahead_ = (uInt)(strstart_ - max_start);
+            strstart_ = (uInt)max_start;
+            flush_block(zs, false);
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+        /* Flush if we may have to slide, otherwise block_start may become
+         * negative and the data will be gone:
+         */
+        if(strstart_ - (uInt)block_start_ >= max_dist()) {
+            flush_block(zs, false);
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+    }
+    insert_ = 0;
+    if(flush == Flush::finish)
+    {
+        flush_block(zs, true);
+        if(zs.avail_out == 0)
+            return finish_started;
+        return finish_done;
+    }
+    if((long)strstart_ > block_start_)
+    {
+        flush_block(zs, false);
+        if(zs.avail_out == 0)
+            return need_more;
+    }
+    return block_done;
+}
+
+/*  Compress as much as possible from the input stream, return the current
+    block state.
+    This function does not perform lazy evaluation of matches and inserts
+    new strings in the dictionary only for unmatched strings or for short
+    matches. It is used only for the fast compression options.
+*/
+template<class>
+auto
+deflate_stream_base::
+f_fast(z_params& zs, Flush flush) ->
+    block_state
+{
+    IPos hash_head;       /* head of the hash chain */
+    bool bflush;           /* set if current block must be flushed */
+
+    for(;;)
+    {
+        /* Make sure that we always have enough lookahead, except
+         * at the end of the input file. We need limits::maxMatch bytes
+         * for the next match, plus limits::minMatch bytes to insert the
+         * string following the next match.
+         */
+        if(lookahead_ < kMinLookahead)
+        {
+            fill_window(zs);
+            if(lookahead_ < kMinLookahead && flush == Flush::none)
+                return need_more;
+            if(lookahead_ == 0)
+                break; /* flush the current block */
+        }
+
+        /* Insert the string window[strstart .. strstart+2] in the
+         * dictionary, and set hash_head to the head of the hash chain:
+         */
+        hash_head = 0;
+        if(lookahead_ >= limits::minMatch) {
+            insert_string(hash_head);
+        }
+
+        /* Find the longest match, discarding those <= prev_length.
+         * At this point we have always match_length < limits::minMatch
+         */
+        if(hash_head != 0 && strstart_ - hash_head <= max_dist()) {
+            /* To simplify the code, we prevent matches with the string
+             * of window index 0 (in particular we have to avoid a match
+             * of the string with itself at the start of the input file).
+             */
+            match_length_ = longest_match (hash_head);
+            /* longest_match() sets match_start */
+        }
+        if(match_length_ >= limits::minMatch) {
+            tr_tally_dist(strstart_ - match_start_,
+                           match_length_ - limits::minMatch, bflush);
+
+            lookahead_ -= match_length_;
+
+            /* Insert new strings in the hash table only if the match length
+             * is not too large. This saves time but degrades compression.
+             */
+            if(match_length_ <= max_lazy_match_ &&
+                lookahead_ >= limits::minMatch) {
+                match_length_--; /* string at strstart already in table */
+                do {
+                    strstart_++;
+                    insert_string(hash_head);
+                    /* strstart never exceeds WSIZE-limits::maxMatch, so there are
+                     * always limits::minMatch bytes ahead.
+                     */
+                } while(--match_length_ != 0);
+                strstart_++;
+            } else
+            {
+                strstart_ += match_length_;
+                match_length_ = 0;
+                ins_h_ = window_[strstart_];
+                update_hash(ins_h_, window_[strstart_+1]);
+                /* If lookahead < limits::minMatch, ins_h is garbage, but it does not
+                 * matter since it will be recomputed at next deflate call.
+                 */
+            }
+        } else {
+            /* No match, output a literal byte */
+            Tracevv((stderr,"%c", window_[strstart_]));
+            tr_tally_lit(window_[strstart_], bflush);
+            lookahead_--;
+            strstart_++;
+        }
+        if(bflush)
+        {
+            flush_block(zs, false);
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+    }
+    insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
+    if(flush == Flush::finish)
+    {
+        flush_block(zs, true);
+        if(zs.avail_out == 0)
+            return finish_started;
+        return finish_done;
+    }
+    if(last_lit_)
+    {
+        flush_block(zs, false);
+        if(zs.avail_out == 0)
+            return need_more;
+    }
+    return block_done;
+}
+
+/*  Same as above, but achieves better compression. We use a lazy
+    evaluation for matches: a match is finally adopted only if there is
+    no better match at the next window position.
+*/
+template<class>
+auto
+deflate_stream_base::
+f_slow(z_params& zs, Flush flush) ->
+    block_state
+{
+    IPos hash_head;          /* head of hash chain */
+    bool bflush;              /* set if current block must be flushed */
+
+    /* Process the input block. */
+    for(;;)
+    {
+        /* Make sure that we always have enough lookahead, except
+         * at the end of the input file. We need limits::maxMatch bytes
+         * for the next match, plus limits::minMatch bytes to insert the
+         * string following the next match.
+         */
+        if(lookahead_ < kMinLookahead) {
+            fill_window(zs);
+            if(lookahead_ < kMinLookahead && flush == Flush::none) {
+                return need_more;
+            }
+            if(lookahead_ == 0) break; /* flush the current block */
+        }
+
+        /* Insert the string window[strstart .. strstart+2] in the
+         * dictionary, and set hash_head to the head of the hash chain:
+         */
+        hash_head = 0;
+        if(lookahead_ >= limits::minMatch) {
+            insert_string(hash_head);
+        }
+
+        /* Find the longest match, discarding those <= prev_length.
+         */
+        prev_length_ = match_length_, prev_match_ = match_start_;
+        match_length_ = limits::minMatch-1;
+
+        if(hash_head != 0 && prev_length_ < max_lazy_match_ &&
+            strstart_ - hash_head <= max_dist()) {
+            /* To simplify the code, we prevent matches with the string
+             * of window index 0 (in particular we have to avoid a match
+             * of the string with itself at the start of the input file).
+             */
+            match_length_ = longest_match(hash_head);
+            /* longest_match() sets match_start */
+
+            if(match_length_ <= 5 && (strategy_ == Strategy::filtered
+                || (match_length_ == limits::minMatch &&
+                    strstart_ - match_start_ > kTooFar)
+                )) {
+
+                /* If prev_match is also limits::minMatch, match_start is garbage
+                 * but we will ignore the current match anyway.
+                 */
+                match_length_ = limits::minMatch-1;
+            }
+        }
+        /* If there was a match at the previous step and the current
+         * match is not better, output the previous match:
+         */
+        if(prev_length_ >= limits::minMatch && match_length_ <= prev_length_) {
+            uInt max_insert = strstart_ + lookahead_ - limits::minMatch;
+            /* Do not insert strings in hash table beyond this. */
+
+            tr_tally_dist(strstart_ -1 - prev_match_,
+                           prev_length_ - limits::minMatch, bflush);
+
+            /* Insert in hash table all strings up to the end of the match.
+             * strstart-1 and strstart are already inserted. If there is not
+             * enough lookahead, the last two strings are not inserted in
+             * the hash table.
+             */
+            lookahead_ -= prev_length_-1;
+            prev_length_ -= 2;
+            do {
+                if(++strstart_ <= max_insert) {
+                    insert_string(hash_head);
+                }
+            } while(--prev_length_ != 0);
+            match_available_ = 0;
+            match_length_ = limits::minMatch-1;
+            strstart_++;
+
+            if(bflush)
+            {
+                flush_block(zs, false);
+                if(zs.avail_out == 0)
+                    return need_more;
+            }
+
+        } else if(match_available_) {
+            /* If there was no match at the previous position, output a
+             * single literal. If there was a match but the current match
+             * is longer, truncate the previous match to a single literal.
+             */
+            Tracevv((stderr,"%c", window_[strstart_-1]));
+            tr_tally_lit(window_[strstart_-1], bflush);
+            if(bflush) {
+                flush_block(zs, false);
+            }
+            strstart_++;
+            lookahead_--;
+            if(zs.avail_out == 0) return need_more;
+        } else {
+            /* There is no previous match to compare with, wait for
+             * the next step to decide.
+             */
+            match_available_ = 1;
+            strstart_++;
+            lookahead_--;
+        }
+    }
+    Assert (flush != Flush::none, "no flush?");
+    if(match_available_) {
+        Tracevv((stderr,"%c", window_[strstart_-1]));
+        tr_tally_lit(window_[strstart_-1], bflush);
+        match_available_ = 0;
+    }
+    insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
+    if(flush == Flush::finish)
+    {
+        flush_block(zs, true);
+        if(zs.avail_out == 0)
+            return finish_started;
+        return finish_done;
+    }
+    if(last_lit_)
+    {
+        flush_block(zs, false);
+        if(zs.avail_out == 0)
+            return need_more;
+    }
+    return block_done;
+}
+
+/*  For Strategy::rle, simply look for runs of bytes, generate matches only of distance
+    one.  Do not maintain a hash table.  (It will be regenerated if this run of
+    deflate switches away from Strategy::rle.)
+*/
+template<class>
+auto
+deflate_stream_base::
+f_rle(z_params& zs, Flush flush) ->
+    block_state
+{
+    bool bflush;            // set if current block must be flushed
+    uInt prev;              // byte at distance one to match
+    Byte *scan, *strend;    // scan goes up to strend for length of run
+
+    for(;;)
+    {
+        /* Make sure that we always have enough lookahead, except
+         * at the end of the input file. We need limits::maxMatch bytes
+         * for the longest run, plus one for the unrolled loop.
+         */
+        if(lookahead_ <= limits::maxMatch) {
+            fill_window(zs);
+            if(lookahead_ <= limits::maxMatch && flush == Flush::none) {
+                return need_more;
+            }
+            if(lookahead_ == 0) break; /* flush the current block */
+        }
+
+        /* See how many times the previous byte repeats */
+        match_length_ = 0;
+        if(lookahead_ >= limits::minMatch && strstart_ > 0) {
+            scan = window_ + strstart_ - 1;
+            prev = *scan;
+            if(prev == *++scan && prev == *++scan && prev == *++scan) {
+                strend = window_ + strstart_ + limits::maxMatch;
+                do {
+                } while(prev == *++scan && prev == *++scan &&
+                         prev == *++scan && prev == *++scan &&
+                         prev == *++scan && prev == *++scan &&
+                         prev == *++scan && prev == *++scan &&
+                         scan < strend);
+                match_length_ = limits::maxMatch - (int)(strend - scan);
+                if(match_length_ > lookahead_)
+                    match_length_ = lookahead_;
+            }
+            Assert(scan <= window_+(uInt)(window_size_-1), "wild scan");
+        }
+
+        /* Emit match if have run of limits::minMatch or longer, else emit literal */
+        if(match_length_ >= limits::minMatch) {
+            tr_tally_dist(1, match_length_ - limits::minMatch, bflush);
+
+            lookahead_ -= match_length_;
+            strstart_ += match_length_;
+            match_length_ = 0;
+        } else {
+            /* No match, output a literal byte */
+            Tracevv((stderr,"%c", window_[strstart_]));
+            tr_tally_lit(window_[strstart_], bflush);
+            lookahead_--;
+            strstart_++;
+        }
+        if(bflush)
+        {
+            flush_block(zs, false);
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+    }
+    insert_ = 0;
+    if(flush == Flush::finish)
+    {
+        flush_block(zs, true);
+        if(zs.avail_out == 0)
+            return finish_started;
+        return finish_done;
+    }
+    if(last_lit_)
+    {
+        flush_block(zs, false);
+        if(zs.avail_out == 0)
+            return need_more;
+    }
+    return block_done;
+}
+
+/* ===========================================================================
+ * For Strategy::huffman, do not look for matches.  Do not maintain a hash table.
+ * (It will be regenerated if this run of deflate switches away from Huffman.)
+ */
+template<class>
+auto
+deflate_stream_base::
+f_huff(z_params& zs, Flush flush) ->
+    block_state
+{
+    bool bflush;             // set if current block must be flushed
+
+    for(;;)
+    {
+        // Make sure that we have a literal to write.
+        if(lookahead_ == 0)
+        {
+            fill_window(zs);
+            if(lookahead_ == 0)
+            {
+                if(flush == Flush::none)
+                    return need_more;
+                break;      // flush the current block
+            }
+        }
+
+        // Output a literal byte
+        match_length_ = 0;
+        Tracevv((stderr,"%c", window_[strstart_]));
+        tr_tally_lit(window_[strstart_], bflush);
+        lookahead_--;
+        strstart_++;
+        if(bflush)
+        {
+            flush_block(zs, false);
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+    }
+    insert_ = 0;
+    if(flush == Flush::finish)
+    {
+        flush_block(zs, true);
+        if(zs.avail_out == 0)
+            return finish_started;
+        return finish_done;
+    }
+    if(last_lit_)
+    {
+        flush_block(zs, false);
+        if(zs.avail_out == 0)
+            return need_more;
+    }
+    return block_done;
+}
 
 } // detail
 } // zlib
