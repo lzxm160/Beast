@@ -103,7 +103,7 @@ public:
 private:
     void tr_flush_block (char *buf, std::uint32_t stored_len, int last);
     void lm_init        ();
-    void fill_window    ();
+    void fill_window    (z_params& zs);
     void flush_pending  (z_params& zs);
     void flush_block    (bool last);
     int  read_buf       (Byte *buf, unsigned size);
