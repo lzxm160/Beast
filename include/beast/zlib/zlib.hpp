@@ -54,8 +54,8 @@ enum z_Type
     Z_UNKNOWN   = 2
 };
 
-/*
-     The application must update next_in and avail_in when avail_in has dropped
+/** 
+    The application must update next_in and avail_in when avail_in has dropped
    to zero.  It must update next_out and avail_out when avail_out has dropped
    to zero.  The application must initialize zalloc, zfree and opaque before
    calling the init function.  All other fields are set by the compression
@@ -98,24 +98,15 @@ struct z_params
 
 enum class Flush
 {
+    // order matters
+
     none,
+    block,
     partial,
     sync,
     full,
     finish,
-    block,
     trees
-};
-
-enum z_Flush
-{
-    Z_NO_FLUSH      = 0,
-    Z_PARTIAL_FLUSH = 1,
-    Z_SYNC_FLUSH    = 2,
-    Z_FULL_FLUSH    = 3,
-    Z_FINISH        = 4,
-    Z_BLOCK         = 5,
-    Z_TREES         = 6
 };
 
 /* Return codes for the compression/decompression functions. Negative values

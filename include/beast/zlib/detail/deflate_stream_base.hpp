@@ -37,10 +37,12 @@
 
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
+#include <boost/optional.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <type_traits>
 
 namespace beast {
 namespace zlib {
@@ -120,7 +122,8 @@ protected:
         pending_buf_size_;          // size of pending_buf
     Byte* pending_out_;             // next pending byte to output to the stream
     uInt pending_;                  // nb of bytes in the pending buffer
-    int last_flush_;                // value of flush param for previous deflate call
+    boost::optional<Flush>
+        last_flush_;                // value of flush param for previous deflate call
 
     uInt w_size_;                   // LZ77 window size (32K by default)
     uInt w_bits_;                   // log2(w_size)  (8..16)
@@ -282,14 +285,6 @@ protected:
     std::uint32_t high_water_;
 
     //--------------------------------------------------------------------------
-
-    // rank Z_BLOCK between Z_NO_FLUSH and Z_PARTIAL_FLUSH
-    static
-    int
-    flushRank(int flush)
-    {
-        return (flush << 1) - (flush > 4 ? 9 : 0);
-    }
 
     /*  In order to simplify the code, particularly on 16 bit machines, match
         distances are limited to MAX_DIST instead of WSIZE.

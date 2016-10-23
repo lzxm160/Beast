@@ -74,7 +74,7 @@ public:
     reset(int level, int windowBits, int memLevel, int strategy);
 
     int
-    write(z_params& zs, int flush);
+    write(z_params& zs, Flush flush);
 
     int
     dictionary(const Byte *dictionary, uInt  dictLength);
@@ -103,14 +103,14 @@ public:
 private:
     void lm_init        ();
 
-    block_state deflate_stored(z_params& zs, int flush);
-    block_state deflate_fast  (z_params& zs, int flush);
-    block_state deflate_slow  (z_params& zs, int flush);
-    block_state deflate_rle   (z_params& zs, int flush);
-    block_state deflate_huff  (z_params& zs, int flush);
+    block_state deflate_stored(z_params& zs, Flush flush);
+    block_state deflate_fast  (z_params& zs, Flush flush);
+    block_state deflate_slow  (z_params& zs, Flush flush);
+    block_state deflate_rle   (z_params& zs, Flush flush);
+    block_state deflate_huff  (z_params& zs, Flush flush);
 
     using self = basic_deflate_stream;
-    typedef block_state(self::*compress_func)(z_params& zs, int flush);
+    typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
 
     /* Values for max_lazy_match, good_match and max_chain_length, depending on
      * the desired pack level (0..9). The values given below have been tuned to

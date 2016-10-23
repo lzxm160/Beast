@@ -97,7 +97,7 @@ public:
             bool progress = true;
             for(;;)
             {
-                result = ds.write(zs, Z_FULL_FLUSH);
+                result = ds.write(zs, Flush::full);
                 if( result == Z_BUF_ERROR ||
                     result == Z_STREAM_END) // per zlib FAQ
                     goto fin;
@@ -224,7 +224,8 @@ public:
                 bool bo = false;
                 for(;;)
                 {
-                    int flush = bi ? Z_FULL_FLUSH : Z_NO_FLUSH;
+                    auto const flush =
+                        bi ? Flush::full : Flush::none;
                     result = ds.write(zs, flush);
                     if( result == Z_BUF_ERROR ||
                         result == Z_STREAM_END) // per zlib FAQ

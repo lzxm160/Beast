@@ -191,7 +191,7 @@ deflateResetKeep()
     pending_out_ = pending_buf_;
 
     status_ = BUSY_STATE;
-    last_flush_ = Z_NO_FLUSH;
+    last_flush_ = Flush::none;
 
     tr_init();
 
@@ -271,7 +271,7 @@ params(z_params& zs, int level, int strategy)
         total_in != 0)
     {
         // Flush the last buffer:
-        err = deflate(zs, Z_BLOCK);
+        err = deflate(zs, Flush::block);
         if(err == Z_BUF_ERROR && pending_ == 0)
             err = Z_OK;
     }
@@ -418,13 +418,13 @@ dictionary(
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-write(z_params& zs, int flush)
+write(z_params& zs, Flush flush)
 {
     // value of flush param for previous deflate call
-    int old_flush;
+    boost::optional<Flush> old_flush;
 
     if(zs.next_out == 0 || (zs.next_in == 0 && zs.avail_in != 0) ||
-        (status_ == FINISH_STATE && flush != Z_FINISH))
+        (status_ == FINISH_STATE && flush != Flush::finish))
     {
         ERR_RETURN(zs, Z_STREAM_ERROR);
     }
@@ -446,16 +446,16 @@ write(z_params& zs, int flush)
              * but this is not an error situation so make sure we
              * return OK instead of BUF_ERROR at next call of deflate:
              */
-            last_flush_ = -1;
+            last_flush_ = boost::none;
             return Z_OK;
         }
     /* Make sure there is something to do and avoid duplicate consecutive
-     * flushes. For repeated and useless calls with Z_FINISH, we keep
+     * flushes. For repeated and useless calls with Flush::finish, we keep
      * returning Z_STREAM_END instead of Z_BUF_ERROR.
      */
     }
-    else if(zs.avail_in == 0 && flushRank(flush) <= flushRank(old_flush) &&
-               flush != Z_FINISH)
+    else if(zs.avail_in == 0 && flush <= old_flush &&
+        flush != Flush::finish)
     {
         ERR_RETURN(zs, Z_BUF_ERROR);
     }
@@ -469,7 +469,7 @@ write(z_params& zs, int flush)
     /* Start a new block or continue the current one.
      */
     if(zs.avail_in != 0 || lookahead_ != 0 ||
-        (flush != Z_NO_FLUSH && status_ != FINISH_STATE))
+        (flush != Flush::none && status_ != FINISH_STATE))
     {
         block_state bstate;
 
@@ -496,10 +496,10 @@ write(z_params& zs, int flush)
         {
             if(zs.avail_out == 0)
             {
-                last_flush_ = -1; /* avoid BUF_ERROR next call, see above */
+                last_flush_ = boost::none; /* avoid BUF_ERROR next call, see above */
             }
             return Z_OK;
-            /* If flush != Z_NO_FLUSH && avail_out == 0, the next call
+            /* If flush != Flush::none && avail_out == 0, the next call
              * of deflate should use the same flush parameter to make sure
              * that the flush is complete. So we don't have to output an
              * empty block here, this will be done at next call. This also
@@ -509,18 +509,18 @@ write(z_params& zs, int flush)
         }
         if(bstate == block_done)
         {
-            if(flush == Z_PARTIAL_FLUSH)
+            if(flush == Flush::partial)
             {
                 tr_align();
             }
-            else if(flush != Z_BLOCK)
+            else if(flush != Flush::block)
             {
                 /* FULL_FLUSH or SYNC_FLUSH */
                 tr_stored_block((char*)0, 0L, 0);
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */
-                if(flush == Z_FULL_FLUSH)
+                if(flush == Flush::full)
                 {
                     clear_hash();             // forget history
                     if(lookahead_ == 0)
@@ -534,13 +534,13 @@ write(z_params& zs, int flush)
             flush_pending(zs);
             if(zs.avail_out == 0)
             {
-                last_flush_ = -1; /* avoid BUF_ERROR at next call, see above */
+                last_flush_ = boost::none; /* avoid BUF_ERROR at next call, see above */
                 return Z_OK;
             }
         }
     }
 
-    if(flush != Z_FINISH)
+    if(flush != Flush::finish)
         return Z_OK;
     return Z_STREAM_END;
 }
@@ -589,7 +589,7 @@ lm_init()
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_stored(z_params& zs, int flush) ->
+deflate_stored(z_params& zs, Flush flush) ->
     block_state
 {
     /* Stored blocks are limited to 0xffff bytes, pending_buf is limited
@@ -611,7 +611,7 @@ deflate_stored(z_params& zs, int flush) ->
                    block_start_ >= (long)w_size_, "slide too late");
 
             fill_window(zs);
-            if(lookahead_ == 0 && flush == Z_NO_FLUSH)
+            if(lookahead_ == 0 && flush == Flush::none)
                 return need_more;
 
             if(lookahead_ == 0) break; /* flush the current block */
@@ -641,7 +641,7 @@ deflate_stored(z_params& zs, int flush) ->
         }
     }
     insert_ = 0;
-    if(flush == Z_FINISH)
+    if(flush == Flush::finish)
     {
         flush_block(zs, true);
         if(zs.avail_out == 0)
@@ -667,7 +667,7 @@ deflate_stored(z_params& zs, int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_fast(z_params& zs, int flush) ->
+deflate_fast(z_params& zs, Flush flush) ->
     block_state
 {
     IPos hash_head;       /* head of the hash chain */
@@ -683,7 +683,7 @@ deflate_fast(z_params& zs, int flush) ->
         if(lookahead_ < kMinLookahead)
         {
             fill_window(zs);
-            if(lookahead_ < kMinLookahead && flush == Z_NO_FLUSH)
+            if(lookahead_ < kMinLookahead && flush == Flush::none)
                 return need_more;
             if(lookahead_ == 0)
                 break; /* flush the current block */
@@ -753,7 +753,7 @@ deflate_fast(z_params& zs, int flush) ->
         }
     }
     insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
-    if(flush == Z_FINISH)
+    if(flush == Flush::finish)
     {
         flush_block(zs, true);
         if(zs.avail_out == 0)
@@ -777,7 +777,7 @@ deflate_fast(z_params& zs, int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_slow(z_params& zs, int flush) ->
+deflate_slow(z_params& zs, Flush flush) ->
     block_state
 {
     IPos hash_head;          /* head of hash chain */
@@ -793,7 +793,7 @@ deflate_slow(z_params& zs, int flush) ->
          */
         if(lookahead_ < kMinLookahead) {
             fill_window(zs);
-            if(lookahead_ < kMinLookahead && flush == Z_NO_FLUSH) {
+            if(lookahead_ < kMinLookahead && flush == Flush::none) {
                 return need_more;
             }
             if(lookahead_ == 0) break; /* flush the current block */
@@ -887,14 +887,14 @@ deflate_slow(z_params& zs, int flush) ->
             lookahead_--;
         }
     }
-    Assert (flush != Z_NO_FLUSH, "no flush?");
+    Assert (flush != Flush::none, "no flush?");
     if(match_available_) {
         Tracevv((stderr,"%c", window_[strstart_-1]));
         tr_tally_lit(window_[strstart_-1], bflush);
         match_available_ = 0;
     }
     insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
-    if(flush == Z_FINISH)
+    if(flush == Flush::finish)
     {
         flush_block(zs, true);
         if(zs.avail_out == 0)
@@ -918,7 +918,7 @@ deflate_slow(z_params& zs, int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_rle(z_params& zs, int flush) ->
+deflate_rle(z_params& zs, Flush flush) ->
     block_state
 {
     bool bflush;             /* set if current block must be flushed */
@@ -933,7 +933,7 @@ deflate_rle(z_params& zs, int flush) ->
          */
         if(lookahead_ <= limits::maxMatch) {
             fill_window(zs);
-            if(lookahead_ <= limits::maxMatch && flush == Z_NO_FLUSH) {
+            if(lookahead_ <= limits::maxMatch && flush == Flush::none) {
                 return need_more;
             }
             if(lookahead_ == 0) break; /* flush the current block */
@@ -981,7 +981,7 @@ deflate_rle(z_params& zs, int flush) ->
         }
     }
     insert_ = 0;
-    if(flush == Z_FINISH)
+    if(flush == Flush::finish)
     {
         flush_block(zs, true);
         if(zs.avail_out == 0)
@@ -1004,7 +1004,7 @@ deflate_rle(z_params& zs, int flush) ->
 template<class Allocator>
 auto
 basic_deflate_stream<Allocator>::
-deflate_huff(z_params& zs, int flush) ->
+deflate_huff(z_params& zs, Flush flush) ->
     block_state
 {
     bool bflush;             // set if current block must be flushed
@@ -1017,7 +1017,7 @@ deflate_huff(z_params& zs, int flush) ->
             fill_window(zs);
             if(lookahead_ == 0)
             {
-                if(flush == Z_NO_FLUSH)
+                if(flush == Flush::none)
                     return need_more;
                 break;      // flush the current block
             }
@@ -1037,7 +1037,7 @@ deflate_huff(z_params& zs, int flush) ->
         }
     }
     insert_ = 0;
-    if(flush == Z_FINISH)
+    if(flush == Flush::finish)
     {
         flush_block(zs, true);
         if(zs.avail_out == 0)
