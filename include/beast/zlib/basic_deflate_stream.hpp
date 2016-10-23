@@ -249,8 +249,26 @@ public:
     int
     pending(unsigned *pending, int *bits);
 
+    /** Insert bits into the compressed output stream.
+
+        This function inserts bits in the deflate output stream. The
+        intent is that this function is used to start off the deflate
+        output with the bits leftover from a previous deflate stream when
+        appending to it. As such, this function can only be used for raw
+        deflate, and must be used before the first `write` call after an
+        initialization. `bits` must be less than or equal to 16, and that
+        many of the least significant bits of `value` will be inserted in
+        the output.
+
+        @return `Z_OK` if success, `Z_BUF_ERROR` if there was not enough
+        room in the internal buffer to insert the bits, or `Z_STREAM_ERROR`
+        if the source stream state was inconsistent.
+    */
     int
-    prime(int bits, int value);
+    prime(int bits, int value)
+    {
+        return doPrime(bits, value);
+    }
 };
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;

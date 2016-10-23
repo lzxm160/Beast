@@ -165,32 +165,6 @@ pending(unsigned *pending, int *bits)
 /* ========================================================================= */
 
 template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-prime(int bits, int value)
-{
-    int put;
-
-    if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
-        return Z_BUF_ERROR;
-    do
-    {
-        put = Buf_size - bi_valid_;
-        if(put > bits)
-            put = bits;
-        bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
-        bi_valid_ += put;
-        tr_flush_bits();
-        value >>= put;
-        bits -= put;
-    }
-    while(bits);
-    return Z_OK;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 params(z_params& zs, int level, Strategy strategy, error_code& ec)

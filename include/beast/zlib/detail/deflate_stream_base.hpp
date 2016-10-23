@@ -505,6 +505,7 @@ protected:
 
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
     template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
+    template<class = void> int  doPrime             (int bits, int value);
 
     template<class = void> void lm_init             ();
     template<class = void> void init_block          ();
@@ -765,6 +766,30 @@ doDictionary(Byte const* dict, uInt dictLength)
     lookahead_ = 0;
     match_length_ = prev_length_ = limits::minMatch-1;
     match_available_ = 0;
+    return Z_OK;
+}
+
+template<class>
+int
+deflate_stream_base::
+doPrime(int bits, int value)
+{
+    int put;
+
+    if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
+        return Z_BUF_ERROR;
+    do
+    {
+        put = Buf_size - bi_valid_;
+        if(put > bits)
+            put = bits;
+        bi_buf_ |= (std::uint16_t)((value & ((1 << put) - 1)) << bi_valid_);
+        bi_valid_ += put;
+        tr_flush_bits();
+        value >>= put;
+        bits -= put;
+    }
+    while(bits);
     return Z_OK;
 }
 
