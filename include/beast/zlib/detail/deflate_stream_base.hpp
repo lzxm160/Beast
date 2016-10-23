@@ -42,6 +42,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 
 namespace beast {

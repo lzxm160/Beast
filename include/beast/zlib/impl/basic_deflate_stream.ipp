@@ -55,22 +55,27 @@ reset(
     int  memLevel,
     Strategy  strategy)
 {
+    if(level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+
+    // VFALCO What do we do about this?
+    // until 256-byte window bug fixed
+    if(windowBits == 8)
+        windowBits = 9;
+
+    if(level < 0 || level > 9)
+        throw std::invalid_argument{"invalid level"};
+
+    if(windowBits < 8 || windowBits > 15)
+        throw std::invalid_argument{"invalid windowBits"};
+
+    if(memLevel < 1 || memLevel > MAX_MEM_LEVEL)
+        throw std::invalid_argument{"invalid memLevel"};
+
     /* We overlay pending_buf and d_buf+l_buf. This works since the average
      * output size for (length,distance) codes is <= 24 bits.
      */
     std::uint16_t* overlay;
-
-    if(level == Z_DEFAULT_COMPRESSION)
-        level = 6;
-
-    BOOST_ASSERT(windowBits >= 0);
-    if(memLevel < 1 || memLevel > MAX_MEM_LEVEL ||
-        windowBits < 8 || windowBits > 15 || level < 0 || level > 9)
-    {
-        return Z_STREAM_ERROR;
-    }
-    if(windowBits == 8)
-        windowBits = 9;  /* until 256-byte window bug fixed */
 
     w_bits_ = windowBits;
     w_size_ = 1 << w_bits_;
@@ -81,7 +86,8 @@ reset(
     hash_mask_ = hash_size_ - 1;
     hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
 
-    lit_bufsize_ = 1 << (memLevel + 6); /* 16K elements by default */
+    // 16K elements by default
+    lit_bufsize_ = 1 << (memLevel + 6);
 
     {
         auto const nwindow  = w_size_ * 2*sizeof(Byte);

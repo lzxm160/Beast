@@ -72,6 +72,9 @@ class basic_deflate_stream
 public:
     basic_deflate_stream();
 
+    int
+    reset(int level, int windowBits, int memLevel, Strategy strategy);
+
     /** Fine tune internal compression parameters.
 
         Compression parameters should only be tuned by someone who
@@ -87,9 +90,6 @@ public:
     {
         doTune(good_length, max_lazy, nice_length, max_chain);
     }
-
-    int
-    reset(int level, int windowBits, int memLevel, Strategy strategy);
 
     /** Compress input and write output.
 
