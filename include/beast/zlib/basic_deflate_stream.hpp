@@ -83,7 +83,10 @@ public:
         and max_chain parameters.
     */
     void
-    tune(int good_length, int max_lazy, int nice_length, int max_chain);
+    tune(int good_length, int max_lazy, int nice_length, int max_chain)
+    {
+        doTune(good_length, max_lazy, nice_length, max_chain);
+    }
 
     int
     reset(int level, int windowBits, int memLevel, Strategy strategy);
@@ -245,9 +248,25 @@ public:
 
     std::size_t
     upper_bound(std::size_t sourceLen) const;
-    
-    int
-    pending(unsigned *pending, int *bits);
+
+    /** Return bits pending in the output.
+
+        This function returns the number of bytes and bits of output
+        that have been generated, but not yet provided in the available
+        output. The bytes not provided would be due to the available
+        output space having being consumed. The number of bits of output
+        not provided are between 0 and 7, where they await more bits to
+        join them in order to fill out a full byte. If pending or bits
+        are `nullptr`, then those values are not set.
+
+        @return `Z_OK` if success, or `Z_STREAM_ERROR` if the source
+        stream state was inconsistent.
+    */
+    void
+    pending(unsigned *value, int *bits)
+    {
+        doPending(pending, bits);
+    }
 
     /** Insert bits into the compressed output stream.
 

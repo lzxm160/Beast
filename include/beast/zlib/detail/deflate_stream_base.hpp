@@ -503,9 +503,11 @@ protected:
         }
     }
 
+    template<class = void> void doTune                (int good_length, int max_lazy, int nice_length, int max_chain);
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
     template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
     template<class = void> int  doPrime             (int bits, int value);
+    template<class = void> void doPending           (unsigned* value, int* bits);
 
     template<class = void> void lm_init             ();
     template<class = void> void init_block          ();
@@ -575,6 +577,21 @@ protected:
 };
 
 //--------------------------------------------------------------------------
+
+template<class>
+void
+deflate_stream_base::
+doTune(
+    int good_length,
+    int max_lazy,
+    int nice_length,
+    int max_chain)
+{
+    good_match_ = good_length;
+    nice_match_ = nice_length;
+    max_lazy_match_ = max_lazy;
+    max_chain_length_ = max_chain;
+}
 
 template<class>
 void
@@ -791,6 +808,17 @@ doPrime(int bits, int value)
     }
     while(bits);
     return Z_OK;
+}
+
+template<class>
+void
+deflate_stream_base::
+doPending(unsigned* value, int* bits)
+{
+    if(value != 0)
+        *value = pending_;
+    if(bits != 0)
+        *bits = bi_valid_;
 }
 
 //--------------------------------------------------------------------------

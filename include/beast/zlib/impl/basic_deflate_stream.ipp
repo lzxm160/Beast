@@ -151,20 +151,6 @@ deflateReset()
 /* ========================================================================= */
 
 template<class Allocator>
-int
-basic_deflate_stream<Allocator>::
-pending(unsigned *pending, int *bits)
-{
-    if(pending != 0)
-        *pending = pending_;
-    if(bits != 0)
-        *bits = bi_valid_;
-    return Z_OK;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 params(z_params& zs, int level, Strategy strategy, error_code& ec)
@@ -197,23 +183,6 @@ params(z_params& zs, int level, Strategy strategy, error_code& ec)
         max_chain_length_ = get_config(level).max_chain;
     }
     strategy_ = strategy;
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-tune(
-    int good_length,
-    int max_lazy,
-    int nice_length,
-    int max_chain)
-{
-    good_match_ = good_length;
-    nice_match_ = nice_length;
-    max_lazy_match_ = max_lazy;
-    max_chain_length_ = max_chain;
 }
 
 /* =========================================================================
