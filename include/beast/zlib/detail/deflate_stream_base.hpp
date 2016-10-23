@@ -405,9 +405,678 @@ protected:
         hash_head = prev_[strstart_ & w_mask_] = head_[ins_h_];
         head_[ins_h_] = (std::uint16_t)strstart_;
     }
+
+    //--------------------------------------------------------------------------
+
+    void init_block         ();
+    void pqdownheap         (detail::ct_data const* tree, int k);
+    void pqremove           (detail::ct_data const* tree, int& top);
+    void gen_bitlen         (tree_desc *desc);
+    void build_tree         (tree_desc *desc);
+    void scan_tree          (detail::ct_data *tree, int max_code);
+    void send_tree          (detail::ct_data *tree, int max_code);
+    int  build_bl_tree      ();
+    void send_all_trees     (int lcodes, int dcodes, int blcodes);
+    void compress_block     (detail::ct_data const* ltree, detail::ct_data const* dtree);
+    int  detect_data_type   ();
+    void bi_windup          ();
+    void bi_flush           ();
+    void copy_block         (char *buf, unsigned len, int header);
 };
 
 //--------------------------------------------------------------------------
+
+// Initialize a new block.
+//
+template<class _>
+void
+deflate_stream_base<_>::
+init_block()
+{
+    for(int n = 0; n < limits::lCodes;  n++)
+        dyn_ltree_[n].fc = 0;
+    for(int n = 0; n < limits::dCodes;  n++)
+        dyn_dtree_[n].fc = 0;
+    for(int n = 0; n < limits::blCodes; n++)
+        bl_tree_[n].fc = 0;
+    dyn_ltree_[END_BLOCK].fc = 1;
+    opt_len_ = 0L;
+    static_len_ = 0L;
+    last_lit_ = 0;
+    matches_ = 0;
+}
+
+/*  Restore the heap property by moving down the tree starting at node k,
+    exchanging a node with the smallest of its two sons if necessary,
+    stopping when the heap property is re-established (each father smaller
+    than its two sons).
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+pqdownheap(
+    detail::ct_data const* tree,    // the tree to restore
+    int k)                          // node to move down
+{
+    int v = heap_[k];
+    int j = k << 1;  // left son of k
+    while(j <= heap_len_)
+    {
+        // Set j to the smallest of the two sons:
+        if(j < heap_len_ &&
+                smaller(tree, heap_[j+1], heap_[j]))
+            j++;
+        // Exit if v is smaller than both sons
+        if(smaller(tree, v, heap_[j]))
+            break;
+
+        // Exchange v with the smallest son
+        heap_[k] = heap_[j];
+        k = j;
+
+        // And continue down the tree,
+        // setting j to the left son of k
+        j <<= 1;
+    }
+    heap_[k] = v;
+}
+
+/*  Remove the smallest element from the heap and recreate the heap
+    with one less element. Updates heap and heap_len.
+*/
+template<class _>
+inline
+void
+deflate_stream_base<_>::
+pqremove(detail::ct_data const* tree, int& top)
+{
+    top = heap_[kSmallest];
+    heap_[kSmallest] = heap_[heap_len_--];
+    pqdownheap(tree, kSmallest);
+}
+
+/*  Compute the optimal bit lengths for a tree and update the total bit length
+    for the current block.
+    IN assertion: the fields freq and dad are set, heap[heap_max] and
+       above are the tree nodes sorted by increasing frequency.
+    OUT assertions: the field len is set to the optimal bit length, the
+        array bl_count contains the frequencies for each bit length.
+        The length opt_len is updated; static_len is also updated if stree is
+        not null.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+gen_bitlen(tree_desc *desc)
+{
+    detail::ct_data *tree           = desc->dyn_tree;
+    int max_code                    = desc->max_code;
+    detail::ct_data const* stree    = desc->stat_desc->static_tree;
+    std::uint8_t const *extra       = desc->stat_desc->extra_bits;
+    int base                        = desc->stat_desc->extra_base;
+    int max_length                  = desc->stat_desc->max_length;
+    int h;                          // heap index
+    int n, m;                       // iterate over the tree elements
+    int bits;                       // bit length
+    int xbits;                      // extra bits
+    std::uint16_t f;                // frequency
+    int overflow = 0;               // number of elements with bit length too large
+
+    std::fill(&bl_count_[0], &bl_count_[limits::maxBits+1], 0);
+
+    /* In a first pass, compute the optimal bit lengths (which may
+     * overflow in the case of the bit length tree).
+     */
+    tree[heap_[heap_max_]].dl = 0; // root of the heap
+
+    for(h = heap_max_+1; h < HEAP_SIZE; h++) {
+        n = heap_[h];
+        bits = tree[tree[n].dl].dl + 1;
+        if(bits > max_length) bits = max_length, overflow++;
+        // We overwrite tree[n].dl which is no longer needed
+        tree[n].dl = (std::uint16_t)bits;
+
+        if(n > max_code)
+            continue; // not a leaf node
+
+        bl_count_[bits]++;
+        xbits = 0;
+        if(n >= base)
+            xbits = extra[n-base];
+        f = tree[n].fc;
+        opt_len_ += (std::uint32_t)f * (bits + xbits);
+        if(stree)
+            static_len_ += (std::uint32_t)f * (stree[n].dl + xbits);
+    }
+    if(overflow == 0)
+        return;
+
+    /* This happens for example on obj2 and pic of the Calgary corpus */
+    Trace((stderr,"\nbit length overflow\n"));
+
+    // Find the first bit length which could increase:
+    do
+    {
+        bits = max_length-1;
+        while(bl_count_[bits] == 0)
+            bits--;
+        bl_count_[bits]--;      // move one leaf down the tree
+        bl_count_[bits+1] += 2; // move one overflow item as its brother
+        bl_count_[max_length]--;
+        /* The brother of the overflow item also moves one step up,
+         * but this does not affect bl_count[max_length]
+         */
+        overflow -= 2;
+    }
+    while(overflow > 0);
+
+    /* Now recompute all bit lengths, scanning in increasing frequency.
+     * h is still equal to HEAP_SIZE. (It is simpler to reconstruct all
+     * lengths instead of fixing only the wrong ones. This idea is taken
+     * from 'ar' written by Haruhiko Okumura.)
+     */
+    for(bits = max_length; bits != 0; bits--)
+    {
+        n = bl_count_[bits];
+        while(n != 0)
+        {
+            m = heap_[--h];
+            if(m > max_code)
+                continue;
+            if((unsigned) tree[m].dl != (unsigned) bits)
+            {
+                Trace((stderr,"code %d bits %d->%d\n", m, tree[m].dl, bits));
+                opt_len_ += ((long)bits - (long)tree[m].dl) *(long)tree[m].fc;
+                tree[m].dl = (std::uint16_t)bits;
+            }
+            n--;
+        }
+    }
+}
+
+/*  Construct one Huffman tree and assigns the code bit strings and lengths.
+    Update the total bit length for the current block.
+    IN assertion: the field freq is set for all tree elements.
+    OUT assertions: the fields len and code are set to the optimal bit length
+        and corresponding code. The length opt_len is updated; static_len is
+        also updated if stree is not null. The field max_code is set.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+build_tree(tree_desc *desc)
+{
+    detail::ct_data *tree         = desc->dyn_tree;
+    detail::ct_data const* stree  = desc->stat_desc->static_tree;
+    int elems                     = desc->stat_desc->elems;
+    int n, m;          // iterate over heap elements
+    int max_code = -1; // largest code with non zero frequency
+    int node;          // new node being created
+
+    /* Construct the initial heap, with least frequent element in
+     * heap[kSmallest]. The sons of heap[n] are heap[2*n] and heap[2*n+1].
+     * heap[0] is not used.
+     */
+    heap_len_ = 0;
+    heap_max_ = HEAP_SIZE;
+
+    for(n = 0; n < elems; n++)
+    {
+        if(tree[n].fc != 0)
+        {
+            heap_[++(heap_len_)] = max_code = n;
+            depth_[n] = 0;
+        }
+        else
+        {
+            tree[n].dl = 0;
+        }
+    }
+
+    /* The pkzip format requires that at least one distance code exists,
+     * and that at least one bit should be sent even if there is only one
+     * possible code. So to avoid special checks later on we force at least
+     * two codes of non zero frequency.
+     */
+    while(heap_len_ < 2)
+    {
+        node = heap_[++(heap_len_)] = (max_code < 2 ? ++max_code : 0);
+        tree[node].fc = 1;
+        depth_[node] = 0;
+        opt_len_--;
+        if(stree)
+            static_len_ -= stree[node].dl;
+        // node is 0 or 1 so it does not have extra bits
+    }
+    desc->max_code = max_code;
+
+    /* The elements heap[heap_len/2+1 .. heap_len] are leaves of the tree,
+     * establish sub-heaps of increasing lengths:
+     */
+    for(n = heap_len_/2; n >= 1; n--)
+        pqdownheap(tree, n);
+
+    /* Construct the Huffman tree by repeatedly combining the least two
+     * frequent nodes.
+     */
+    node = elems;              /* next internal node of the tree */
+    do
+    {
+        pqremove(tree, n);  /* n = node of least frequency */
+        m = heap_[kSmallest]; /* m = node of next least frequency */
+
+        heap_[--(heap_max_)] = n; /* keep the nodes sorted by frequency */
+        heap_[--(heap_max_)] = m;
+
+        /* Create a new node father of n and m */
+        tree[node].fc = tree[n].fc + tree[m].fc;
+        depth_[node] = (std::uint8_t)((depth_[n] >= depth_[m] ?
+                                depth_[n] : depth_[m]) + 1);
+        tree[n].dl = tree[m].dl = (std::uint16_t)node;
+        /* and insert the new node in the heap */
+        heap_[kSmallest] = node++;
+        pqdownheap(tree, kSmallest);
+
+    }
+    while(heap_len_ >= 2);
+
+    heap_[--(heap_max_)] = heap_[kSmallest];
+
+    /* At this point, the fields freq and dad are set. We can now
+     * generate the bit lengths.
+     */
+    gen_bitlen((tree_desc *)desc);
+
+    /* The field len is now set, we can generate the bit codes */
+    detail::gen_codes(tree, max_code, bl_count_);
+}
+
+/*  Scan a literal or distance tree to determine the frequencies
+    of the codes in the bit length tree.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+scan_tree(
+    detail::ct_data *tree,      // the tree to be scanned
+    int max_code)               // and its largest code of non zero frequency
+{
+    int n;                      // iterates over all tree elements
+    int prevlen = -1;           // last emitted length
+    int curlen;                 // length of current code
+    int nextlen = tree[0].dl;   // length of next code
+    int count = 0;              // repeat count of the current code
+    int max_count = 7;          // max repeat count
+    int min_count = 4;          // min repeat count
+
+    if(nextlen == 0)
+    {
+        max_count = 138;
+        min_count = 3;
+    }
+    tree[max_code+1].dl = (std::uint16_t)0xffff; // guard
+
+    for(n = 0; n <= max_code; n++)
+    {
+        curlen = nextlen; nextlen = tree[n+1].dl;
+        if(++count < max_count && curlen == nextlen)
+        {
+            continue;
+        }
+        else if(count < min_count)
+        {
+            bl_tree_[curlen].fc += count;
+        }
+        else if(curlen != 0)
+        {
+            if(curlen != prevlen) bl_tree_[curlen].fc++;
+                bl_tree_[REP_3_6].fc++;
+        }
+        else if(count <= 10)
+        {
+            bl_tree_[REPZ_3_10].fc++;
+        }
+        else
+        {
+            bl_tree_[REPZ_11_138].fc++;
+        }
+        count = 0;
+        prevlen = curlen;
+        if(nextlen == 0)
+        {
+            max_count = 138;
+            min_count = 3;
+        }
+        else if(curlen == nextlen)
+        {
+            max_count = 6;
+            min_count = 3;
+        }
+        else
+        {
+            max_count = 7;
+            min_count = 4;
+        }
+    }
+}
+
+/*  Send a literal or distance tree in compressed form,
+    using the codes in bl_tree.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+send_tree(
+    detail::ct_data *tree,      // the tree to be scanned
+    int max_code)               // and its largest code of non zero frequency
+{
+    int n;                      // iterates over all tree elements
+    int prevlen = -1;           // last emitted length
+    int curlen;                 // length of current code
+    int nextlen = tree[0].dl;   // length of next code
+    int count = 0;              // repeat count of the current code
+    int max_count = 7;          // max repeat count
+    int min_count = 4;          // min repeat count
+
+    // tree[max_code+1].dl = -1; // guard already set
+    if(nextlen == 0)
+    {
+        max_count = 138;
+        min_count = 3;
+    }
+
+    for(n = 0; n <= max_code; n++)
+    {
+        curlen = nextlen;
+        nextlen = tree[n+1].dl;
+        if(++count < max_count && curlen == nextlen)
+        {
+            continue;
+        }
+        else if(count < min_count)
+        {
+            do
+            {
+                send_code(curlen, bl_tree_);
+            }
+            while (--count != 0);
+        }
+        else if(curlen != 0)
+        {
+            if(curlen != prevlen)
+            {
+                send_code(curlen, bl_tree_);
+                count--;
+            }
+            Assert(count >= 3 && count <= 6, " 3_6?");
+            send_code(REP_3_6, bl_tree_);
+            send_bits(count-3, 2);
+        }
+        else if(count <= 10)
+        {
+            send_code(REPZ_3_10, bl_tree_);
+            send_bits(count-3, 3);
+        }
+        else
+        {
+            send_code(REPZ_11_138, bl_tree_);
+            send_bits(count-11, 7);
+        }
+        count = 0;
+        prevlen = curlen;
+        if(nextlen == 0)
+        {
+            max_count = 138;
+            min_count = 3;
+        }
+        else if(curlen == nextlen)
+        {
+            max_count = 6;
+            min_count = 3;
+        }
+        else
+        {
+            max_count = 7;
+            min_count = 4;
+        }
+    }
+}
+
+/*  Construct the Huffman tree for the bit lengths and return
+    the index in bl_order of the last bit length code to send.
+*/
+template<class _>
+int
+deflate_stream_base<_>::
+build_bl_tree()
+{
+    int max_blindex;  // index of last bit length code of non zero freq
+
+    // Determine the bit length frequencies for literal and distance trees
+    scan_tree((detail::ct_data *)dyn_ltree_, l_desc_.max_code);
+    scan_tree((detail::ct_data *)dyn_dtree_, d_desc_.max_code);
+
+    // Build the bit length tree:
+    build_tree((tree_desc *)(&(bl_desc_)));
+    /* opt_len now includes the length of the tree representations, except
+     * the lengths of the bit lengths codes and the 5+5+4 bits for the counts.
+     */
+
+    /* Determine the number of bit length codes to send. The pkzip format
+     * requires that at least 4 bit length codes be sent. (appnote.txt says
+     * 3 but the actual value used is 4.)
+     */
+    for(max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--)
+    {
+        if(bl_tree_[lut_.bl_order[max_blindex]].dl != 0)
+            break;
+    }
+    // Update opt_len to include the bit length tree and counts
+    opt_len_ += 3*(max_blindex+1) + 5+5+4;
+    Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
+            opt_len_, static_len_));
+    return max_blindex;
+}
+
+/*  Send the header for a block using dynamic Huffman trees: the counts,
+    the lengths of the bit length codes, the literal tree and the distance
+    tree.
+    IN assertion: lcodes >= 257, dcodes >= 1, blcodes >= 4.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+send_all_trees(
+    int lcodes,
+    int dcodes,
+    int blcodes)    // number of codes for each tree
+{
+    int rank;       // index in bl_order
+
+    Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
+    Assert (lcodes <= limits::lCodes && dcodes <= limits::dCodes && blcodes <= limits::blCodes,
+            "too many codes");
+    Tracev((stderr, "\nbl counts: "));
+    send_bits(lcodes-257, 5); // not +255 as stated in appnote.txt
+    send_bits(dcodes-1,   5);
+    send_bits(blcodes-4,  4); // not -3 as stated in appnote.txt
+    for(rank = 0; rank < blcodes; rank++)
+    {
+        Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
+        send_bits(bl_tree_[lut_.bl_order[rank]].dl, 3);
+    }
+    Tracev((stderr, "\nbl tree: sent %ld", bits_sent_));
+
+    send_tree((detail::ct_data *)dyn_ltree_, lcodes-1); // literal tree
+    Tracev((stderr, "\nlit tree: sent %ld", bits_sent_));
+
+    send_tree((detail::ct_data *)dyn_dtree_, dcodes-1); // distance tree
+    Tracev((stderr, "\ndist tree: sent %ld", bits_sent_));
+}
+
+/*  Send the block data compressed using the given Huffman trees
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+compress_block(
+    detail::ct_data const* ltree, // literal tree
+    detail::ct_data const* dtree) // distance tree
+{
+    unsigned dist;      /* distance of matched string */
+    int lc;             /* match length or unmatched char (if dist == 0) */
+    unsigned lx = 0;    /* running index in l_buf */
+    unsigned code;      /* the code to send */
+    int extra;          /* number of extra bits to send */
+
+    if(last_lit_ != 0)
+    {
+        do
+        {
+            dist = d_buf_[lx];
+            lc = l_buf_[lx++];
+            if(dist == 0)
+            {
+                send_code(lc, ltree); /* send a literal byte */
+                Tracecv(isgraph(lc), (stderr," '%c' ", lc));
+            }
+            else
+            {
+                /* Here, lc is the match length - limits::minMatch */
+                code = lut_.length_code[lc];
+                send_code(code+limits::literals+1, ltree); /* send the length code */
+                extra = lut_.extra_lbits[code];
+                if(extra != 0)
+                {
+                    lc -= lut_.base_length[code];
+                    send_bits(lc, extra);       /* send the extra length bits */
+                }
+                dist--; /* dist is now the match distance - 1 */
+                code = d_code(dist);
+                Assert (code < limits::dCodes, "bad d_code");
+
+                send_code(code, dtree);       /* send the distance code */
+                extra = lut_.extra_dbits[code];
+                if(extra != 0)
+                {
+                    dist -= lut_.base_dist[code];
+                    send_bits(dist, extra);   /* send the extra distance bits */
+                }
+            } /* literal or match pair ? */
+
+            /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
+            Assert((uInt)(pending_) < lit_bufsize_ + 2*lx,
+               "pendingBuf overflow");
+        }
+        while(lx < last_lit_);
+    }
+
+    send_code(END_BLOCK, ltree);
+}
+
+/*  Check if the data type is TEXT or BINARY, using the following algorithm:
+    - TEXT if the two conditions below are satisfied:
+        a) There are no non-portable control characters belonging to the
+            "black list" (0..6, 14..25, 28..31).
+        b) There is at least one printable character belonging to the
+            "white list" (9 {TAB}, 10 {LF}, 13 {CR}, 32..255).
+    - BINARY otherwise.
+    - The following partially-portable control characters form a
+        "gray list" that is ignored in this detection algorithm:
+        (7 {BEL}, 8 {BS}, 11 {VT}, 12 {FF}, 26 {SUB}, 27 {ESC}).
+    IN assertion: the fields fc of dyn_ltree are set.
+*/
+template<class _>
+int
+deflate_stream_base<_>::
+detect_data_type()
+{
+    /* black_mask is the bit mask of black-listed bytes
+     * set bits 0..6, 14..25, and 28..31
+     * 0xf3ffc07f = binary 11110011111111111100000001111111
+     */
+    unsigned long black_mask = 0xf3ffc07fUL;
+    int n;
+
+    // Check for non-textual ("black-listed") bytes.
+    for(n = 0; n <= 31; n++, black_mask >>= 1)
+        if((black_mask & 1) && (dyn_ltree_[n].fc != 0))
+            return Z_BINARY;
+
+    // Check for textual ("white-listed") bytes. */
+    if(dyn_ltree_[9].fc != 0 || dyn_ltree_[10].fc != 0
+            || dyn_ltree_[13].fc != 0)
+        return Z_TEXT;
+    for(n = 32; n < limits::literals; n++)
+        if(dyn_ltree_[n].fc != 0)
+            return Z_TEXT;
+
+    /* There are no "black-listed" or "white-listed" bytes:
+     * this stream either is empty or has tolerated ("gray-listed") bytes only.
+     */
+    return Z_BINARY;
+}
+
+/*  Flush the bit buffer and align the output on a byte boundary
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+bi_windup()
+{
+    if(bi_valid_ > 8)
+        put_short(bi_buf_);
+    else if(bi_valid_ > 0)
+        put_byte((Byte)bi_buf_);
+    bi_buf_ = 0;
+    bi_valid_ = 0;
+}
+
+/*  Flush the bit buffer, keeping at most 7 bits in it.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+bi_flush()
+{
+    if(bi_valid_ == 16)
+    {
+        put_short(bi_buf_);
+        bi_buf_ = 0;
+        bi_valid_ = 0;
+    }
+    else if(bi_valid_ >= 8)
+    {
+        put_byte((Byte)bi_buf_);
+        bi_buf_ >>= 8;
+        bi_valid_ -= 8;
+    }
+}
+
+/*  Copy a stored block, storing first the length and its
+    one's complement if requested.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+copy_block(
+    char    *buf,       // the input data
+    unsigned len,       // its length
+    int      header)    // true if block header must be written
+{
+    bi_windup();        // align on byte boundary
+
+    if(header)
+    {
+        put_short((std::uint16_t)len);
+        put_short((std::uint16_t)~len);
+    }
+    // VFALCO Use memcpy?
+    while (len--)
+        put_byte(*buf++);
+}
+
+//------------------------------------------------------------------------------
 
 } // detail
 } // zlib

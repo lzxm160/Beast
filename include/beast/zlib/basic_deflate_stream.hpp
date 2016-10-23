@@ -101,21 +101,6 @@ public:
     prime(int bits, int value);
 
 private:
-    void init_block         ();
-    void pqdownheap         (detail::ct_data const* tree, int k);
-    void pqremove           (detail::ct_data const* tree, int& top);
-    void gen_bitlen         (tree_desc *desc);
-    void build_tree         (tree_desc *desc);
-    void scan_tree          (detail::ct_data *tree, int max_code);
-    void send_tree          (detail::ct_data *tree, int max_code);
-    int  build_bl_tree      ();
-    void send_all_trees     (int lcodes, int dcodes, int blcodes);
-    void compress_block     (detail::ct_data const* ltree, detail::ct_data const* dtree);
-    int  detect_data_type   ();
-    void bi_windup          ();
-    void bi_flush           ();
-    void copy_block         (char *buf, unsigned len, int header);
-
     void tr_init            ();
     void tr_align           ();
     void tr_flush_bits      ();
