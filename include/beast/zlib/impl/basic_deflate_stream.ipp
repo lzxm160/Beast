@@ -360,9 +360,8 @@ upper_bound(std::size_t sourceLen) const
 template<class Allocator>
 int
 basic_deflate_stream<Allocator>::
-deflateSetDictionary (
-    const Byte *dictionary,
-    uInt  dictLength)
+dictionary(
+    Byte const* dict, uInt dictLength)
 {
     uInt str, n;
     unsigned avail;
@@ -371,22 +370,22 @@ deflateSetDictionary (
     if(lookahead_)
         return Z_STREAM_ERROR;
 
-    /* if dictionary would fill window, just replace the history */
+    /* if dict would fill window, just replace the history */
     if(dictLength >= w_size_)
     {
         clear_hash();
         strstart_ = 0;
         block_start_ = 0L;
         insert_ = 0;
-        dictionary += dictLength - w_size_;  /* use the tail */
+        dict += dictLength - w_size_;  /* use the tail */
         dictLength = w_size_;
     }
 
-    /* insert dictionary into window and hash */
+    /* insert dict into window and hash */
     avail = avail_in;
     next = next_in;
     avail_in = dictLength;
-    next_in = (const Byte *)dictionary;
+    next_in = (const Byte *)dict;
     fill_window(zs);
     while(lookahead_ >= limits::minMatch) {
         str = strstart_;

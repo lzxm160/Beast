@@ -77,7 +77,7 @@ public:
     write(z_params& zs, int flush);
 
     int
-    deflateSetDictionary(const Byte *dictionary, uInt  dictLength);
+    dictionary(const Byte *dictionary, uInt  dictLength);
 
     int
     deflateResetKeep();
