@@ -107,6 +107,7 @@ private:
     void send_code          (int value, detail::ct_data const* tree);
     std::uint8_t d_code     (unsigned dist);
     void update_hash        (uInt& h, std::uint8_t c);
+    void clear_hash         ();
 
     void init_block         ();
     bool smaller            (detail::ct_data const* tree, int n, int m);

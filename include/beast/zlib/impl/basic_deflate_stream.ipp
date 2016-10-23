@@ -203,14 +203,6 @@ reset(
     match_head = prev_[(str) & w_mask_] = head_[ins_h_], \
     head_[ins_h_] = (std::uint16_t)(str))
 
-/* ===========================================================================
- * Initialize the hash table (avoiding 64K overflow for 16 bit systems).
- * prev[] will be initialized on the fly.
- */
-#define CLEAR_HASH(s) \
-    s->head_[s->hash_size_-1] = 0; \
-    std::memset((Byte *)s->head_, 0, (unsigned)(s->hash_size_-1)*sizeof(*s->head_));
-
 #define MIN_LOOKAHEAD (limits::maxMatch+limits::minMatch+1)
 /* Minimum amount of lookahead, except at the end of the input file.
  * See deflate.c for comments about the limits::minMatch+1.
@@ -307,6 +299,20 @@ basic_deflate_stream<Allocator>::
 update_hash(uInt& h, std::uint8_t c)
 {
     h = ((h << hash_shift_) ^ c) & hash_mask_;
+}
+
+/*  Initialize the hash table (avoiding 64K overflow for 16 bit systems).
+    prev[] will be initialized on the fly.
+*/
+template<class Allocator>
+inline
+void
+basic_deflate_stream<Allocator>::
+clear_hash()
+{
+    head_[hash_size_-1] = 0;
+    std::memset((Byte *)head_, 0,
+        (unsigned)(hash_size_-1)*sizeof(*head_));
 }
 
 //------------------------------------------------------------------------------
@@ -1176,7 +1182,7 @@ lm_init()
 {
     window_size_ = (std::uint32_t)2L*w_size_;
 
-    CLEAR_HASH(this);
+    clear_hash();
 
     /* Set the default configuration parameters:
      */
@@ -1516,8 +1522,9 @@ auto strm = this;
         return Z_STREAM_ERROR;
 
     /* if dictionary would fill window, just replace the history */
-    if(dictLength >= s->w_size_) {
-        CLEAR_HASH(s);
+    if(dictLength >= s->w_size_)
+    {
+        clear_hash();
         s->strstart_ = 0;
         s->block_start_ = 0L;
         s->insert_ = 0;
@@ -1822,9 +1829,11 @@ deflate(int flush)
                 /* For a full flush, this empty block will be recognized
                  * as a special marker by inflate_sync().
                  */
-                if(flush == Z_FULL_FLUSH) {
-                    CLEAR_HASH(this);             /* forget history */
-                    if(lookahead_ == 0) {
+                if(flush == Z_FULL_FLUSH)
+                {
+                    clear_hash();             // forget history
+                    if(lookahead_ == 0)
+                    {
                         strstart_ = 0;
                         block_start_ = 0L;
                         insert_ = 0;
