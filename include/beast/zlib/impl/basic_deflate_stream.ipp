@@ -249,13 +249,13 @@ prime(int bits, int value)
 template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
-params(z_params& zs, int level, int strategy, error_code& ec)
+params(z_params& zs, int level, Strategy strategy, error_code& ec)
 {
     compress_func func;
 
     if(level == Z_DEFAULT_COMPRESSION)
         level = 6;
-    if(level < 0 || level > 9 || strategy < 0 || strategy > Strategy::fixed)
+    if(level < 0 || level > 9)
     {
         ec = error::stream_error;
         return;

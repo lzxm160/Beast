@@ -101,7 +101,7 @@ public:
     deflateReset();
 
     void
-    params(z_params& zs, int level, int strategy, error_code& ec);
+    params(z_params& zs, int level, Strategy strategy, error_code& ec);
 
     std::size_t
     upper_bound(std::size_t sourceLen) const;
