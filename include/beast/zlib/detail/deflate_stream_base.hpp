@@ -429,6 +429,13 @@ protected:
     void tr_stored_block    (char *bu, std::uint32_t stored_len, int last);
     void tr_tally_dist      (std::uint16_t dist, std::uint8_t len, bool& flush);
     void tr_tally_lit       (std::uint8_t c, bool& flush);
+
+    void tr_flush_block (z_params& zs, char *buf, std::uint32_t stored_len, int last);
+    void fill_window    (z_params& zs);
+    void flush_pending  (z_params& zs);
+    void flush_block    (z_params& zs, bool last);
+    int  read_buf       (z_params& zs, Byte *buf, unsigned size);
+    uInt longest_match  (IPos cur_match);
 };
 
 //--------------------------------------------------------------------------
@@ -1169,6 +1176,443 @@ tr_tally_lit(std::uint8_t c, bool& flush)
     l_buf_[last_lit_++] = c;
     dyn_ltree_[c].fc++;
     flush = (last_lit_ == lit_bufsize_-1);
+}
+
+//------------------------------------------------------------------------------
+
+/*  Determine the best encoding for the current block: dynamic trees,
+    static trees or store, and output the encoded block to the zip file.
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+tr_flush_block(
+    z_params& zs,
+    char *buf,                  // input block, or NULL if too old
+    std::uint32_t stored_len,   // length of input block
+    int last)                   // one if this is the last block for a file
+{
+    std::uint32_t opt_lenb;
+    std::uint32_t static_lenb;  // opt_len and static_len in bytes
+    int max_blindex = 0;        // index of last bit length code of non zero freq
+
+    // Build the Huffman trees unless a stored block is forced
+    if(level_ > 0)
+    {
+        // Check if the file is binary or text
+        if(zs.data_type == Z_UNKNOWN)
+            zs.data_type = detect_data_type();
+
+        // Construct the literal and distance trees
+        build_tree((tree_desc *)(&(l_desc_)));
+        Tracev((stderr, "\nlit data: dyn %ld, stat %ld", opt_len_,
+                static_len_));
+
+        build_tree((tree_desc *)(&(d_desc_)));
+        Tracev((stderr, "\ndist data: dyn %ld, stat %ld", opt_len_,
+                static_len_));
+        /* At this point, opt_len and static_len are the total bit lengths of
+         * the compressed block data, excluding the tree representations.
+         */
+
+        /* Build the bit length tree for the above two trees, and get the index
+         * in bl_order of the last bit length code to send.
+         */
+        max_blindex = build_bl_tree();
+
+        /* Determine the best encoding. Compute the block lengths in bytes. */
+        opt_lenb = (opt_len_+3+7)>>3;
+        static_lenb = (static_len_+3+7)>>3;
+
+        Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
+                opt_lenb, opt_len_, static_lenb, static_len_, stored_len,
+                last_lit_));
+        if(static_lenb <= opt_lenb)
+            opt_lenb = static_lenb;
+    }
+    else
+    {
+        Assert(buf != (char*)0, "lost buf");
+        opt_lenb = static_lenb = stored_len + 5; // force a stored block
+    }
+
+#ifdef FORCE_STORED
+    if(buf != (char*)0) { /* force stored block */
+#else
+    if(stored_len+4 <= opt_lenb && buf != (char*)0) {
+                       /* 4: two words for the lengths */
+#endif
+        /* The test buf != NULL is only necessary if LIT_BUFSIZE > WSIZE.
+         * Otherwise we can't have processed more than WSIZE input bytes since
+         * the last block flush, because compression would have been
+         * successful. If LIT_BUFSIZE <= WSIZE, it is never too late to
+         * transform a block into a stored block.
+         */
+        tr_stored_block(buf, stored_len, last);
+
+#ifdef FORCE_STATIC
+    }
+    else if(static_lenb >= 0)
+    {
+        // force static trees
+#else
+    }
+    else if(strategy_ == Z_FIXED || static_lenb == opt_lenb)
+    {
+#endif
+        send_bits((STATIC_TREES<<1)+last, 3);
+        compress_block(lut_.ltree, lut_.dtree);
+    }
+    else
+    {
+        send_bits((DYN_TREES<<1)+last, 3);
+        send_all_trees(l_desc_.max_code+1, d_desc_.max_code+1,
+                       max_blindex+1);
+        compress_block((const detail::ct_data *)dyn_ltree_,
+                       (const detail::ct_data *)dyn_dtree_);
+    }
+    Assert (compressed_len_ == bits_sent_, "bad compressed size");
+    /* The above check is made mod 2^32, for files larger than 512 MB
+     * and std::size_t implemented on 32 bits.
+     */
+    init_block();
+
+    if(last)
+        bi_windup();
+    Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
+           compressed_len_-7*last));
+}
+
+template<class _>
+void
+deflate_stream_base<_>::
+fill_window(z_params& zs)
+{
+    unsigned n, m;
+    unsigned more;    // Amount of free space at the end of the window.
+    std::uint16_t *p;
+    uInt wsize = w_size_;
+
+    do
+    {
+        more = (unsigned)(window_size_ -
+            (std::uint32_t)lookahead_ -(std::uint32_t)strstart_);
+
+        // Deal with !@#$% 64K limit:
+        if(sizeof(int) <= 2)
+        {
+            if(more == 0 && strstart_ == 0 && lookahead_ == 0)
+            {
+                more = wsize;
+            }
+            else if(more == (unsigned)(-1))
+            {
+                /* Very unlikely, but possible on 16 bit machine if
+                 * strstart == 0 && lookahead == 1 (input done a byte at time)
+                 */
+                more--;
+            }
+        }
+
+        /*  If the window is almost full and there is insufficient lookahead,
+            move the upper half to the lower one to make room in the upper half.
+        */
+        if(strstart_ >= wsize+max_dist())
+        {
+            std::memcpy(window_, window_+wsize, (unsigned)wsize);
+            match_start_ -= wsize;
+            strstart_    -= wsize; // we now have strstart >= max_dist
+            block_start_ -= (long) wsize;
+
+            /* Slide the hash table (could be avoided with 32 bit values
+               at the expense of memory usage). We slide even when level == 0
+               to keep the hash table consistent if we switch back to level > 0
+               later. (Using level 0 permanently is not an optimal usage of
+               zlib, so we don't care about this pathological case.)
+            */
+            n = hash_size_;
+            p = &head_[n];
+            do
+            {
+                m = *--p;
+                *p = (std::uint16_t)(m >= wsize ? m-wsize : 0);
+            }
+            while(--n);
+
+            n = wsize;
+            p = &prev_[n];
+            do
+            {
+                m = *--p;
+                *p = (std::uint16_t)(m >= wsize ? m-wsize : 0);
+                /*  If n is not on any hash chain, prev[n] is garbage but
+                    its value will never be used.
+                */
+            }
+            while(--n);
+            more += wsize;
+        }
+        if(zs.avail_in == 0)
+            break;
+
+        /*  If there was no sliding:
+               strstart <= WSIZE+max_dist-1 && lookahead <= kMinLookahead - 1 &&
+               more == window_size - lookahead - strstart
+            => more >= window_size - (kMinLookahead-1 + WSIZE + max_dist-1)
+            => more >= window_size - 2*WSIZE + 2
+            In the BIG_MEM or MMAP case (not yet supported),
+              window_size == input_size + kMinLookahead  &&
+              strstart + lookahead_ <= input_size => more >= kMinLookahead.
+            Otherwise, window_size == 2*WSIZE so more >= 2.
+            If there was sliding, more >= WSIZE. So in all cases, more >= 2.
+        */
+        n = read_buf(zs, window_ + strstart_ + lookahead_, more);
+        lookahead_ += n;
+
+        // Initialize the hash value now that we have some input:
+        if(lookahead_ + insert_ >= limits::minMatch)
+        {
+            uInt str = strstart_ - insert_;
+            ins_h_ = window_[str];
+            update_hash(ins_h_, window_[str + 1]);
+            while(insert_)
+            {
+                update_hash(ins_h_, window_[str + limits::minMatch-1]);
+                prev_[str & w_mask_] = head_[ins_h_];
+                head_[ins_h_] = (std::uint16_t)str;
+                str++;
+                insert_--;
+                if(lookahead_ + insert_ < limits::minMatch)
+                    break;
+            }
+        }
+        /*  If the whole input has less than limits::minMatch bytes, ins_h is garbage,
+            but this is not important since only literal bytes will be emitted.
+        */
+    }
+    while(lookahead_ < kMinLookahead && zs.avail_in != 0);
+
+    /*  If the kWinInit bytes after the end of the current data have never been
+        written, then zero those bytes in order to avoid memory check reports of
+        the use of uninitialized (or uninitialised as Julian writes) bytes by
+        the longest match routines.  Update the high water mark for the next
+        time through here.  kWinInit is set to limits::maxMatch since the longest match
+        routines allow scanning to strstart + limits::maxMatch, ignoring lookahead.
+    */
+    if(high_water_ < window_size_)
+    {
+        std::uint32_t curr = strstart_ + (std::uint32_t)(lookahead_);
+        std::uint32_t init;
+
+        if(high_water_ < curr)
+        {
+            /*  Previous high water mark below current data -- zero kWinInit
+                bytes or up to end of window, whichever is less.
+            */
+            init = window_size_ - curr;
+            if(init > kWinInit)
+                init = kWinInit;
+            std::memset(window_ + curr, 0, (unsigned)init);
+            high_water_ = curr + init;
+        }
+        else if(high_water_ < (std::uint32_t)curr + kWinInit)
+        {
+            /*  High water mark at or above current data, but below current data
+                plus kWinInit -- zero out to current data plus kWinInit, or up
+                to end of window, whichever is less.
+            */
+            init = (std::uint32_t)curr + kWinInit - high_water_;
+            if(init > window_size_ - high_water_)
+                init = window_size_ - high_water_;
+            std::memset(window_ + high_water_, 0, (unsigned)init);
+            high_water_ += init;
+        }
+    }
+}
+
+/*  Flush as much pending output as possible. All write() output goes
+    through this function so some applications may wish to modify it
+    to avoid allocating a large strm->next_out buffer and copying into it.
+    (See also read_buf()).
+*/
+template<class _>
+void
+deflate_stream_base<_>::
+flush_pending(z_params& zs)
+{
+    tr_flush_bits();
+    unsigned len = pending_;
+    if(len > zs.avail_out)
+        len = zs.avail_out;
+    if(len == 0)
+        return;
+
+    std::memcpy(zs.next_out, pending_out_, len);
+    zs.next_out =
+        static_cast<std::uint8_t*>(zs.next_out) + len;
+    pending_out_  += len;
+    zs.total_out += len;
+    zs.avail_out  -= len;
+    pending_ -= len;
+    if(pending_ == 0)
+        pending_out_ = pending_buf_;
+}
+
+/*  Flush the current block, with given end-of-file flag.
+    IN assertion: strstart is set to the end of the current match.
+*/
+template<class _>
+inline
+void
+deflate_stream_base<_>::
+flush_block(z_params& zs, bool last)
+{
+    tr_flush_block(zs,
+        (block_start_ >= 0L ?
+            (char *)&window_[(unsigned)block_start_] :
+            (char *)0),
+        (std::uint32_t)((long)strstart_ - block_start_),
+        last);
+   block_start_ = strstart_;
+   flush_pending(zs);
+}
+
+/*  Read a new buffer from the current input stream, update the adler32
+    and total number of bytes read.  All write() input goes through
+    this function so some applications may wish to modify it to avoid
+    allocating a large strm->next_in buffer and copying from it.
+    (See also flush_pending()).
+*/
+template<class _>
+int
+deflate_stream_base<_>::
+read_buf(z_params& zs, Byte *buf, unsigned size)
+{
+    unsigned len = zs.avail_in;
+
+    if(len > size)
+        len = size;
+    if(len == 0)
+        return 0;
+
+    zs.avail_in  -= len;
+
+    std::memcpy(buf, zs.next_in, len);
+    zs.next_in = static_cast<
+        std::uint8_t const*>(zs.next_in) + len;
+    zs.total_in += len;
+    return (int)len;
+}
+
+/*  Set match_start to the longest match starting at the given string and
+    return its length. Matches shorter or equal to prev_length are discarded,
+    in which case the result is equal to prev_length and match_start is
+    garbage.
+    IN assertions: cur_match is the head of the hash chain for the current
+        string (strstart) and its distance is <= max_dist, and prev_length >= 1
+    OUT assertion: the match length is not greater than s->lookahead_.
+
+    For 80x86 and 680x0, an optimized version will be provided in match.asm or
+    match.S. The code will be functionally equivalent.
+*/
+template<class _>
+uInt
+deflate_stream_base<_>::
+longest_match(IPos cur_match)
+{
+    unsigned chain_length = max_chain_length_;/* max hash chain length */
+    Byte *scan = window_ + strstart_; /* current string */
+    Byte *match;                       /* matched string */
+    int len;                           /* length of current match */
+    int best_len = prev_length_;              /* best match length so far */
+    int nice_match = nice_match_;             /* stop if match long enough */
+    IPos limit = strstart_ > (IPos)max_dist() ?
+        strstart_ - (IPos)max_dist() : 0;
+    /* Stop when cur_match becomes <= limit. To simplify the code,
+     * we prevent matches with the string of window index 0.
+     */
+    std::uint16_t *prev = prev_;
+    uInt wmask = w_mask_;
+
+    Byte *strend = window_ + strstart_ + limits::maxMatch;
+    Byte scan_end1  = scan[best_len-1];
+    Byte scan_end   = scan[best_len];
+
+    /* The code is optimized for HASH_BITS >= 8 and limits::maxMatch-2 multiple of 16.
+     * It is easy to get rid of this optimization if necessary.
+     */
+    Assert(hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
+
+    /* Do not waste too much time if we already have a good match: */
+    if(prev_length_ >= good_match_) {
+        chain_length >>= 2;
+    }
+    /* Do not look for matches beyond the end of the input. This is necessary
+     * to make deflate deterministic.
+     */
+    if((uInt)nice_match > lookahead_)
+        nice_match = lookahead_;
+
+    Assert((std::uint32_t)strstart_ <= window_size_-kMinLookahead, "need lookahead");
+
+    do {
+        Assert(cur_match < strstart_, "no future");
+        match = window_ + cur_match;
+
+        /* Skip to next match if the match length cannot increase
+         * or if the match length is less than 2.  Note that the checks below
+         * for insufficient lookahead only occur occasionally for performance
+         * reasons.  Therefore uninitialized memory will be accessed, and
+         * conditional jumps will be made that depend on those values.
+         * However the length of the match is limited to the lookahead, so
+         * the output of deflate is not affected by the uninitialized values.
+         */
+        if(     match[best_len]   != scan_end  ||
+                match[best_len-1] != scan_end1 ||
+                *match            != *scan     ||
+                *++match          != scan[1])
+            continue;
+
+        /* The check at best_len-1 can be removed because it will be made
+         * again later. (This heuristic is not always a win.)
+         * It is not necessary to compare scan[2] and match[2] since they
+         * are always equal when the other bytes match, given that
+         * the hash keys are equal and that HASH_BITS >= 8.
+         */
+        scan += 2, match++;
+        Assert(*scan == *match, "match[2]?");
+
+        /* We check for insufficient lookahead only every 8th comparison;
+         * the 256th check will be made at strstart+258.
+         */
+        do
+        {
+        }
+        while(  *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                *++scan == *++match && *++scan == *++match &&
+                scan < strend);
+
+        Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
+
+        len = limits::maxMatch - (int)(strend - scan);
+        scan = strend - limits::maxMatch;
+
+        if(len > best_len) {
+            match_start_ = cur_match;
+            best_len = len;
+            if(len >= nice_match) break;
+            scan_end1  = scan[best_len-1];
+            scan_end   = scan[best_len];
+        }
+    }
+    while((cur_match = prev[cur_match & wmask]) > limit
+        && --chain_length != 0);
+
+    if((uInt)best_len <= lookahead_)
+        return (uInt)best_len;
+    return lookahead_;
 }
 
 //------------------------------------------------------------------------------

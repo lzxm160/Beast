@@ -38,8 +38,9 @@
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
 #include <beast/zlib/detail/deflate_stream_base.hpp>
+#include <algorithm>
 #include <cstdlib>
-
+#include <cstring>
 #include <memory>
 
 namespace beast {
@@ -101,12 +102,6 @@ public:
 
 private:
     void lm_init        ();
-    void tr_flush_block (z_params& zs, char *buf, std::uint32_t stored_len, int last);
-    void fill_window    (z_params& zs);
-    void flush_pending  (z_params& zs);
-    void flush_block    (z_params& zs, bool last);
-    int  read_buf       (z_params& zs, Byte *buf, unsigned size);
-    uInt longest_match  (IPos cur_match);
 
     block_state deflate_stored(z_params& zs, int flush);
     block_state deflate_fast  (z_params& zs, int flush);
