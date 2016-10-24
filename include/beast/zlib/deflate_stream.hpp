@@ -87,8 +87,8 @@ public:
         after a reset, any required internal buffers are not
         dynamically allocated until needed.
 
-        @note Any unprocessed input or pending output from previous
-        calls are discarded.
+        @note Any unprocessed input or pending output from
+        previous calls are discarded.
     */
     void
     reset(
@@ -105,6 +105,9 @@ public:
         This function performs the equivalent of calling `clear`
         followed by `reset` with the same compression settings,
         without deallocating the internal buffers.
+
+        @note Any unprocessed input or pending output from
+        previous calls are discarded.
     */
     void
     reset()
@@ -117,6 +120,9 @@ public:
         This function resets the stream and frees all dynamically
         allocated internal buffers. The compression settings are
         left unchanged.
+
+        @note Any unprocessed input or pending output from
+        previous calls are discarded.
     */
     void
     clear()
@@ -308,6 +314,7 @@ public:
     {
         return doDictionary(dict, dictLength);
     }
+
     /** Update the compression level and strategy.
 
         This function dynamically updates the compression level and
@@ -367,14 +374,13 @@ public:
         many of the least significant bits of `value` will be inserted in
         the output.
 
-        @return `Z_OK` if success, `Z_BUF_ERROR` if there was not enough
-        room in the internal buffer to insert the bits, or `Z_STREAM_ERROR`
-        if the source stream state was inconsistent.
+        @return `error::need_buffers` if there was not enough room in
+        the internal buffer to insert the bits.
     */
-    int
-    prime(int bits, int value)
+    void
+    prime(int bits, int value, error_code& ec)
     {
-        return doPrime(bits, value);
+        return doPrime(bits, value, ec);
     }
 };
 
