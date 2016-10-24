@@ -36,6 +36,7 @@
 #define BEAST_ZLIB_DETAIL_DEFLATE_STREAM_HPP
 
 #include <beast/zlib/zlib.hpp>
+#include <boost/assert.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
 #include <cstdlib>
@@ -98,13 +99,6 @@ namespace detail {
  *
  */
 
-/* default memLevel */
-#if MAX_MEM_LEVEL >= 8
-#  define DEF_MEM_LEVEL 8
-#else
-#  define DEF_MEM_LEVEL  MAX_MEM_LEVEL
-#endif
-
 /* Diagnostic functions */
 #  define Assert(cond,msg)
 #  define Trace(x)
@@ -116,38 +110,35 @@ namespace detail {
 class deflate_stream
 {
 protected:
-    struct limits
-    {
-        // Upper limit on code length
-        static std::uint8_t constexpr maxBits = 15;
+    // Upper limit on code length
+    static std::uint8_t constexpr maxBits = 15;
 
-        // Number of length codes, not counting the special END_BLOCK code
-        static std::uint16_t constexpr lengthCodes = 29;
+    // Number of length codes, not counting the special END_BLOCK code
+    static std::uint16_t constexpr lengthCodes = 29;
 
-        // Number of literal bytes 0..255
-        static std::uint16_t constexpr literals = 256;
+    // Number of literal bytes 0..255
+    static std::uint16_t constexpr literals = 256;
     
-        // Number of Literal or Length codes, including the END_BLOCK code
-        static std::uint16_t constexpr lCodes = literals + 1 + lengthCodes;
+    // Number of Literal or Length codes, including the END_BLOCK code
+    static std::uint16_t constexpr lCodes = literals + 1 + lengthCodes;
 
-        // Number of distance code lengths
-        static std::uint16_t constexpr dCodes = 30;
+    // Number of distance code lengths
+    static std::uint16_t constexpr dCodes = 30;
 
-        // Number of codes used to transfer the bit lengths
-        static std::uint16_t constexpr blCodes = 19;
+    // Number of codes used to transfer the bit lengths
+    static std::uint16_t constexpr blCodes = 19;
 
-        // Number of distance codes
-        static std::uint16_t constexpr distCodeLen = 512;
+    // Number of distance codes
+    static std::uint16_t constexpr distCodeLen = 512;
 
-        // Size limit on bit length codes
-        static std::uint8_t constexpr maxBlBits= 7;
+    // Size limit on bit length codes
+    static std::uint8_t constexpr maxBlBits= 7;
 
-        static std::uint16_t constexpr minMatch = 3;
-        static std::uint16_t constexpr maxMatch = 258;
+    static std::uint16_t constexpr minMatch = 3;
+    static std::uint16_t constexpr maxMatch = 258;
 
-        // Can't change minMatch without also changing code, see original zlib
-        static_assert(minMatch==3, "");
-    };
+    // Can't change minMatch without also changing code, see original zlib
+    static_assert(minMatch==3, "");
 
     // end of block literal code
     static std::uint16_t constexpr END_BLOCK = 256;
@@ -169,6 +160,33 @@ protected:
     // Maximum value for memLevel in deflateInit2
     static std::uint8_t constexpr MAX_MEM_LEVEL = 9;
 
+    // Default memLevel
+    static std::uint8_t constexpr DEF_MEM_LEVEL = MAX_MEM_LEVEL;
+
+    /*  Note: the deflate() code requires max_lazy >= minMatch and max_chain >= 4
+        For deflate_fast() (levels <= 3) good is ignored and lazy has a different
+        meaning.
+    */
+
+    // maximum heap size
+    static std::uint16_t constexpr HEAP_SIZE = 2 * lCodes + 1;
+
+    // size of bit buffer in bi_buf
+    static std::uint8_t constexpr Buf_size = 16;
+
+    // Matches of length 3 are discarded if their distance exceeds kTooFar
+    static std::size_t constexpr kTooFar = 4096;
+
+    /*  Minimum amount of lookahead, except at the end of the input file.
+        See deflate.c for comments about the minMatch+1.
+    */
+    static std::size_t constexpr kMinLookahead = maxMatch + minMatch+1;
+
+    /*  Number of bytes after end of data in window to initialize in order
+        to avoid memory checker errors from longest match routines
+    */
+    static std::size_t constexpr kWinInit = maxMatch;
+
     // Describes a single value and its code string.
     struct ct_data
     {
@@ -182,7 +200,7 @@ protected:
         }
     };
 
-    struct static_tree_desc
+    struct static_desc
     {
         ct_data const*      static_tree;// static tree or NULL
         std::uint8_t const* extra_bits; // extra bits for each code or NULL
@@ -191,74 +209,65 @@ protected:
         std::uint8_t        max_length; // max bit length for the codes
     };
 
-    struct deflate_tables
+    struct lut_type
     {
         // Number of extra bits for each length code
-        std::uint8_t const extra_lbits[limits::lengthCodes] = {
+        std::uint8_t const extra_lbits[lengthCodes] = {
             0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0
         };
 
         // Number of extra bits for each distance code
-        std::uint8_t const extra_dbits[limits::dCodes] = {
+        std::uint8_t const extra_dbits[dCodes] = {
             0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13
         };
 
         // Number of extra bits for each bit length code
-        std::uint8_t const extra_blbits[limits::blCodes] = {
+        std::uint8_t const extra_blbits[blCodes] = {
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,3,7
         };
 
         // The lengths of the bit length codes are sent in order
         // of decreasing probability, to avoid transmitting the
         // lengths for unused bit length codes.
-        std::uint8_t const bl_order[limits::blCodes] = {
+        std::uint8_t const bl_order[blCodes] = {
             16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15
         };
 
-        ct_data ltree[limits::lCodes + 2];
+        ct_data ltree[lCodes + 2];
 
-        ct_data dtree[limits::dCodes];
+        ct_data dtree[dCodes];
 
         // Distance codes. The first 256 values correspond to the distances
         // 3 .. 258, the last 256 values correspond to the top 8 bits of
         // the 15 bit distances.
-        std::uint8_t dist_code[limits::distCodeLen];
+        std::uint8_t dist_code[distCodeLen];
 
-        std::uint8_t length_code[limits::maxMatch-limits::minMatch+1];
+        std::uint8_t length_code[maxMatch-minMatch+1];
 
-        std::uint8_t base_length[limits::lengthCodes];
+        std::uint8_t base_length[lengthCodes];
 
-        std::uint16_t base_dist[limits::dCodes];
+        std::uint16_t base_dist[dCodes];
 
-        static_tree_desc l_desc = {
-            ltree, extra_lbits, limits::literals+1, limits::lCodes, limits::maxBits
+        static_desc l_desc = {
+            ltree, extra_lbits, literals+1, lCodes, maxBits
         };
 
-        static_tree_desc d_desc = {
-            dtree, extra_dbits, 0, limits::dCodes, limits::maxBits
+        static_desc d_desc = {
+            dtree, extra_dbits, 0, dCodes, maxBits
         };
 
-        static_tree_desc bl_desc =
+        static_desc bl_desc =
         {
-            nullptr, extra_blbits, 0, limits::blCodes, limits::maxBlBits
+            nullptr, extra_blbits, 0, blCodes, maxBlBits
         };
     };
 
-    static
-    unsigned
-    bi_reverse(unsigned code, int len);
-    
-    template<class = void>
-    static
-    void
-    gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count);
-
-    template<class = void>
-    static
-    deflate_tables const&
-    get_lut();
-
-    deflate_stream();
+    struct tree_desc
+    {
+        ct_data *dyn_tree;           /* the dynamic tree */
+        int     max_code;            /* largest code with non zero frequency */
+        static_desc const* stat_desc; /* the corresponding static tree */
+    };
 
     enum block_state
     {
@@ -267,33 +276,6 @@ protected:
         finish_started, /* finish started, need only more output at next deflate */
         finish_done     /* finish done, accept no more input or output */
     };
-
-    using self = deflate_stream;
-    typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
-
-    /*  Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
-        For deflate_fast() (levels <= 3) good is ignored and lazy has a different
-        meaning.
-    */
-
-    // maximum heap size
-    static std::uint16_t constexpr HEAP_SIZE = 2 * limits::lCodes + 1;
-
-    // size of bit buffer in bi_buf
-    static std::uint8_t constexpr Buf_size = 16;
-
-    // Matches of length 3 are discarded if their distance exceeds kTooFar
-    static std::size_t constexpr kTooFar = 4096;
-
-    /*  Minimum amount of lookahead, except at the end of the input file.
-        See deflate.c for comments about the limits::minMatch+1.
-    */
-    static std::size_t constexpr kMinLookahead = limits::maxMatch + limits::minMatch+1;
-
-    /*  Number of bytes after end of data in window to initialize in order
-        to avoid memory checker errors from longest match routines
-    */
-    static std::size_t constexpr kWinInit = limits::maxMatch;
 
     // VFALCO This might not be needed, e.g. for zip/gzip
     enum StreamStatus
@@ -306,19 +288,17 @@ protected:
         FINISH_STATE = 666
     };
 
-    struct tree_desc
-    {
-        ct_data *dyn_tree;           /* the dynamic tree */
-        int     max_code;            /* largest code with non zero frequency */
-        static_tree_desc const* stat_desc; /* the corresponding static tree */
-    };
-
     /* A std::uint16_t is an index in the character window. We use short instead of int to
      * save space in the various tables. IPos is used only for parameter passing.
      */
     using IPos = unsigned;
 
-    deflate_tables const& lut_;
+    using self = deflate_stream;
+    typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
+
+    //--------------------------------------------------------------------------
+
+    lut_type const& lut_;
 
     bool inited_ = false;
     std::size_t buf_size_;
@@ -340,7 +320,7 @@ protected:
     /*  Sliding window. Input bytes are read into the second half of the window,
         and move to the first half later to keep a dictionary of at least wSize
         bytes. With this organization, matches are limited to a distance of
-        wSize-limits::maxMatch bytes, but this ensures that IO is always
+        wSize-maxMatch bytes, but this ensures that IO is always
         performed with a length multiple of the block size. Also, it limits
         the window size to 64K.
         To do: use the user input buffer as sliding window.
@@ -366,9 +346,9 @@ protected:
     uInt  hash_mask_;               // hash_size-1
 
     /*  Number of bits by which ins_h must be shifted at each input
-        step. It must be such that after limits::minMatch steps,
+        step. It must be such that after minMatch steps,
         the oldest byte no longer takes part in the hash key, that is:
-        hash_shift * limits::minMatch >= hash_bits
+        hash_shift * minMatch >= hash_bits
     */
     uInt hash_shift_;
 
@@ -416,16 +396,16 @@ protected:
     ct_data dyn_ltree_[
         HEAP_SIZE];                 // literal and length tree
     ct_data dyn_dtree_[
-        2*limits::dCodes+1];        // distance tree */
+        2*dCodes+1];        // distance tree */
     ct_data bl_tree_[
-        2*limits::blCodes+1];       // Huffman tree for bit lengths
+        2*blCodes+1];       // Huffman tree for bit lengths
 
     tree_desc l_desc_;              // desc. for literal tree
     tree_desc d_desc_;              // desc. for distance tree
     tree_desc bl_desc_;             // desc. for bit length tree
 
     // number of codes at each bit length for an optimal tree
-    std::uint16_t bl_count_[limits::maxBits+1];
+    std::uint16_t bl_count_[maxBits+1];
 
     // Index within the heap array of least frequent node in the Huffman tree
     static std::size_t constexpr kSmallest = 1;
@@ -434,12 +414,12 @@ protected:
         heap[0] is not used. The same heap array is used to build all trees.
     */
 
-    int heap_[2*limits::lCodes+1];  // heap used to build the Huffman trees
+    int heap_[2*lCodes+1];  // heap used to build the Huffman trees
     int heap_len_;                  // number of elements in the heap
     int heap_max_;                  // element of largest frequency
 
     // Depth of each subtree used as tie breaker for trees of equal frequency
-    std::uint8_t depth_[2*limits::lCodes+1];
+    std::uint8_t depth_[2*lCodes+1];
 
     std::uint8_t *l_buf_;           // buffer for literals or lengths
 
@@ -493,6 +473,11 @@ protected:
     std::uint32_t high_water_;
 
     //--------------------------------------------------------------------------
+
+    deflate_stream()
+        : lut_(get_lut())
+    {
+    }
 
     /*  In order to simplify the code, particularly on 16 bit machines, match
         distances are limited to MAX_DIST instead of WSIZE.
@@ -596,14 +581,14 @@ protected:
         If this file is compiled with -DFASTEST, the compression level
         is forced to 1, and no hash chains are maintained.
         IN  assertion: all calls to to INSERT_STRING are made with
-            consecutive input characters and the first limits::minMatch
-            bytes of str are valid (except for the last limits::minMatch-1
+            consecutive input characters and the first minMatch
+            bytes of str are valid (except for the last minMatch-1
             bytes of the input file).
     */
     void
     insert_string(IPos& hash_head)
     {
-        update_hash(ins_h_, window_[strstart_ + (limits::minMatch-1)]);
+        update_hash(ins_h_, window_[strstart_ + (minMatch-1)]);
         hash_head = prev_[strstart_ & w_mask_] = head_[ins_h_];
         head_[ins_h_] = (std::uint16_t)strstart_;
     }
@@ -665,6 +650,20 @@ protected:
         if(! inited_)
             init();
     }
+
+    static
+    unsigned
+    bi_reverse(unsigned code, int len);
+    
+    template<class = void>
+    static
+    void
+    gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count);
+
+    template<class = void>
+    static
+    lut_type const&
+    get_lut();
 
     template<class = void> void doReset             (int level, int windowBits, int memLevel, Strategy strategy);
     template<class = void> void doReset             ();
@@ -775,19 +774,21 @@ void
 deflate_stream::
 gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count)
 {
-    std::uint16_t next_code[limits::maxBits+1]; /* next code value for each bit length */
+    std::uint16_t next_code[maxBits+1]; /* next code value for each bit length */
     std::uint16_t code = 0;              /* running code value */
     int bits;                  /* bit index */
     int n;                     /* code index */
 
     // The distribution counts are first used to
     // generate the code values without bit reversal.
-    for (bits = 1; bits <= limits::maxBits; bits++) {
-        next_code[bits] = code = (code + bl_count[bits-1]) << 1;
+    for(bits = 1; bits <= maxBits; bits++)
+    {
+        code = (code + bl_count[bits-1]) << 1;
+        next_code[bits] = code;
     }
     // Check that the bit counts in bl_count are consistent.
     // The last code must be all ones.
-    BOOST_ASSERT(code + bl_count[limits::maxBits]-1 == (1<<limits::maxBits)-1);
+    BOOST_ASSERT(code + bl_count[maxBits]-1 == (1<<maxBits)-1);
     for(n = 0; n <= max_code; n++)
     {
         int len = tree[n].dl;
@@ -800,20 +801,20 @@ gen_codes(ct_data *tree, int max_code, std::uint16_t *bl_count)
 template<class>
 auto
 deflate_stream::get_lut() ->
-    deflate_tables const&
+    lut_type const&
 {
     struct init
     {
-        deflate_tables tables;
+        lut_type tables;
 
         init()
         {
             // number of codes at each bit length for an optimal tree
-            //std::uint16_t bl_count[limits::maxBits+1];
+            //std::uint16_t bl_count[maxBits+1];
 
             // Initialize the mapping length (0..255) -> length code (0..28)
             std::uint8_t length = 0;
-            for(std::uint8_t code = 0; code < limits::lengthCodes-1; ++code)
+            for(std::uint8_t code = 0; code < lengthCodes-1; ++code)
             {
                 tables.base_length[code] = length;
                 for(std::size_t n = 0; n < (1U<<tables.extra_lbits[code]); ++n)
@@ -823,7 +824,7 @@ deflate_stream::get_lut() ->
             // Note that the length 255 (match length 258) can be represented
             // in two different ways: code 284 + 5 bits or code 285, so we
             // overwrite length_code[255] to use the best encoding:
-            tables.length_code[length-1] = limits::lengthCodes-1;
+            tables.length_code[length-1] = lengthCodes-1;
 
             // Initialize the mapping dist (0..32K) -> dist code (0..29)
             {
@@ -838,7 +839,7 @@ deflate_stream::get_lut() ->
                 BOOST_ASSERT(dist == 256);
                 // from now on, all distances are divided by 128
                 dist >>= 7;
-                for(; code < limits::dCodes; ++code)
+                for(; code < dCodes; ++code)
                 {
                     tables.base_dist[code] = dist << 7;
                     for(std::size_t n = 0; n < (1U<<(tables.extra_dbits[code]-7)); ++n)
@@ -848,7 +849,7 @@ deflate_stream::get_lut() ->
             }
 
             // Construct the codes of the static literal tree
-            std::uint16_t bl_count[limits::maxBits+1];
+            std::uint16_t bl_count[maxBits+1];
             std::memset(bl_count, 0, sizeof(bl_count));
             std::size_t n = 0;
             while (n <= 143)
@@ -865,9 +866,9 @@ deflate_stream::get_lut() ->
             bl_count[8] += 8;
             // Codes 286 and 287 do not exist, but we must include them in the tree
             // construction to get a canonical Huffman tree (longest code all ones)
-            gen_codes(tables.ltree, limits::lCodes+1, bl_count);
+            gen_codes(tables.ltree, lCodes+1, bl_count);
 
-            for(n = 0; n < limits::dCodes; ++n)
+            for(n = 0; n < dCodes; ++n)
             {
                 tables.dtree[n].dl = 5;
                 tables.dtree[n].fc = bi_reverse(n, 5);
@@ -876,12 +877,6 @@ deflate_stream::get_lut() ->
     };
     static init const data;
     return data.tables;
-}
-
-inline
-deflate_stream::deflate_stream()
-    :  lut_(get_lut())
-{
 }
 
 template<class>
@@ -1185,27 +1180,27 @@ doDictionary(Byte const* dict, uInt dictLength, error_code& ec)
     zs.avail_out = 0;
     zs.next_out = 0;
     fill_window(zs);
-    while(lookahead_ >= limits::minMatch)
+    while(lookahead_ >= minMatch)
     {
         uInt str = strstart_;
-        uInt n = lookahead_ - (limits::minMatch-1);
+        uInt n = lookahead_ - (minMatch-1);
         do
         {
-            update_hash(ins_h_, window_[str + limits::minMatch-1]);
+            update_hash(ins_h_, window_[str + minMatch-1]);
             prev_[str & w_mask_] = head_[ins_h_];
             head_[ins_h_] = (std::uint16_t)str;
             str++;
         }
         while(--n);
         strstart_ = str;
-        lookahead_ = limits::minMatch-1;
+        lookahead_ = minMatch-1;
         fill_window(zs);
     }
     strstart_ += lookahead_;
     block_start_ = (long)strstart_;
     insert_ = lookahead_;
     lookahead_ = 0;
-    match_length_ = prev_length_ = limits::minMatch-1;
+    match_length_ = prev_length_ = minMatch-1;
     match_available_ = 0;
 }
 
@@ -1267,7 +1262,7 @@ init()
 
     hash_size_ = 1 << hash_bits_;
     hash_mask_ = hash_size_ - 1;
-    hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
+    hash_shift_ =  ((hash_bits_+minMatch-1)/minMatch);
 
     auto const nwindow  = w_size_ * 2*sizeof(Byte);
     auto const nprev    = w_size_ * sizeof(std::uint16_t);
@@ -1286,7 +1281,7 @@ init()
     head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
 
     /*  We overlay pending_buf_ and d_buf_ + l_buf_. This works
-        since the average output size for (length, distance)
+        since the average output size for(length, distance)
         codes is <= 24 bits.
     */
     auto overlay = reinterpret_cast<std::uint16_t*>(
@@ -1339,7 +1334,7 @@ lm_init()
     block_start_ = 0L;
     lookahead_ = 0;
     insert_ = 0;
-    match_length_ = prev_length_ = limits::minMatch-1;
+    match_length_ = prev_length_ = minMatch-1;
     match_available_ = 0;
     ins_h_ = 0;
 }
@@ -1351,11 +1346,11 @@ void
 deflate_stream::
 init_block()
 {
-    for(int n = 0; n < limits::lCodes;  n++)
+    for(int n = 0; n < lCodes;  n++)
         dyn_ltree_[n].fc = 0;
-    for(int n = 0; n < limits::dCodes;  n++)
+    for(int n = 0; n < dCodes;  n++)
         dyn_dtree_[n].fc = 0;
-    for(int n = 0; n < limits::blCodes; n++)
+    for(int n = 0; n < blCodes; n++)
         bl_tree_[n].fc = 0;
     dyn_ltree_[END_BLOCK].fc = 1;
     opt_len_ = 0L;
@@ -1440,7 +1435,7 @@ gen_bitlen(tree_desc *desc)
     std::uint16_t f;                // frequency
     int overflow = 0;               // number of elements with bit length too large
 
-    std::fill(&bl_count_[0], &bl_count_[limits::maxBits+1], 0);
+    std::fill(&bl_count_[0], &bl_count_[maxBits+1], 0);
 
     /* In a first pass, compute the optimal bit lengths (which may
      * overflow in the case of the bit length tree).
@@ -1784,7 +1779,7 @@ build_bl_tree()
      * requires that at least 4 bit length codes be sent. (appnote.txt says
      * 3 but the actual value used is 4.)
      */
-    for(max_blindex = limits::blCodes-1; max_blindex >= 3; max_blindex--)
+    for(max_blindex = blCodes-1; max_blindex >= 3; max_blindex--)
     {
         if(bl_tree_[lut_.bl_order[max_blindex]].dl != 0)
             break;
@@ -1812,7 +1807,7 @@ send_all_trees(
     int rank;       // index in bl_order
 
     Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
-    Assert (lcodes <= limits::lCodes && dcodes <= limits::dCodes && blcodes <= limits::blCodes,
+    Assert (lcodes <= lCodes && dcodes <= dCodes && blcodes <= blCodes,
             "too many codes");
     Tracev((stderr, "\nbl counts: "));
     send_bits(lcodes-257, 5); // not +255 as stated in appnote.txt
@@ -1860,9 +1855,9 @@ compress_block(
             }
             else
             {
-                /* Here, lc is the match length - limits::minMatch */
+                /* Here, lc is the match length - minMatch */
                 code = lut_.length_code[lc];
-                send_code(code+limits::literals+1, ltree); /* send the length code */
+                send_code(code+literals+1, ltree); /* send the length code */
                 extra = lut_.extra_lbits[code];
                 if(extra != 0)
                 {
@@ -1871,7 +1866,7 @@ compress_block(
                 }
                 dist--; /* dist is now the match distance - 1 */
                 code = d_code(dist);
-                Assert (code < limits::dCodes, "bad d_code");
+                Assert (code < dCodes, "bad d_code");
 
                 send_code(code, dtree);       /* send the distance code */
                 extra = lut_.extra_dbits[code];
@@ -1925,7 +1920,7 @@ detect_data_type()
     if(dyn_ltree_[9].fc != 0 || dyn_ltree_[10].fc != 0
             || dyn_ltree_[13].fc != 0)
         return Z_TEXT;
-    for(n = 32; n < limits::literals; n++)
+    for(n = 32; n < literals; n++)
         if(dyn_ltree_[n].fc != 0)
             return Z_TEXT;
 
@@ -2065,7 +2060,7 @@ tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
     d_buf_[last_lit_] = dist;
     l_buf_[last_lit_++] = len;
     dist--;
-    dyn_ltree_[lut_.length_code[len]+limits::literals+1].fc++;
+    dyn_ltree_[lut_.length_code[len]+literals+1].fc++;
     dyn_dtree_[d_code(dist)].fc++;
     flush = (last_lit_ == lit_bufsize_-1);
 }
@@ -2274,23 +2269,23 @@ fill_window(z_params& zs)
         lookahead_ += n;
 
         // Initialize the hash value now that we have some input:
-        if(lookahead_ + insert_ >= limits::minMatch)
+        if(lookahead_ + insert_ >= minMatch)
         {
             uInt str = strstart_ - insert_;
             ins_h_ = window_[str];
             update_hash(ins_h_, window_[str + 1]);
             while(insert_)
             {
-                update_hash(ins_h_, window_[str + limits::minMatch-1]);
+                update_hash(ins_h_, window_[str + minMatch-1]);
                 prev_[str & w_mask_] = head_[ins_h_];
                 head_[ins_h_] = (std::uint16_t)str;
                 str++;
                 insert_--;
-                if(lookahead_ + insert_ < limits::minMatch)
+                if(lookahead_ + insert_ < minMatch)
                     break;
             }
         }
-        /*  If the whole input has less than limits::minMatch bytes, ins_h is garbage,
+        /*  If the whole input has less than minMatch bytes, ins_h is garbage,
             but this is not important since only literal bytes will be emitted.
         */
     }
@@ -2300,8 +2295,8 @@ fill_window(z_params& zs)
         written, then zero those bytes in order to avoid memory check reports of
         the use of uninitialized (or uninitialised as Julian writes) bytes by
         the longest match routines.  Update the high water mark for the next
-        time through here.  kWinInit is set to limits::maxMatch since the longest match
-        routines allow scanning to strstart + limits::maxMatch, ignoring lookahead.
+        time through here.  kWinInit is set to maxMatch since the longest match
+        routines allow scanning to strstart + maxMatch, ignoring lookahead.
     */
     if(high_water_ < window_size_)
     {
@@ -2438,14 +2433,14 @@ longest_match(IPos cur_match)
     std::uint16_t *prev = prev_;
     uInt wmask = w_mask_;
 
-    Byte *strend = window_ + strstart_ + limits::maxMatch;
+    Byte *strend = window_ + strstart_ + maxMatch;
     Byte scan_end1  = scan[best_len-1];
     Byte scan_end   = scan[best_len];
 
-    /* The code is optimized for HASH_BITS >= 8 and limits::maxMatch-2 multiple of 16.
+    /* The code is optimized for HASH_BITS >= 8 and maxMatch-2 multiple of 16.
      * It is easy to get rid of this optimization if necessary.
      */
-    Assert(hash_bits_ >= 8 && limits::maxMatch == 258, "fc too clever");
+    Assert(hash_bits_ >= 8 && maxMatch == 258, "fc too clever");
 
     /* Do not waste too much time if we already have a good match: */
     if(prev_length_ >= good_match_) {
@@ -2500,8 +2495,8 @@ longest_match(IPos cur_match)
 
         Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
 
-        len = limits::maxMatch - (int)(strend - scan);
-        scan = strend - limits::maxMatch;
+        len = maxMatch - (int)(strend - scan);
+        scan = strend - maxMatch;
 
         if(len > best_len) {
             match_start_ = cur_match;
@@ -2620,8 +2615,8 @@ f_fast(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need limits::maxMatch bytes
-         * for the next match, plus limits::minMatch bytes to insert the
+         * at the end of the input file. We need maxMatch bytes
+         * for the next match, plus minMatch bytes to insert the
          * string following the next match.
          */
         if(lookahead_ < kMinLookahead)
@@ -2637,12 +2632,12 @@ f_fast(z_params& zs, Flush flush) ->
          * dictionary, and set hash_head to the head of the hash chain:
          */
         hash_head = 0;
-        if(lookahead_ >= limits::minMatch) {
+        if(lookahead_ >= minMatch) {
             insert_string(hash_head);
         }
 
         /* Find the longest match, discarding those <= prev_length.
-         * At this point we have always match_length < limits::minMatch
+         * At this point we have always match_length < minMatch
          */
         if(hash_head != 0 && strstart_ - hash_head <= max_dist()) {
             /* To simplify the code, we prevent matches with the string
@@ -2652,9 +2647,9 @@ f_fast(z_params& zs, Flush flush) ->
             match_length_ = longest_match (hash_head);
             /* longest_match() sets match_start */
         }
-        if(match_length_ >= limits::minMatch) {
+        if(match_length_ >= minMatch) {
             tr_tally_dist(strstart_ - match_start_,
-                           match_length_ - limits::minMatch, bflush);
+                           match_length_ - minMatch, bflush);
 
             lookahead_ -= match_length_;
 
@@ -2662,13 +2657,13 @@ f_fast(z_params& zs, Flush flush) ->
              * is not too large. This saves time but degrades compression.
              */
             if(match_length_ <= max_lazy_match_ &&
-                lookahead_ >= limits::minMatch) {
+                lookahead_ >= minMatch) {
                 match_length_--; /* string at strstart already in table */
                 do {
                     strstart_++;
                     insert_string(hash_head);
-                    /* strstart never exceeds WSIZE-limits::maxMatch, so there are
-                     * always limits::minMatch bytes ahead.
+                    /* strstart never exceeds WSIZE-maxMatch, so there are
+                     * always minMatch bytes ahead.
                      */
                 } while(--match_length_ != 0);
                 strstart_++;
@@ -2678,7 +2673,7 @@ f_fast(z_params& zs, Flush flush) ->
                 match_length_ = 0;
                 ins_h_ = window_[strstart_];
                 update_hash(ins_h_, window_[strstart_+1]);
-                /* If lookahead < limits::minMatch, ins_h is garbage, but it does not
+                /* If lookahead < minMatch, ins_h is garbage, but it does not
                  * matter since it will be recomputed at next deflate call.
                  */
             }
@@ -2696,7 +2691,7 @@ f_fast(z_params& zs, Flush flush) ->
                 return need_more;
         }
     }
-    insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
+    insert_ = strstart_ < minMatch-1 ? strstart_ : minMatch-1;
     if(flush == Flush::finish)
     {
         flush_block(zs, true);
@@ -2731,8 +2726,8 @@ f_slow(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need limits::maxMatch bytes
-         * for the next match, plus limits::minMatch bytes to insert the
+         * at the end of the input file. We need maxMatch bytes
+         * for the next match, plus minMatch bytes to insert the
          * string following the next match.
          */
         if(lookahead_ < kMinLookahead) {
@@ -2747,14 +2742,14 @@ f_slow(z_params& zs, Flush flush) ->
          * dictionary, and set hash_head to the head of the hash chain:
          */
         hash_head = 0;
-        if(lookahead_ >= limits::minMatch) {
+        if(lookahead_ >= minMatch) {
             insert_string(hash_head);
         }
 
         /* Find the longest match, discarding those <= prev_length.
          */
         prev_length_ = match_length_, prev_match_ = match_start_;
-        match_length_ = limits::minMatch-1;
+        match_length_ = minMatch-1;
 
         if(hash_head != 0 && prev_length_ < max_lazy_match_ &&
             strstart_ - hash_head <= max_dist()) {
@@ -2766,25 +2761,25 @@ f_slow(z_params& zs, Flush flush) ->
             /* longest_match() sets match_start */
 
             if(match_length_ <= 5 && (strategy_ == Strategy::filtered
-                || (match_length_ == limits::minMatch &&
+                || (match_length_ == minMatch &&
                     strstart_ - match_start_ > kTooFar)
                 )) {
 
-                /* If prev_match is also limits::minMatch, match_start is garbage
+                /* If prev_match is also minMatch, match_start is garbage
                  * but we will ignore the current match anyway.
                  */
-                match_length_ = limits::minMatch-1;
+                match_length_ = minMatch-1;
             }
         }
         /* If there was a match at the previous step and the current
          * match is not better, output the previous match:
          */
-        if(prev_length_ >= limits::minMatch && match_length_ <= prev_length_) {
-            uInt max_insert = strstart_ + lookahead_ - limits::minMatch;
+        if(prev_length_ >= minMatch && match_length_ <= prev_length_) {
+            uInt max_insert = strstart_ + lookahead_ - minMatch;
             /* Do not insert strings in hash table beyond this. */
 
             tr_tally_dist(strstart_ -1 - prev_match_,
-                           prev_length_ - limits::minMatch, bflush);
+                           prev_length_ - minMatch, bflush);
 
             /* Insert in hash table all strings up to the end of the match.
              * strstart-1 and strstart are already inserted. If there is not
@@ -2799,7 +2794,7 @@ f_slow(z_params& zs, Flush flush) ->
                 }
             } while(--prev_length_ != 0);
             match_available_ = 0;
-            match_length_ = limits::minMatch-1;
+            match_length_ = minMatch-1;
             strstart_++;
 
             if(bflush)
@@ -2837,7 +2832,7 @@ f_slow(z_params& zs, Flush flush) ->
         tr_tally_lit(window_[strstart_-1], bflush);
         match_available_ = 0;
     }
-    insert_ = strstart_ < limits::minMatch-1 ? strstart_ : limits::minMatch-1;
+    insert_ = strstart_ < minMatch-1 ? strstart_ : minMatch-1;
     if(flush == Flush::finish)
     {
         flush_block(zs, true);
@@ -2872,12 +2867,12 @@ f_rle(z_params& zs, Flush flush) ->
     for(;;)
     {
         /* Make sure that we always have enough lookahead, except
-         * at the end of the input file. We need limits::maxMatch bytes
+         * at the end of the input file. We need maxMatch bytes
          * for the longest run, plus one for the unrolled loop.
          */
-        if(lookahead_ <= limits::maxMatch) {
+        if(lookahead_ <= maxMatch) {
             fill_window(zs);
-            if(lookahead_ <= limits::maxMatch && flush == Flush::none) {
+            if(lookahead_ <= maxMatch && flush == Flush::none) {
                 return need_more;
             }
             if(lookahead_ == 0) break; /* flush the current block */
@@ -2885,27 +2880,27 @@ f_rle(z_params& zs, Flush flush) ->
 
         /* See how many times the previous byte repeats */
         match_length_ = 0;
-        if(lookahead_ >= limits::minMatch && strstart_ > 0) {
+        if(lookahead_ >= minMatch && strstart_ > 0) {
             scan = window_ + strstart_ - 1;
             prev = *scan;
             if(prev == *++scan && prev == *++scan && prev == *++scan) {
-                strend = window_ + strstart_ + limits::maxMatch;
+                strend = window_ + strstart_ + maxMatch;
                 do {
                 } while(prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          prev == *++scan && prev == *++scan &&
                          scan < strend);
-                match_length_ = limits::maxMatch - (int)(strend - scan);
+                match_length_ = maxMatch - (int)(strend - scan);
                 if(match_length_ > lookahead_)
                     match_length_ = lookahead_;
             }
             Assert(scan <= window_+(uInt)(window_size_-1), "wild scan");
         }
 
-        /* Emit match if have run of limits::minMatch or longer, else emit literal */
-        if(match_length_ >= limits::minMatch) {
-            tr_tally_dist(1, match_length_ - limits::minMatch, bflush);
+        /* Emit match if have run of minMatch or longer, else emit literal */
+        if(match_length_ >= minMatch) {
+            tr_tally_dist(1, match_length_ - minMatch, bflush);
 
             lookahead_ -= match_length_;
             strstart_ += match_length_;
