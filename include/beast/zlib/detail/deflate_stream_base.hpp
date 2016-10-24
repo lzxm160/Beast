@@ -517,6 +517,7 @@ protected:
     template<class = void> void doReset             ();
     template<class = void> void doClear             ();
     template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
+    template<class = void> void doParams            (z_params& zs, int level, Strategy strategy, error_code& ec);
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
     template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
     template<class = void> int  doPrime             (int bits, int value);
@@ -661,6 +662,41 @@ doTune(
     nice_match_ = nice_length;
     max_lazy_match_ = max_lazy;
     max_chain_length_ = max_chain;
+}
+
+template<class>
+void
+deflate_stream_base::
+doParams(z_params& zs, int level, Strategy strategy, error_code& ec)
+{
+    compress_func func;
+
+    if(level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+    if(level < 0 || level > 9)
+    {
+        ec = error::stream_error;
+        return;
+    }
+    func = get_config(level_).func;
+
+    if((strategy != strategy_ || func != get_config(level).func) &&
+        zs.total_in != 0)
+    {
+        // Flush the last buffer:
+        write(zs, Flush::block, ec);
+        if(ec == error::need_buffers && pending_ == 0)
+            ec = {};
+    }
+    if(level_ != level)
+    {
+        level_ = level;
+        max_lazy_match_   = get_config(level).max_lazy;
+        good_match_       = get_config(level).good_length;
+        nice_match_       = get_config(level).nice_length;
+        max_chain_length_ = get_config(level).max_chain;
+    }
+    strategy_ = strategy;
 }
 
 template<class>

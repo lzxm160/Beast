@@ -309,9 +309,34 @@ public:
     {
         return doDictionary(dict, dictLength);
     }
+    /** Update the compression level and strategy.
 
+        This function dynamically updates the compression level and
+        compression strategy. The interpretation of level and strategy
+        is as in @ref reset. This can be used to switch between compression
+        and straight copy of the input data, or to switch to a different kind
+        of input data requiring a different strategy. If the compression level
+        is changed, the input available so far is compressed with the old level
+        (and may be flushed); the new level will take effect only at the next
+        call of @ref write.
+
+        Before the call of `params`, the stream state must be set as for a
+        call of @ref write, since the currently available input may have to be
+        compressed and flushed. In particular, `zs.avail_out` must be non-zero.
+
+        @return `Z_OK` if success, `Z_STREAM_ERROR` if the source stream state
+        was inconsistent or if a parameter was invalid, `error::need_buffers`
+        if `zs.avail_out` was zero.
+    */
     void
-    params(z_params& zs, int level, Strategy strategy, error_code& ec);
+    params(
+        z_params& zs,
+        int level,
+        Strategy strategy,
+        error_code& ec)
+    {
+        doParams(zs, level, strategy, ec);
+    }
 
     /** Return bits pending in the output.
 

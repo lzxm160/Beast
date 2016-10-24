@@ -39,41 +39,6 @@ namespace beast {
 namespace zlib {
 
 template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-params(z_params& zs, int level, Strategy strategy, error_code& ec)
-{
-    compress_func func;
-
-    if(level == Z_DEFAULT_COMPRESSION)
-        level = 6;
-    if(level < 0 || level > 9)
-    {
-        ec = error::stream_error;
-        return;
-    }
-    func = get_config(level_).func;
-
-    if((strategy != strategy_ || func != get_config(level).func) &&
-        zs.total_in != 0)
-    {
-        // Flush the last buffer:
-        write(zs, Flush::block, ec);
-        if(ec == error::need_buffers && pending_ == 0)
-            ec = {};
-    }
-    if(level_ != level)
-    {
-        level_ = level;
-        max_lazy_match_   = get_config(level).max_lazy;
-        good_match_       = get_config(level).good_length;
-        nice_match_       = get_config(level).nice_length;
-        max_chain_length_ = get_config(level).max_chain;
-    }
-    strategy_ = strategy;
-}
-
-template<class Allocator>
 std::size_t
 basic_deflate_stream<Allocator>::
 upper_bound(std::size_t sourceLen) const
