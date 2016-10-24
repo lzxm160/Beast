@@ -2240,6 +2240,7 @@ longest_match(IPos cur_match)
     window to pending_buf.
 */
 template<class>
+inline
 auto
 deflate_stream_base::
 f_stored(z_params& zs, Flush flush) ->
@@ -2317,6 +2318,7 @@ f_stored(z_params& zs, Flush flush) ->
     matches. It is used only for the fast compression options.
 */
 template<class>
+inline
 auto
 deflate_stream_base::
 f_fast(z_params& zs, Flush flush) ->
@@ -2426,6 +2428,7 @@ f_fast(z_params& zs, Flush flush) ->
     no better match at the next window position.
 */
 template<class>
+inline
 auto
 deflate_stream_base::
 f_slow(z_params& zs, Flush flush) ->
@@ -2566,6 +2569,7 @@ f_slow(z_params& zs, Flush flush) ->
     deflate switches away from Strategy::rle.)
 */
 template<class>
+inline
 auto
 deflate_stream_base::
 f_rle(z_params& zs, Flush flush) ->
@@ -2652,6 +2656,7 @@ f_rle(z_params& zs, Flush flush) ->
  * (It will be regenerated if this run of deflate switches away from Huffman.)
  */
 template<class>
+inline
 auto
 deflate_stream_base::
 f_huff(z_params& zs, Flush flush) ->
