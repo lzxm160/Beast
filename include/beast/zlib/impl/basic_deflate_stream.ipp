@@ -39,15 +39,6 @@ namespace beast {
 namespace zlib {
 
 template<class Allocator>
-basic_deflate_stream<Allocator>::
-basic_deflate_stream()
-{
-    //reset(6, 15, DEF_MEM_LEVEL, Strategy::normal);
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
 void
 basic_deflate_stream<Allocator>::
 params(z_params& zs, int level, Strategy strategy, error_code& ec)
@@ -80,34 +71,6 @@ params(z_params& zs, int level, Strategy strategy, error_code& ec)
         max_chain_length_ = get_config(level).max_chain;
     }
     strategy_ = strategy;
-}
-
-/* =========================================================================
- * For the default windowBits of 15 and memLevel of 8, this function returns
- * a close to exact, as well as small, upper bound on the compressed size.
- * They are coded as constants here for a reason--if the #define's are
- * changed, then this function needs to be changed as well.  The return
- * value for 15 and 8 only works for those exact settings.
- *
- * For any setting other than those defaults for windowBits and memLevel,
- * the value returned is a conservative worst case for the maximum expansion
- * resulting from using fixed blocks instead of stored blocks, which deflate
- * can emit on compressed data for some combinations of the parameters.
- *
- * This function could be more sophisticated to provide closer upper bounds for
- * every combination of windowBits and memLevel.  But even the conservative
- * upper bound of about 14% expansion does not seem onerous for output buffer
- * allocation.
- */
-
-inline
-std::size_t
-deflate_upper_bound(std::size_t bytes)
-{
-    return bytes +
-        ((bytes + 7) >> 3) +
-        ((bytes + 63) >> 6) + 5 +
-        6;
 }
 
 template<class Allocator>

@@ -168,6 +168,7 @@ protected:
     deflate_tables const& lut_;
 
     bool inited_ = false;
+    std::size_t buf_size_;
     std::unique_ptr<std::uint8_t[]> buf_;
 
     int status_;                    // as the name implies
@@ -617,49 +618,17 @@ doReset(
     if(memLevel < 1 || memLevel > MAX_MEM_LEVEL)
         throw std::invalid_argument{"invalid memLevel"};
 
-    /* We overlay pending_buf and d_buf+l_buf. This works since the average
-     * output size for (length,distance) codes is <= 24 bits.
-     */
-    std::uint16_t* overlay;
-
     w_bits_ = windowBits;
-    w_size_ = 1 << w_bits_;
-    w_mask_ = w_size_ - 1;
 
     hash_bits_ = memLevel + 7;
-    hash_size_ = 1 << hash_bits_;
-    hash_mask_ = hash_size_ - 1;
-    hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
 
     // 16K elements by default
     lit_bufsize_ = 1 << (memLevel + 6);
 
-    {
-        auto const nwindow  = w_size_ * 2*sizeof(Byte);
-        auto const nprev    = w_size_ * sizeof(std::uint16_t);
-        auto const nhead    = hash_size_ * sizeof(std::uint16_t);
-        auto const noverlay = lit_bufsize_ * (sizeof(std::uint16_t)+2);
-        
-        buf_.reset(new std::uint8_t[nwindow + nprev + nhead + noverlay]);
-
-        window_ = reinterpret_cast<Byte*>(buf_.get());
-        prev_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow);
-        head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
-        overlay = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev + nhead);
-    }
-
-    high_water_ = 0;      /* nothing written to window_ yet */
-
-    pending_buf_ = (std::uint8_t *) overlay;
-    pending_buf_size_ = (std::uint32_t)lit_bufsize_ * (sizeof(std::uint16_t)+2L);
-
-    d_buf_ = overlay + lit_bufsize_/sizeof(std::uint16_t);
-    l_buf_ = pending_buf_ + (1+sizeof(std::uint16_t))*lit_bufsize_;
-
     level_ = level;
     strategy_ = strategy;
 
-    doReset();
+    inited_ = false;
 }
 
 template<class>
@@ -667,14 +636,7 @@ void
 deflate_stream_base::
 doReset()
 {
-    pending_ = 0;
-    pending_out_ = pending_buf_;
-
-    status_ = BUSY_STATE;
-    last_flush_ = Flush::none;
-
-    tr_init();
-    lm_init();
+    inited_ = false;
 }
 
 template<class>
@@ -682,7 +644,8 @@ void
 deflate_stream_base::
 doClear()
 {
-    doReset();
+    inited_ = false;
+    buf_.reset();
 }
 
 template<class>
@@ -719,6 +682,8 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
         ec = error::need_buffers;
         return;
     }
+
+    maybe_init();
 
     old_flush = last_flush_;
     last_flush_ = flush;
@@ -850,6 +815,8 @@ doDictionary(Byte const* dict, uInt dictLength)
     if(lookahead_)
         return Z_STREAM_ERROR;
 
+    maybe_init();
+
     /* if dict would fill window, just replace the history */
     if(dictLength >= w_size_)
     {
@@ -900,6 +867,8 @@ doPrime(int bits, int value)
 {
     int put;
 
+    maybe_init();
+
     if((Byte *)(d_buf_) < pending_out_ + ((Buf_size + 7) >> 3))
         return Z_BUF_ERROR;
     do
@@ -936,6 +905,64 @@ void
 deflate_stream_base::
 init()
 {
+    //  Caller must set these:
+    //      w_bits_
+    //      hash_bits_
+    //      lit_bufsize_
+    //      level_
+    //      strategy_
+
+    w_size_ = 1 << w_bits_;
+    w_mask_ = w_size_ - 1;
+
+    hash_size_ = 1 << hash_bits_;
+    hash_mask_ = hash_size_ - 1;
+    hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
+
+    auto const nwindow  = w_size_ * 2*sizeof(Byte);
+    auto const nprev    = w_size_ * sizeof(std::uint16_t);
+    auto const nhead    = hash_size_ * sizeof(std::uint16_t);
+    auto const noverlay = lit_bufsize_ * (sizeof(std::uint16_t)+2);
+    auto const needed   = nwindow + nprev + nhead + noverlay;
+
+    if(! buf_ || buf_size_ != needed)
+    {
+        buf_.reset(new std::uint8_t[needed]);
+        buf_size_ = needed;
+    }
+
+    window_ = reinterpret_cast<Byte*>(buf_.get());
+    prev_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow);
+    head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
+
+    /*  We overlay pending_buf_ and d_buf_ + l_buf_. This works
+        since the average output size for (length, distance)
+        codes is <= 24 bits.
+    */
+    auto overlay = reinterpret_cast<std::uint16_t*>(
+        buf_.get() + nwindow + nprev + nhead);
+
+    // nothing written to window_ yet
+    high_water_ = 0;
+
+    pending_buf_ =
+        reinterpret_cast<std::uint8_t*>(overlay);
+    pending_buf_size_ =
+        static_cast<std::uint32_t>(lit_bufsize_) *
+            (sizeof(std::uint16_t) + 2L);
+
+    d_buf_ = overlay + lit_bufsize_ / sizeof(std::uint16_t);
+    l_buf_ = pending_buf_ + (1 + sizeof(std::uint16_t)) * lit_bufsize_;
+
+    pending_ = 0;
+    pending_out_ = pending_buf_;
+
+    status_ = BUSY_STATE;
+    last_flush_ = Flush::none;
+
+    tr_init();
+    lm_init();
+
     inited_ = true;
 }
 

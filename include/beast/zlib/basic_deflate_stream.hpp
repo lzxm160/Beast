@@ -87,7 +87,10 @@ public:
         after construction, any required internal buffers are
         not dynamically allocated until needed.
     */
-    basic_deflate_stream();
+    basic_deflate_stream()
+    {
+        reset(6, 15, DEF_MEM_LEVEL, Strategy::normal);
+    }
 
     /** Reset the stream and compression settings.
 
@@ -135,8 +138,8 @@ public:
         doClear();
     }
     
-    void
-    deflateReset();
+    std::size_t
+    upper_bound(std::size_t sourceLen) const;
 
     /** Fine tune internal compression parameters.
 
@@ -310,9 +313,6 @@ public:
     void
     params(z_params& zs, int level, Strategy strategy, error_code& ec);
 
-    std::size_t
-    upper_bound(std::size_t sourceLen) const;
-
     /** Return bits pending in the output.
 
         This function returns the number of bytes and bits of output
@@ -353,6 +353,32 @@ public:
         return doPrime(bits, value);
     }
 };
+
+/*  For the default windowBits of 15 and memLevel of 8, this function returns
+    a close to exact, as well as small, upper bound on the compressed size.
+    They are coded as constants here for a reason--if the #define's are
+    changed, then this function needs to be changed as well.  The return
+    value for 15 and 8 only works for those exact settings.
+    
+    For any setting other than those defaults for windowBits and memLevel,
+    the value returned is a conservative worst case for the maximum expansion
+    resulting from using fixed blocks instead of stored blocks, which deflate
+    can emit on compressed data for some combinations of the parameters.
+    
+    This function could be more sophisticated to provide closer upper bounds for
+    every combination of windowBits and memLevel.  But even the conservative
+    upper bound of about 14% expansion does not seem onerous for output buffer
+    allocation.
+*/
+inline
+std::size_t
+deflate_upper_bound(std::size_t bytes)
+{
+    return bytes +
+        ((bytes + 7) >> 3) +
+        ((bytes + 63) >> 6) + 5 +
+        6;
+}
 
 using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
 
