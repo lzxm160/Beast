@@ -101,8 +101,6 @@ struct z_params
     */
     std::size_t total_out = 0;
 
-    char const* msg = nullptr;  // last error message, NULL if no error
-
     int data_type = Z_UNKNOWN;  // best guess about the data type: binary or text
 };
 
