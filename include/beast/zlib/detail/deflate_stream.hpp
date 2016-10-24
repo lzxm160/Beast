@@ -32,8 +32,8 @@
     (zlib format), rfc1951 (deflate format) and rfc1952 (gzip format).
 */
 
-#ifndef BEAST_ZLIB_DETAIL_DEFLATE_STREAM_BASE_HPP
-#define BEAST_ZLIB_DETAIL_DEFLATE_STREAM_BASE_HPP
+#ifndef BEAST_ZLIB_DETAIL_DEFLATE_STREAM_HPP
+#define BEAST_ZLIB_DETAIL_DEFLATE_STREAM_HPP
 
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
@@ -99,10 +99,10 @@ namespace detail {
  *
  */
 
-class deflate_stream_base
+class deflate_stream
 {
 protected:
-    deflate_stream_base()
+    deflate_stream()
         :  lut_(get_deflate_tables())
     {
     }
@@ -115,7 +115,7 @@ protected:
         finish_done     /* finish done, accept no more input or output */
     };
 
-    using self = deflate_stream_base;
+    using self = deflate_stream;
     typedef block_state(self::*compress_func)(z_params& zs, Flush flush);
 
     /*  Note: the deflate() code requires max_lazy >= limits::minMatch and max_chain >= 4
@@ -596,7 +596,7 @@ protected:
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doReset(
     int level,
     int windowBits,
@@ -635,7 +635,7 @@ doReset(
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doReset()
 {
     inited_ = false;
@@ -643,7 +643,7 @@ doReset()
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doClear()
 {
     inited_ = false;
@@ -652,7 +652,7 @@ doClear()
 
 template<class>
 std::size_t
-deflate_stream_base::
+deflate_stream::
 doUpperBound(std::size_t sourceLen) const
 {
     std::size_t complen;
@@ -676,7 +676,7 @@ doUpperBound(std::size_t sourceLen) const
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doTune(
     int good_length,
     int max_lazy,
@@ -691,7 +691,7 @@ doTune(
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doParams(z_params& zs, int level, Strategy strategy, error_code& ec)
 {
     compress_func func;
@@ -726,7 +726,7 @@ doParams(z_params& zs, int level, Strategy strategy, error_code& ec)
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doWrite(z_params& zs, Flush flush, error_code& ec)
 {
     // value of flush param for previous deflate call
@@ -866,7 +866,7 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doDictionary(Byte const* dict, uInt dictLength, error_code& ec)
 {
     if(lookahead_)
@@ -921,7 +921,7 @@ doDictionary(Byte const* dict, uInt dictLength, error_code& ec)
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doPrime(int bits, int value, error_code& ec)
 {
     maybe_init();
@@ -948,7 +948,7 @@ doPrime(int bits, int value, error_code& ec)
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 doPending(unsigned* value, int* bits)
 {
     if(value != 0)
@@ -962,7 +962,7 @@ doPending(unsigned* value, int* bits)
 // Do lazy initialization
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 init()
 {
     //  Caller must set these:
@@ -1030,7 +1030,7 @@ init()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 lm_init()
 {
     window_size_ = (std::uint32_t)2L*w_size_;
@@ -1058,7 +1058,7 @@ lm_init()
 //
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 init_block()
 {
     for(int n = 0; n < limits::lCodes;  n++)
@@ -1081,7 +1081,7 @@ init_block()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 pqdownheap(
     detail::ct_data const* tree,    // the tree to restore
     int k)                          // node to move down
@@ -1115,7 +1115,7 @@ pqdownheap(
 template<class>
 inline
 void
-deflate_stream_base::
+deflate_stream::
 pqremove(detail::ct_data const* tree, int& top)
 {
     top = heap_[kSmallest];
@@ -1134,7 +1134,7 @@ pqremove(detail::ct_data const* tree, int& top)
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 gen_bitlen(tree_desc *desc)
 {
     detail::ct_data *tree           = desc->dyn_tree;
@@ -1231,7 +1231,7 @@ gen_bitlen(tree_desc *desc)
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 build_tree(tree_desc *desc)
 {
     detail::ct_data *tree         = desc->dyn_tree;
@@ -1324,7 +1324,7 @@ build_tree(tree_desc *desc)
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 scan_tree(
     detail::ct_data *tree,      // the tree to be scanned
     int max_code)               // and its largest code of non zero frequency
@@ -1393,7 +1393,7 @@ scan_tree(
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 send_tree(
     detail::ct_data *tree,      // the tree to be scanned
     int max_code)               // and its largest code of non zero frequency
@@ -1475,7 +1475,7 @@ send_tree(
 */
 template<class>
 int
-deflate_stream_base::
+deflate_stream::
 build_bl_tree()
 {
     int max_blindex;  // index of last bit length code of non zero freq
@@ -1513,7 +1513,7 @@ build_bl_tree()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 send_all_trees(
     int lcodes,
     int dcodes,
@@ -1546,7 +1546,7 @@ send_all_trees(
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 compress_block(
     detail::ct_data const* ltree, // literal tree
     detail::ct_data const* dtree) // distance tree
@@ -1616,7 +1616,7 @@ compress_block(
 */
 template<class>
 int
-deflate_stream_base::
+deflate_stream::
 detect_data_type()
 {
     /* black_mask is the bit mask of black-listed bytes
@@ -1649,7 +1649,7 @@ detect_data_type()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 bi_windup()
 {
     if(bi_valid_ > 8)
@@ -1664,7 +1664,7 @@ bi_windup()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 bi_flush()
 {
     if(bi_valid_ == 16)
@@ -1686,7 +1686,7 @@ bi_flush()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 copy_block(
     char    *buf,       // the input data
     unsigned len,       // its length
@@ -1710,7 +1710,7 @@ copy_block(
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 tr_init()
 {
     l_desc_.dyn_tree = dyn_ltree_;
@@ -1734,7 +1734,7 @@ tr_init()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 tr_align()
 {
     send_bits(STATIC_TREES<<1, 3);
@@ -1746,7 +1746,7 @@ tr_align()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 tr_flush_bits()
 {
     bi_flush();
@@ -1756,7 +1756,7 @@ tr_flush_bits()
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 tr_stored_block(
     char *buf,                  // input block
     std::uint32_t stored_len,   // length of input block
@@ -1769,7 +1769,7 @@ tr_stored_block(
 template<class>
 inline
 void
-deflate_stream_base::
+deflate_stream::
 tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
 {
     d_buf_[last_lit_] = dist;
@@ -1783,7 +1783,7 @@ tr_tally_dist(std::uint16_t dist, std::uint8_t len, bool& flush)
 template<class>
 inline
 void
-deflate_stream_base::
+deflate_stream::
 tr_tally_lit(std::uint8_t c, bool& flush)
 {
     d_buf_[last_lit_] = 0;
@@ -1799,7 +1799,7 @@ tr_tally_lit(std::uint8_t c, bool& flush)
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 tr_flush_block(
     z_params& zs,
     char *buf,                  // input block, or NULL if too old
@@ -1899,7 +1899,7 @@ tr_flush_block(
 
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 fill_window(z_params& zs)
 {
     unsigned n, m;
@@ -2051,7 +2051,7 @@ fill_window(z_params& zs)
 */
 template<class>
 void
-deflate_stream_base::
+deflate_stream::
 flush_pending(z_params& zs)
 {
     tr_flush_bits();
@@ -2078,7 +2078,7 @@ flush_pending(z_params& zs)
 template<class>
 inline
 void
-deflate_stream_base::
+deflate_stream::
 flush_block(z_params& zs, bool last)
 {
     tr_flush_block(zs,
@@ -2099,7 +2099,7 @@ flush_block(z_params& zs, bool last)
 */
 template<class>
 int
-deflate_stream_base::
+deflate_stream::
 read_buf(z_params& zs, Byte *buf, unsigned size)
 {
     unsigned len = zs.avail_in;
@@ -2131,7 +2131,7 @@ read_buf(z_params& zs, Byte *buf, unsigned size)
 */
 template<class>
 uInt
-deflate_stream_base::
+deflate_stream::
 longest_match(IPos cur_match)
 {
     unsigned chain_length = max_chain_length_;/* max hash chain length */
@@ -2242,7 +2242,7 @@ longest_match(IPos cur_match)
 template<class>
 inline
 auto
-deflate_stream_base::
+deflate_stream::
 f_stored(z_params& zs, Flush flush) ->
     block_state
 {
@@ -2320,7 +2320,7 @@ f_stored(z_params& zs, Flush flush) ->
 template<class>
 inline
 auto
-deflate_stream_base::
+deflate_stream::
 f_fast(z_params& zs, Flush flush) ->
     block_state
 {
@@ -2430,7 +2430,7 @@ f_fast(z_params& zs, Flush flush) ->
 template<class>
 inline
 auto
-deflate_stream_base::
+deflate_stream::
 f_slow(z_params& zs, Flush flush) ->
     block_state
 {
@@ -2571,7 +2571,7 @@ f_slow(z_params& zs, Flush flush) ->
 template<class>
 inline
 auto
-deflate_stream_base::
+deflate_stream::
 f_rle(z_params& zs, Flush flush) ->
     block_state
 {
@@ -2658,7 +2658,7 @@ f_rle(z_params& zs, Flush flush) ->
 template<class>
 inline
 auto
-deflate_stream_base::
+deflate_stream::
 f_huff(z_params& zs, Flush flush) ->
     block_state
 {

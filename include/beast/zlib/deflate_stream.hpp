@@ -38,7 +38,7 @@
 #include <beast/zlib/error.hpp>
 #include <beast/zlib/zlib.hpp>
 #include <beast/zlib/detail/deflate.hpp>
-#include <beast/zlib/detail/deflate_stream_base.hpp>
+#include <beast/zlib/detail/deflate_stream.hpp>
 #include <algorithm>
 #include <cstdlib>
 #include <cstdint>
@@ -53,7 +53,7 @@ namespace zlib {
     This is a port of zlib's "deflate" functionality to C++.
 */
 class deflate_stream
-    : private detail::deflate_stream_base
+    : private detail::deflate_stream
 {
 public:
     /** Construct a default deflate stream.
