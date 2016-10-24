@@ -1077,7 +1077,7 @@ get_fixed_tables() ->
                     throw std::logic_error{ec.message()};
             }
 
-            // VFALCO These fixups work around a bug in Zlib
+            // VFALCO These fixups are from ZLib
             len_[ 99].op = 64;
             len_[227].op = 64;
             len_[355].op = 64;
