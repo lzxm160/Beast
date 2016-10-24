@@ -2142,7 +2142,6 @@ tr_flush_block(
         compress_block((const ct_data *)dyn_ltree_,
                        (const ct_data *)dyn_dtree_);
     }
-    BOOST_ASSERT(compressed_len_ == bits_sent_);
     /* The above check is made mod 2^32, for files larger than 512 MB
      * and std::size_t implemented on 32 bits.
      */
