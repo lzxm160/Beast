@@ -504,7 +504,9 @@ protected:
         }
     }
 
-    template<class = void> void doTune                (int good_length, int max_lazy, int nice_length, int max_chain);
+    template<class = void> void doReset             ();
+    template<class = void> void doClear             ();
+    template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
     template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
     template<class = void> int  doPrime             (int bits, int value);
@@ -578,6 +580,29 @@ protected:
 };
 
 //--------------------------------------------------------------------------
+
+template<class>
+void
+deflate_stream_base::
+doReset()
+{
+    pending_ = 0;
+    pending_out_ = pending_buf_;
+
+    status_ = BUSY_STATE;
+    last_flush_ = Flush::none;
+
+    tr_init();
+    lm_init();
+}
+
+template<class>
+void
+deflate_stream_base::
+doClear()
+{
+    doReset();
+}
 
 template<class>
 void
@@ -1523,7 +1548,7 @@ tr_init()
     bi_buf_ = 0;
     bi_valid_ = 0;
 
-    /* Initialize the first block of the first file: */
+    // Initialize the first block of the first file:
     init_block();
 }
 

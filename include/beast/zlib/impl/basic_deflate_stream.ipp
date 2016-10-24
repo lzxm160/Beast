@@ -114,40 +114,7 @@ reset(
     level_ = level;
     strategy_ = strategy;
 
-    deflateReset();
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-deflateResetKeep()
-{
-    // VFALCO TODO
-    //total_in = 0;
-    //total_out = 0;
-    //msg = 0;
-    //data_type = Z_UNKNOWN;
-
-    pending_ = 0;
-    pending_out_ = pending_buf_;
-
-    status_ = BUSY_STATE;
-    last_flush_ = Flush::none;
-
-    tr_init();
-}
-
-/* ========================================================================= */
-
-template<class Allocator>
-void
-basic_deflate_stream<Allocator>::
-deflateReset()
-{
-    deflateResetKeep();
-    lm_init();
+    reset();
 }
 
 /* ========================================================================= */

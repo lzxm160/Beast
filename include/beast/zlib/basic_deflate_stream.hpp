@@ -72,8 +72,47 @@ class basic_deflate_stream
 public:
     basic_deflate_stream();
 
+    /** Reset the stream and compression settings.
+
+        This function initializes the stream to the specified
+        compression settings.
+
+        @note Any unprocessed input or pending output from previous
+        calls are discarded.
+    */
     void
-    reset(int level, int windowBits, int memLevel, Strategy strategy);
+    reset(
+        int level,
+        int windowBits,
+        int memLevel,
+        Strategy strategy);
+
+    /** Reset the stream without deallocating memory.
+
+        This function performs the equivalent of calling `clear`
+        followed by `reset` with the same compression settings,
+        without deallocating the internal buffers.
+    */
+    void
+    reset()
+    {
+        doReset();
+    }
+
+    /** Clear the stream.
+
+        This function resets the stream and frees all dynamically
+        allocated internal buffers. The compression settings are
+        left unchanged.
+    */
+    void
+    clear()
+    {
+        doClear();
+    }
+    
+    void
+    deflateReset();
 
     /** Fine tune internal compression parameters.
 
@@ -86,7 +125,11 @@ public:
         and max_chain parameters.
     */
     void
-    tune(int good_length, int max_lazy, int nice_length, int max_chain)
+    tune(
+        int good_length,
+        int max_lazy,
+        int nice_length,
+        int max_chain)
     {
         doTune(good_length, max_lazy, nice_length, max_chain);
     }
@@ -202,7 +245,10 @@ public:
         to continue compressing.
     */
     void
-    write(z_params& zs, Flush flush, error_code& ec)
+    write(
+        z_params& zs,
+        Flush flush,
+        error_code& ec)
     {
         doWrite(zs, flush, ec);
     }
@@ -236,12 +282,6 @@ public:
     {
         return doDictionary(dict, dictLength);
     }
-
-    void
-    deflateResetKeep();
-    
-    void
-    deflateReset();
 
     void
     params(z_params& zs, int level, Strategy strategy, error_code& ec);
