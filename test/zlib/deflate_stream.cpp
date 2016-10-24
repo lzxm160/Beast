@@ -322,8 +322,7 @@ public:
     void
     run() override
     {
-        //testDeflate();
-        pass();
+        testDeflate();
     }
 };
 
