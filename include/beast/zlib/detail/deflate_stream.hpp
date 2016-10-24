@@ -36,6 +36,7 @@
 #define BEAST_ZLIB_DETAIL_DEFLATE_STREAM_HPP
 
 #include <beast/zlib/zlib.hpp>
+#include <beast/zlib/detail/ranges.hpp>
 #include <boost/assert.hpp>
 #include <boost/optional.hpp>
 #include <cstdint>
@@ -98,14 +99,6 @@ namespace detail {
  *         Data Compression with Finite Windows, Comm.ACM, 32,4 (1989) 490-595
  *
  */
-
-/* Diagnostic functions */
-#  define Assert(cond,msg)
-#  define Trace(x)
-#  define Tracev(x)
-#  define Tracevv(x)
-#  define Tracec(c,x)
-#  define Tracecv(c,x)
 
 class deflate_stream
 {
@@ -1468,9 +1461,6 @@ gen_bitlen(tree_desc *desc)
     if(overflow == 0)
         return;
 
-    /* This happens for example on obj2 and pic of the Calgary corpus */
-    Trace((stderr,"\nbit length overflow\n"));
-
     // Find the first bit length which could increase:
     do
     {
@@ -1502,7 +1492,6 @@ gen_bitlen(tree_desc *desc)
                 continue;
             if((unsigned) tree[m].dl != (unsigned) bits)
             {
-                Trace((stderr,"code %d bits %d->%d\n", m, tree[m].dl, bits));
                 opt_len_ += ((long)bits - (long)tree[m].dl) *(long)tree[m].fc;
                 tree[m].dl = (std::uint16_t)bits;
             }
@@ -1725,7 +1714,7 @@ send_tree(
                 send_code(curlen, bl_tree_);
                 count--;
             }
-            Assert(count >= 3 && count <= 6, " 3_6?");
+            BOOST_ASSERT(count >= 3 && count <= 6);
             send_code(REP_3_6, bl_tree_);
             send_bits(count-3, 2);
         }
@@ -1790,8 +1779,6 @@ build_bl_tree()
     }
     // Update opt_len to include the bit length tree and counts
     opt_len_ += 3*(max_blindex+1) + 5+5+4;
-    Tracev((stderr, "\ndyn trees: dyn %ld, stat %ld",
-            opt_len_, static_len_));
     return max_blindex;
 }
 
@@ -1810,25 +1797,15 @@ send_all_trees(
 {
     int rank;       // index in bl_order
 
-    Assert (lcodes >= 257 && dcodes >= 1 && blcodes >= 4, "not enough codes");
-    Assert (lcodes <= lCodes && dcodes <= dCodes && blcodes <= blCodes,
-            "too many codes");
-    Tracev((stderr, "\nbl counts: "));
+    BOOST_ASSERT(lcodes >= 257 && dcodes >= 1 && blcodes >= 4);
+    BOOST_ASSERT(lcodes <= lCodes && dcodes <= dCodes && blcodes <= blCodes);
     send_bits(lcodes-257, 5); // not +255 as stated in appnote.txt
     send_bits(dcodes-1,   5);
     send_bits(blcodes-4,  4); // not -3 as stated in appnote.txt
     for(rank = 0; rank < blcodes; rank++)
-    {
-        Tracev((stderr, "\nbl code %2d ", bl_order[rank]));
         send_bits(bl_tree_[lut_.bl_order[rank]].dl, 3);
-    }
-    Tracev((stderr, "\nbl tree: sent %ld", bits_sent_));
-
     send_tree((ct_data *)dyn_ltree_, lcodes-1); // literal tree
-    Tracev((stderr, "\nlit tree: sent %ld", bits_sent_));
-
     send_tree((ct_data *)dyn_dtree_, dcodes-1); // distance tree
-    Tracev((stderr, "\ndist tree: sent %ld", bits_sent_));
 }
 
 /*  Send the block data compressed using the given Huffman trees
@@ -1855,7 +1832,6 @@ compress_block(
             if(dist == 0)
             {
                 send_code(lc, ltree); /* send a literal byte */
-                Tracecv(isgraph(lc), (stderr," '%c' ", lc));
             }
             else
             {
@@ -1870,7 +1846,7 @@ compress_block(
                 }
                 dist--; /* dist is now the match distance - 1 */
                 code = d_code(dist);
-                Assert (code < dCodes, "bad d_code");
+                BOOST_ASSERT(code < dCodes);
 
                 send_code(code, dtree);       /* send the distance code */
                 extra = lut_.extra_dbits[code];
@@ -1882,8 +1858,7 @@ compress_block(
             } /* literal or match pair ? */
 
             /* Check that the overlay between pending_buf and d_buf+l_buf is ok: */
-            Assert((uInt)(pending_) < lit_bufsize_ + 2*lx,
-               "pendingBuf overflow");
+            BOOST_ASSERT((uInt)(pending_) < lit_bufsize_ + 2*lx);
         }
         while(lx < last_lit_);
     }
@@ -2108,12 +2083,8 @@ tr_flush_block(
 
         // Construct the literal and distance trees
         build_tree((tree_desc *)(&(l_desc_)));
-        Tracev((stderr, "\nlit data: dyn %ld, stat %ld", opt_len_,
-                static_len_));
 
         build_tree((tree_desc *)(&(d_desc_)));
-        Tracev((stderr, "\ndist data: dyn %ld, stat %ld", opt_len_,
-                static_len_));
         /* At this point, opt_len and static_len are the total bit lengths of
          * the compressed block data, excluding the tree representations.
          */
@@ -2127,15 +2098,12 @@ tr_flush_block(
         opt_lenb = (opt_len_+3+7)>>3;
         static_lenb = (static_len_+3+7)>>3;
 
-        Tracev((stderr, "\nopt %lu(%lu) stat %lu(%lu) stored %lu lit %u ",
-                opt_lenb, opt_len_, static_lenb, static_len_, stored_len,
-                last_lit_));
         if(static_lenb <= opt_lenb)
             opt_lenb = static_lenb;
     }
     else
     {
-        Assert(buf != (char*)0, "lost buf");
+        BOOST_ASSERT(buf);
         opt_lenb = static_lenb = stored_len + 5; // force a stored block
     }
 
@@ -2174,7 +2142,7 @@ tr_flush_block(
         compress_block((const ct_data *)dyn_ltree_,
                        (const ct_data *)dyn_dtree_);
     }
-    Assert (compressed_len_ == bits_sent_, "bad compressed size");
+    BOOST_ASSERT(compressed_len_ == bits_sent_);
     /* The above check is made mod 2^32, for files larger than 512 MB
      * and std::size_t implemented on 32 bits.
      */
@@ -2182,8 +2150,6 @@ tr_flush_block(
 
     if(last)
         bi_windup();
-    Tracev((stderr,"\ncomprlen %lu(%lu) ", compressed_len_>>3,
-           compressed_len_-7*last));
 }
 
 template<class>
@@ -2344,9 +2310,7 @@ deflate_stream::
 flush_pending(z_params& zs)
 {
     tr_flush_bits();
-    unsigned len = pending_;
-    if(len > zs.avail_out)
-        len = zs.avail_out;
+    auto len = clamp(pending_, zs.avail_out);
     if(len == 0)
         return;
 
@@ -2391,10 +2355,7 @@ int
 deflate_stream::
 read_buf(z_params& zs, Byte *buf, unsigned size)
 {
-    unsigned len = zs.avail_in;
-
-    if(len > size)
-        len = size;
+    auto len = clamp(zs.avail_in, size);
     if(len == 0)
         return 0;
 
@@ -2444,7 +2405,7 @@ longest_match(IPos cur_match)
     /* The code is optimized for HASH_BITS >= 8 and maxMatch-2 multiple of 16.
      * It is easy to get rid of this optimization if necessary.
      */
-    Assert(hash_bits_ >= 8 && maxMatch == 258, "fc too clever");
+    BOOST_ASSERT(hash_bits_ >= 8 && maxMatch == 258);
 
     /* Do not waste too much time if we already have a good match: */
     if(prev_length_ >= good_match_) {
@@ -2456,10 +2417,10 @@ longest_match(IPos cur_match)
     if((uInt)nice_match > lookahead_)
         nice_match = lookahead_;
 
-    Assert((std::uint32_t)strstart_ <= window_size_-kMinLookahead, "need lookahead");
+    BOOST_ASSERT((std::uint32_t)strstart_ <= window_size_-kMinLookahead);
 
     do {
-        Assert(cur_match < strstart_, "no future");
+        BOOST_ASSERT(cur_match < strstart_);
         match = window_ + cur_match;
 
         /* Skip to next match if the match length cannot increase
@@ -2483,7 +2444,7 @@ longest_match(IPos cur_match)
          * the hash keys are equal and that HASH_BITS >= 8.
          */
         scan += 2, match++;
-        Assert(*scan == *match, "match[2]?");
+        BOOST_ASSERT(*scan == *match);
 
         /* We check for insufficient lookahead only every 8th comparison;
          * the 256th check will be made at strstart+258.
@@ -2497,7 +2458,7 @@ longest_match(IPos cur_match)
                 *++scan == *++match && *++scan == *++match &&
                 scan < strend);
 
-        Assert(scan <= window_+(unsigned)(window_size_-1), "wild scan");
+        BOOST_ASSERT(scan <= window_+(unsigned)(window_size_-1));
 
         len = maxMatch - (int)(strend - scan);
         scan = strend - maxMatch;
@@ -2550,8 +2511,8 @@ f_stored(z_params& zs, Flush flush) ->
         /* Fill the window as much as possible: */
         if(lookahead_ <= 1) {
 
-            Assert(strstart_ < w_size_+max_dist() ||
-                   block_start_ >= (long)w_size_, "slide too late");
+            BOOST_ASSERT(strstart_ < w_size_+max_dist() ||
+                   block_start_ >= (long)w_size_);
 
             fill_window(zs);
             if(lookahead_ == 0 && flush == Flush::none)
@@ -2559,7 +2520,7 @@ f_stored(z_params& zs, Flush flush) ->
 
             if(lookahead_ == 0) break; /* flush the current block */
         }
-        Assert(block_start_ >= 0L, "block gone");
+        BOOST_ASSERT(block_start_ >= 0L);
 
         strstart_ += lookahead_;
         lookahead_ = 0;
@@ -2689,7 +2650,6 @@ f_fast(z_params& zs, Flush flush) ->
         else
         {
             /* No match, output a literal byte */
-            Tracevv((stderr,"%c", window_[strstart_]));
             tr_tally_lit(window_[strstart_], bflush);
             lookahead_--;
             strstart_++;
@@ -2823,7 +2783,6 @@ f_slow(z_params& zs, Flush flush) ->
              * single literal. If there was a match but the current match
              * is longer, truncate the previous match to a single literal.
              */
-            Tracevv((stderr,"%c", window_[strstart_-1]));
             tr_tally_lit(window_[strstart_-1], bflush);
             if(bflush)
                 flush_block(zs, false);
@@ -2842,10 +2801,9 @@ f_slow(z_params& zs, Flush flush) ->
             lookahead_--;
         }
     }
-    Assert (flush != Flush::none, "no flush?");
+    BOOST_ASSERT(flush != Flush::none);
     if(match_available_)
     {
-        Tracevv((stderr,"%c", window_[strstart_-1]));
         tr_tally_lit(window_[strstart_-1], bflush);
         match_available_ = 0;
     }
@@ -2912,7 +2870,7 @@ f_rle(z_params& zs, Flush flush) ->
                 if(match_length_ > lookahead_)
                     match_length_ = lookahead_;
             }
-            Assert(scan <= window_+(uInt)(window_size_-1), "wild scan");
+            BOOST_ASSERT(scan <= window_+(uInt)(window_size_-1));
         }
 
         /* Emit match if have run of minMatch or longer, else emit literal */
@@ -2924,7 +2882,6 @@ f_rle(z_params& zs, Flush flush) ->
             match_length_ = 0;
         } else {
             /* No match, output a literal byte */
-            Tracevv((stderr,"%c", window_[strstart_]));
             tr_tally_lit(window_[strstart_], bflush);
             lookahead_--;
             strstart_++;
@@ -2982,7 +2939,6 @@ f_huff(z_params& zs, Flush flush) ->
 
         // Output a literal byte
         match_length_ = 0;
-        Tracevv((stderr,"%c", window_[strstart_]));
         tr_tally_lit(window_[strstart_], bflush);
         lookahead_--;
         strstart_++;
