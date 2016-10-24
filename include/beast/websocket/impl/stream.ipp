@@ -10,6 +10,7 @@
 
 #include <beast/websocket/teardown.hpp>
 #include <beast/websocket/detail/hybi13.hpp>
+#include <beast/websocket/detail/pmd_extension.hpp>
 #include <beast/http/read.hpp>
 #include <beast/http/write.hpp>
 #include <beast/http/reason.hpp>
@@ -45,8 +46,7 @@ stream<NextLayer>::
 reset()
 {
     failed_ = false;
-    rd_need_ = 0;
-    rd_cont_ = false;
+    rd_.cont = false;
     wr_close_ = false;
     wr_.cont = false;
     wr_block_ = nullptr;    // should be nullptr on close anyway
@@ -71,6 +71,23 @@ build_request(boost::string_ref const& host,
     key = detail::make_sec_ws_key(maskgen_);
     req.headers.insert("Sec-WebSocket-Key", key);
     req.headers.insert("Sec-WebSocket-Version", "13");
+#if PMD_ENABLED
+    if(pmd_opts_.enable)
+    {
+        detail::pmd_offer config;
+        config.accept = true;
+        config.server_max_window_bits =
+            pmd_opts_.server_max_window_bits;
+        config.client_max_window_bits =
+            pmd_opts_.client_max_window_bits;
+        config.server_no_context_takeover =
+            pmd_opts_.server_no_context_takeover;
+        config.client_no_context_takeover =
+            pmd_opts_.client_no_context_takeover;
+        detail::pmd_write(
+            req.headers, config);
+    }
+#endif
     (*d_)(req);
     http::prepare(req, http::connection::upgrade);
     return req;
@@ -129,6 +146,19 @@ build_response(http::request<Body, Headers> const& req)
         }
     }
     http::response<http::string_body> res;
+    {
+        detail::pmd_offer offer;
+        pmd_read(offer, req.headers);
+    #if ! PMD_ENABLED
+        offer.accept = false;
+    #endif
+        if(offer.accept && pmd_opts_.enable)
+        {
+            detail::pmd_offer unused;
+            pmd_negotiate(
+                res.headers, unused, offer, pmd_opts_);
+        }
+    }
     res.status = 101;
     res.reason = http::reason_string(res.status);
     res.version = req.version;
@@ -167,30 +197,12 @@ do_response(http::response<Body, Headers> const& res,
     if(res.headers["Sec-WebSocket-Accept"] !=
         detail::make_sec_ws_accept(key))
         return fail();
+    detail::pmd_offer offer;
+    pmd_read(offer, res.headers);
+    // VFALCO see if offer satisfies pmd_config_,
+    //        return an error if not.
+    pmd_config_ = offer; // overwrite for now
     open(detail::role_type::client);
-}
-
-template<class NextLayer>
-void
-stream<NextLayer>::
-do_read_fh(detail::frame_streambuf& fb,
-    close_code::value& code, error_code& ec)
-{
-    fb.commit(boost::asio::read(
-        stream_, fb.prepare(2), ec));
-    if(ec)
-        return;
-    auto const n = read_fh1(fb, code);
-    if(code != close_code::none)
-        return;
-    if(n > 0)
-    {
-        fb.commit(boost::asio::read(
-            stream_, fb.prepare(n), ec));
-        if(ec)
-            return;
-    }
-    read_fh2(fb, code);
 }
 
 } // websocket

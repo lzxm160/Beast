@@ -97,10 +97,35 @@ endfunction()
 include_directories (extras)
 include_directories (include)
 
+set(ZLIB_SOURCES
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/crc32.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/deflate.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inffast.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inffixed.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inflate.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inftrees.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/trees.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/zlib.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/zutil.h
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/adler32.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/compress.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/crc32.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/deflate.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/infback.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inffast.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inflate.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/inftrees.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/trees.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/uncompr.c
+    ${PROJECT_SOURCE_DIR}/test/zlib/zlib-1.2.8/zutil.c
+)
+
 file(GLOB_RECURSE BEAST_INCLUDES
     ${PROJECT_SOURCE_DIR}/include/beast/*.hpp
     ${PROJECT_SOURCE_DIR}/include/beast/*.ipp
 )
+
+set(BEAST_INCLUDES ${BEAST_INCLUDES} ${ZLIB_SOURCES})
 
 file(GLOB_RECURSE EXTRAS_INCLUDES
     ${PROJECT_SOURCE_DIR}/extras/beast/*.hpp
