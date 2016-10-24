@@ -516,6 +516,7 @@ protected:
     template<class = void> void doReset             (int level, int windowBits, int memLevel, Strategy strategy);
     template<class = void> void doReset             ();
     template<class = void> void doClear             ();
+    template<class = void> std::size_t doUpperBound (std::size_t sourceLen) const;
     template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
     template<class = void> void doParams            (z_params& zs, int level, Strategy strategy, error_code& ec);
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
@@ -647,6 +648,30 @@ doClear()
 {
     inited_ = false;
     buf_.reset();
+}
+
+template<class>
+std::size_t
+deflate_stream_base::
+doUpperBound(std::size_t sourceLen) const
+{
+    std::size_t complen;
+    std::size_t wraplen;
+
+    /* conservative upper bound for compressed data */
+    complen = sourceLen +
+              ((sourceLen + 7) >> 3) + ((sourceLen + 63) >> 6) + 5;
+
+    /* compute wrapper length */
+    wraplen = 0;
+
+    /* if not default parameters, return conservative bound */
+    if(w_bits_ != 15 || hash_bits_ != 8 + 7)
+        return complen + wraplen;
+
+    /* default settings: return tight bound for that case */
+    return sourceLen + (sourceLen >> 12) + (sourceLen >> 14) +
+           (sourceLen >> 25) + 13 - 6 + wraplen;
 }
 
 template<class>

@@ -138,8 +138,21 @@ public:
         doClear();
     }
     
+    /** Returns the upper limit on the size of a compressed block.
+
+        This function makes a conservative estimate of the maximum number
+        of bytes needed to store the result of compressing a block of
+        data based on the current compression level and strategy.
+
+        @param bytes The size of the uncompressed data.
+
+        @return The maximum number of resulting compressed bytes.
+    */
     std::size_t
-    upper_bound(std::size_t sourceLen) const;
+    upper_bound(std::size_t sourceLen) const
+    {
+        return doUpperBound(sourceLen);
+    }
 
     /** Fine tune internal compression parameters.
 
@@ -409,7 +422,5 @@ using deflate_stream = basic_deflate_stream<std::allocator<std::uint8_t>>;
 
 } // zlib
 } // beast
-
-#include <beast/zlib/impl/basic_deflate_stream.ipp>
 
 #endif
