@@ -37,7 +37,6 @@ add_executable (zlib-tests
     ${ZLIB_SOURCES}
     ../../extras/beast/unit_test/main.cpp
     ztest.hpp
-    basic_inflate_stream.cpp
     deflate_stream.cpp
     error.cpp
     inflate_stream.cpp

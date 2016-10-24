@@ -35,15 +35,55 @@
 #ifndef BEAST_ZLIB_INFLATE_STREAM_HPP
 #define BEAST_ZLIB_INFLATE_STREAM_HPP
 
-#include <beast/zlib/basic_inflate_stream.hpp>
-#include <cstdint>
-#include <memory>
+#include <beast/zlib/detail/inflate_stream.hpp>
 
 namespace beast {
 namespace zlib {
 
-using inflate_stream =
-    basic_inflate_stream<std::allocator<std::uint8_t>>;
+/** Raw deflate decompressor.
+
+    This is a port of ZLib's "inflate" functionality to C++.
+*/
+class inflate_stream
+    : private detail::inflate_stream
+{
+public:
+    /** Construct a raw deflate decompression stream.
+
+        The window size is set to the default of 15 bits.
+    */
+    inflate_stream() = default;
+
+    /** Reset the stream.
+
+        This puts the stream in a newly constructed state with the
+        specified window size, but without de-allocating any dynamically
+        created structures.
+    */
+    void
+    reset(int windowBits)
+    {
+        doReset(windowBits);
+    }
+
+    /** Put the stream in a newly constructed state.
+
+        All dynamically allocated memory is de-allocated.
+    */
+    void
+    clear()
+    {
+        doClear();
+    }
+
+    /** Decompressed data.
+    */
+    void
+    write(z_params& zs, Flush flush, error_code& ec)
+    {
+        doWrite(zs, flush, ec);
+    }
+};
 
 } // zlib
 } // beast
