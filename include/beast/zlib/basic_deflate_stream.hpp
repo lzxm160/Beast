@@ -106,7 +106,10 @@ public:
         int level,
         int windowBits,
         int memLevel,
-        Strategy strategy);
+        Strategy strategy)
+    {
+        doReset(level, windowBits, memLevel, strategy);
+    }
 
     /** Reset the stream without deallocating memory.
 

@@ -512,6 +512,7 @@ protected:
             init();
     }
 
+    template<class = void> void doReset             (int level, int windowBits, int memLevel, Strategy strategy);
     template<class = void> void doReset             ();
     template<class = void> void doClear             ();
     template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
@@ -589,6 +590,77 @@ protected:
 };
 
 //--------------------------------------------------------------------------
+
+template<class>
+void
+deflate_stream_base::
+doReset(
+    int level,
+    int windowBits,
+    int memLevel,
+    Strategy strategy)
+{
+    if(level == Z_DEFAULT_COMPRESSION)
+        level = 6;
+
+    // VFALCO What do we do about this?
+    // until 256-byte window bug fixed
+    if(windowBits == 8)
+        windowBits = 9;
+
+    if(level < 0 || level > 9)
+        throw std::invalid_argument{"invalid level"};
+
+    if(windowBits < 8 || windowBits > 15)
+        throw std::invalid_argument{"invalid windowBits"};
+
+    if(memLevel < 1 || memLevel > MAX_MEM_LEVEL)
+        throw std::invalid_argument{"invalid memLevel"};
+
+    /* We overlay pending_buf and d_buf+l_buf. This works since the average
+     * output size for (length,distance) codes is <= 24 bits.
+     */
+    std::uint16_t* overlay;
+
+    w_bits_ = windowBits;
+    w_size_ = 1 << w_bits_;
+    w_mask_ = w_size_ - 1;
+
+    hash_bits_ = memLevel + 7;
+    hash_size_ = 1 << hash_bits_;
+    hash_mask_ = hash_size_ - 1;
+    hash_shift_ =  ((hash_bits_+limits::minMatch-1)/limits::minMatch);
+
+    // 16K elements by default
+    lit_bufsize_ = 1 << (memLevel + 6);
+
+    {
+        auto const nwindow  = w_size_ * 2*sizeof(Byte);
+        auto const nprev    = w_size_ * sizeof(std::uint16_t);
+        auto const nhead    = hash_size_ * sizeof(std::uint16_t);
+        auto const noverlay = lit_bufsize_ * (sizeof(std::uint16_t)+2);
+        
+        buf_.reset(new std::uint8_t[nwindow + nprev + nhead + noverlay]);
+
+        window_ = reinterpret_cast<Byte*>(buf_.get());
+        prev_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow);
+        head_   = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev);
+        overlay = reinterpret_cast<std::uint16_t*>(buf_.get() + nwindow + nprev + nhead);
+    }
+
+    high_water_ = 0;      /* nothing written to window_ yet */
+
+    pending_buf_ = (std::uint8_t *) overlay;
+    pending_buf_size_ = (std::uint32_t)lit_bufsize_ * (sizeof(std::uint16_t)+2L);
+
+    d_buf_ = overlay + lit_bufsize_/sizeof(std::uint16_t);
+    l_buf_ = pending_buf_ + (1+sizeof(std::uint16_t))*lit_bufsize_;
+
+    level_ = level;
+    strategy_ = strategy;
+
+    doReset();
+}
 
 template<class>
 void
