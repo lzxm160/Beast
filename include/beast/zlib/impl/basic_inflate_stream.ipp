@@ -71,8 +71,6 @@ reset(int windowBits)
     mode_ = HEAD;
     last_ = 0;
     dmax_ = 32768U;
-    hold_ = 0;
-    bits_ = 0;
     lencode_ = codes_;
     distcode_ = codes_;
     next_ = codes_;

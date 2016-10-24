@@ -135,10 +135,6 @@ private:
     // sliding window
     detail::window w_;
 
-    // bit accumulator
-    unsigned long hold_ = 0;        // input bit accumulator
-    unsigned bits_ = 0;             // number of bits in "in"
-
     // for string and stored block copying
     unsigned length_;               // literal or length of data to copy
     unsigned offset_;               // distance back to copy string from
