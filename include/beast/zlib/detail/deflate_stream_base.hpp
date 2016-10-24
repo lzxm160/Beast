@@ -709,7 +709,7 @@ doParams(z_params& zs, int level, Strategy strategy, error_code& ec)
         zs.total_in != 0)
     {
         // Flush the last buffer:
-        write(zs, Flush::block, ec);
+        doWrite(zs, Flush::block, ec);
         if(ec == error::need_buffers && pending_ == 0)
             ec = {};
     }
@@ -870,8 +870,6 @@ deflate_stream_base::
 doDictionary(Byte const* dict, uInt dictLength)
 {
     uInt str, n;
-    unsigned avail;
-    const unsigned char *next;
 
     if(lookahead_)
         return Z_STREAM_ERROR;

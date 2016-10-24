@@ -100,7 +100,6 @@ unit-test zlib-tests :
     zlib/zlib-1.2.8/trees.c
     zlib/zlib-1.2.8/uncompr.c
     zlib/zlib-1.2.8/zutil.c
-    zlib/basic_deflate_stream.cpp
     zlib/basic_inflate_stream.cpp
     zlib/deflate_stream.cpp
     zlib/error.cpp
