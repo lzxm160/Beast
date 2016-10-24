@@ -37,7 +37,6 @@
 
 #include <beast/zlib/error.hpp>
 #include <beast/zlib/zlib.hpp>
-#include <beast/zlib/detail/deflate.hpp>
 #include <beast/zlib/detail/deflate_stream.hpp>
 #include <algorithm>
 #include <cstdlib>
