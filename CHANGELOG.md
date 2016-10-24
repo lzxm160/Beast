@@ -2,11 +2,21 @@
 
 * Check invariants in parse_op:
 * Increase optimization settings for MSVC builds
+* Add zlib module
+
+HTTP
+
 * Clean up message docs
+
+WebSocket
+
+* Fix write_frame masking and auto-fragment handling
+
+Extras
+
 * unit_test::suite fixes:
   - New overload of fail() specifies file and line
   - BEAST_EXPECTS only evaluates the reason string on a failure
-* Add zlib module
 
 --------------------------------------------------------------------------------
 
