@@ -125,6 +125,7 @@ public:
     }
 };
 
+// Lots of repeats, limited char range
 inline
 std::string
 corpus1(std::size_t n)
@@ -146,6 +147,20 @@ corpus1(std::size_t n)
         s.insert(s.end(), rep, ch);
     }
     s.resize(n);
+    return s;
+}
+
+// Random data
+inline
+std::string
+corpus2(std::size_t n)
+{
+    std::string s;
+    s.reserve(n);
+    std::mt19937 g;
+    std::uniform_int_distribution<std::uint32_t> d0{0, 255};
+    while(n--)
+        s.push_back(static_cast<char>(d0(g)));
     return s;
 }
 

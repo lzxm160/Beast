@@ -19,372 +19,65 @@ namespace zlib {
 class inflate_stream_test : public beast::unit_test::suite
 {
 public:
-    using self = inflate_stream_test;
-    typedef void(self::*pmf_t)(
-        int windowBits, std::string const& in, std::string const& check);
-
     //--------------------------------------------------------------------------
 
-    //
-    // Decompress in a single step using Z_SYNC_FLUSH
-    //
-
-    void
-    doInflate1_zlib(int windowBits,
-        std::string const& in, std::string const& check)
+    enum Split
     {
-        int result;
-        std::string out;
-        out.resize(check.size() + 1);
-        ::z_stream zs;
-        memset(&zs, 0, sizeof(zs));
-        result = inflateInit2(&zs, -windowBits);
-        if(! BEAST_EXPECT(result == Z_OK))
-            goto err;
-        zs.next_in = (Bytef*)in.data();
-        zs.avail_in = static_cast<uInt>(in.size());
-        zs.next_out = (Bytef*)out.data();
-        zs.avail_out = static_cast<uInt>(out.size());
+        once,
+        half,
+        full
+    };
+
+    class Beast
+    {
+        Split in_;
+        Split check_;
+        Flush flush_;
+
+    public:
+        Beast(Split in, Split check, Flush flush = Flush::sync)
+            : in_(in)
+            , check_(check)
+            , flush_(flush)
         {
-            bool progress = true;
-            for(;;)
-            {
-                result = inflate(&zs, Z_SYNC_FLUSH);
-                if( result == Z_BUF_ERROR ||
-                    result == Z_STREAM_END) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECT(progress))
-                    goto err;
-                progress = false;
-            }
         }
 
-    fin:
-        out.resize(zs.total_out);
-        BEAST_EXPECT(out == check);
-
-    err:
-        inflateEnd(&zs);
-    }
-
-    void
-    doInflate1_beast(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        std::string out;
-        out.resize(check.size() + 1);
-        z_params zs;
-        zs.next_in = in.data();
-        zs.avail_in = in.size();
-        zs.next_out = &out[0];
-        zs.avail_out = out.size();
-        inflate_stream is;
-        is.reset(windowBits);
+        void
+        operator()(
+            int window,
+            std::string const& in,
+            std::string const& check,
+            unit_test::suite& suite) const
         {
-            bool progress = true;
-            for(;;)
+            auto const f =
+            [&](std::size_t i, std::size_t j)
             {
-                error_code ec;
-                is.write(zs, Flush::sync, ec);
-                if( ec == error::need_buffers ||
-                    ec == error::end_of_stream) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECTS(! ec, ec.message()))
-                    goto err;
-                if(! BEAST_EXPECT(progress))
-                    goto err;
-                progress = false;
-            }
-        }
-
-    fin:
-        out.resize(zs.total_out);
-        BEAST_EXPECT(out == check);
-    err:
-        ;
-    }
-
-    //--------------------------------------------------------------------------
-
-    //
-    // Decompress the input in two pieces, using Z_BLOCK
-    //
-
-    void
-    doInflate2_zlib(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            int result;
-            std::string out;
-            out.resize(check.size() + 1);
-            ::z_stream zs;
-            memset(&zs, 0, sizeof(zs));
-            result = inflateInit2(&zs, -windowBits);
-            if(! BEAST_EXPECT(result == Z_OK))
-                continue;
-            zs.next_in = (Bytef*)in.data();
-            zs.avail_in = static_cast<uInt>(i);
-            zs.next_out = (Bytef*)out.data();
-            zs.avail_out = static_cast<uInt>(out.size());
-            bool b = false;
-            for(;;)
-            {
-                result = inflate(&zs, Z_BLOCK);
-                if( result == Z_BUF_ERROR ||
-                    result == Z_STREAM_END) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECT(result == Z_OK))
-                    goto err;
-                if(zs.avail_in == 0 && ! b)
-                {
-                    b = true;
-                    zs.avail_in = static_cast<uInt>(in.size() - i);
-                }
-            }
-
-        fin:
-            out.resize(zs.total_out);
-            BEAST_EXPECT(out == check);
-
-        err:
-            inflateEnd(&zs);
-        }
-    }
-
-    void
-    doInflate2_beast(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            std::string out;
-            out.resize(check.size() + 1);
-            z_params zs;
-            zs.next_in = in.data();
-            zs.avail_in = i;
-            zs.next_out = &out[0];
-            zs.avail_out = out.size();
-            inflate_stream is;
-            is.reset(windowBits);
-            bool b = false;
-            for(;;)
-            {
-                error_code ec;
-                is.write(zs, Flush::block, ec);
-                if( ec == error::need_buffers ||
-                    ec == error::end_of_stream) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECTS(! ec, ec.message()))
-                    goto err;
-                if(zs.avail_in == 0 && ! b)
-                {
-                    b = true;
-                    zs.avail_in = in.size() - i;
-                }
-            }
-
-        fin:
-            out.resize(zs.total_out);
-            BEAST_EXPECT(out == check);
-
-        err:
-            ;
-        }
-    }
-
-    //--------------------------------------------------------------------------
-
-    //
-    // Decompress the input in two pieces, using Z_TREES
-    //
-
-    void
-    doInflate3_zlib(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            int result;
-            std::string out;
-            out.resize(check.size() + 1);
-            ::z_stream zs;
-            memset(&zs, 0, sizeof(zs));
-            result = inflateInit2(&zs, -windowBits);
-            if(! BEAST_EXPECT(result == Z_OK))
-                continue;
-            zs.next_in = (Bytef*)in.data();
-            zs.avail_in = static_cast<uInt>(i);
-            zs.next_out = (Bytef*)out.data();
-            zs.avail_out = static_cast<uInt>(out.size());
-            bool b = false;
-            for(;;)
-            {
-                result = inflate(&zs, Z_TREES);
-                if( result == Z_BUF_ERROR ||
-                    result == Z_STREAM_END) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECT(result == Z_OK))
-                    goto err;
-                if(zs.avail_in == 0 && ! b)
-                {
-                    b = true;
-                    zs.avail_in = static_cast<uInt>(in.size() - i);
-                }
-            }
-
-        fin:
-            out.resize(zs.total_out);
-            BEAST_EXPECT(out == check);
-
-        err:
-            inflateEnd(&zs);
-        }
-    }
-
-    void
-    doInflate3_beast(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            std::string out;
-            out.resize(check.size() + 1);
-            z_params zs;
-            zs.next_in = in.data();
-            zs.avail_in = i;
-            zs.next_out = &out[0];
-            zs.avail_out = out.size();
-            inflate_stream is;
-            is.reset(windowBits);
-            bool b = false;
-            for(;;)
-            {
-                error_code ec;
-                is.write(zs, Flush::trees, ec);
-                if( ec == error::need_buffers ||
-                    ec == error::end_of_stream) // per zlib FAQ
-                    goto fin;
-                if(! BEAST_EXPECTS(! ec, ec.message()))
-                    goto err;
-                if(zs.avail_in == 0 && ! b)
-                {
-                    b = true;
-                    zs.avail_in = in.size() - i;
-                }
-            }
-
-        fin:
-            out.resize(zs.total_out);
-            BEAST_EXPECT(out == check);
-
-        err:
-            ;
-        }
-    }
-
-    //--------------------------------------------------------------------------
-
-    //
-    // Decompress with input and output each broken into
-    // two pieces, using Z_SYNC_FLUSH (this is CPU intensive)
-    //
-
-    void
-    doInflate4_zlib(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            for(std::size_t j = 1; j < check.size(); ++j)
-            {
-                int result;
-                std::string out;
-                out.resize(check.size() + 1);
-                ::z_stream zs;
-                memset(&zs, 0, sizeof(zs));
-                result = inflateInit2(&zs, -windowBits);
-                if(! BEAST_EXPECT(result == Z_OK))
-                    continue;
-                zs.next_in = (Bytef*)in.data();
-                zs.avail_in = static_cast<uInt>(i);
-                zs.next_out = (Bytef*)out.data();
-                zs.avail_out = static_cast<uInt>(j);
-                bool bi = false;
-                bool bo = false;
-                for(;;)
-                {
-                    result = inflate(&zs, Z_SYNC_FLUSH);
-                    if( result == Z_BUF_ERROR ||
-                        result == Z_STREAM_END) // per zlib FAQ
-                        goto fin;
-                    if(! BEAST_EXPECT(result == Z_OK))
-                        goto err;
-                    if(zs.avail_in == 0 && ! bi)
-                    {
-                        bi = true;
-                        zs.avail_in =
-                            static_cast<uInt>(in.size() - i);
-                    }
-                    if(zs.avail_out == 0 && ! bo)
-                    {
-                        bo = true;
-                        zs.avail_out =
-                            static_cast<uInt>(check.size() - j);
-                    }
-                }
-
-            fin:
-                out.resize(zs.total_out);
-                BEAST_EXPECT(out == check);
-
-            err:
-                inflateEnd(&zs);
-            }
-        }
-    }
-
-    void
-    doInflate4_beast(int windowBits,
-        std::string const& in, std::string const& check)
-    {
-        BEAST_EXPECT(in.size() > 1);
-        BEAST_EXPECT(check.size() > 1);
-        for(std::size_t i = 1; i < in.size(); ++i)
-        {
-            for(std::size_t j = 1; j < check.size(); ++j)
-            {
-                std::string out;
-                out.resize(check.size() + 1);
+                std::string out(check.size(), 0);
                 z_params zs;
                 zs.next_in = in.data();
-                zs.avail_in = static_cast<uInt>(i);
                 zs.next_out = &out[0];
-                zs.avail_out = static_cast<uInt>(j);
+                zs.avail_in = i;
+                zs.avail_out = j;
                 inflate_stream is;
-                is.reset(windowBits);
-                bool bi = false;
-                bool bo = false;
+                is.reset(window);
+                bool bi = ! (i < in.size());
+                bool bo = ! (j < check.size());
                 for(;;)
                 {
                     error_code ec;
-                    is.write(zs, Flush::sync, ec);
+                    is.write(zs, flush_, ec);
                     if( ec == error::need_buffers ||
-                        ec == error::end_of_stream) // per zlib FAQ
-                        goto fin;
-                    if(! BEAST_EXPECTS(! ec, ec.message()))
-                        goto err;
+                        ec == error::end_of_stream)
+                    {
+                        out.resize(zs.total_out);
+                        suite.expect(out == check, __FILE__, __LINE__);
+                        break;
+                    }
+                    if(ec)
+                    {
+                        suite.fail(ec.message(), __FILE__, __LINE__);
+                        break;
+                    }
                     if(zs.avail_in == 0 && ! bi)
                     {
                         bi = true;
@@ -396,102 +89,296 @@ public:
                         zs.avail_out = check.size() - j;
                     }
                 }
+            };
 
-            fin:
-                out.resize(zs.total_out);
-                BEAST_EXPECT(out == check);
+            std::size_t i0, i1;
+            std::size_t j0, j1;
 
-            err:
-                ;
-            }
-        }
-    }
-
-    //--------------------------------------------------------------------------
-
-    //
-    // Calls a decompression test function with all possible
-    // compressed versions of the specified check plaintext
-    //
-
-    void
-    doMatrix(std::string const& label,
-        std::string const& check, pmf_t pmf)
-    {
-        using namespace std::chrono;
-        using clock_type = steady_clock;
-        auto const when = clock_type::now();
-        for(int level = 0; level <= 9; ++level)
-        {
-            for(int windowBits = 8; windowBits <= 9; ++windowBits)
+            switch(in_)
             {
-                for(int strategy = 0; strategy <= 4; ++strategy)
+            default:
+            case once: i0 = in.size();     i1 = i0;         break;
+            case half: i0 = in.size() / 2; i1 = i0;         break;
+            case full: i0 = 1;             i1 = in.size();  break;
+            }
+
+            switch(check_)
+            {
+            default:
+            case once: j0 = check.size();     j1 = j0;              break;
+            case half: j0 = check.size() / 2; j1 = j0;              break;
+            case full: j0 = 1;                j1 = check.size();    break;
+            }
+
+            for(std::size_t i = i0; i <= i1; ++i)
+                for(std::size_t j = j0; j <= j1; ++j)
+                    f(i, j);
+        }
+    };
+
+    class ZLib
+    {
+        Split in_;
+        Split check_;
+        int flush_;
+
+    public:
+        ZLib(Split in, Split check, int flush = Z_SYNC_FLUSH)
+            : in_(in)
+            , check_(check)
+            , flush_(flush)
+        {
+        }
+
+        void
+        operator()(
+            int window,
+            std::string const& in,
+            std::string const& check,
+            unit_test::suite& suite) const
+        {
+            auto const f =
+            [&](std::size_t i, std::size_t j)
+            {
+                int result;
+                std::string out(check.size(), 0);
+                ::z_stream zs;
+                memset(&zs, 0, sizeof(zs));
+                result = inflateInit2(&zs, -window);
+                if(result != Z_OK)
                 {
-                    z_deflator zd;
-                    zd.level(level);
-                    zd.windowBits(windowBits);
-                    zd.strategy(strategy);
-                    auto const in = zd(check);
-                    (this->*pmf)(windowBits, in, check);
+                    suite.fail("! Z_OK", __FILE__, __LINE__);
+                    return;
+                }
+                zs.next_in = (Bytef*)in.data();
+                zs.next_out = (Bytef*)out.data();
+                zs.avail_in = static_cast<uInt>(i);
+                zs.avail_out = static_cast<uInt>(j);
+                bool bi = ! (i < in.size());
+                bool bo = ! (j < check.size());
+                for(;;)
+                {
+                    result = inflate(&zs, flush_);
+                    if( result == Z_BUF_ERROR ||
+                        result == Z_STREAM_END) // per zlib FAQ
+                    {
+                        out.resize(zs.total_out);
+                        suite.expect(out == check, __FILE__, __LINE__);
+                        break;
+                    }
+                    if(result != Z_OK)
+                    {
+                        suite.fail("! Z_OK", __FILE__, __LINE__);
+                        break;
+                    }
+                    if(zs.avail_in == 0 && ! bi)
+                    {
+                        bi = true;
+                        zs.avail_in = static_cast<uInt>(in.size() - i);
+                    }
+                    if(zs.avail_out == 0 && ! bo)
+                    {
+                        bo = true;
+                        zs.avail_out = static_cast<uInt>(check.size() - j);
+                    }
+                }
+                inflateEnd(&zs);
+            };
+
+            std::size_t i0, i1;
+            std::size_t j0, j1;
+
+            switch(in_)
+            {
+            default:
+            case once: i0 = in.size();     i1 = i0;         break;
+            case half: i0 = in.size() / 2; i1 = i0;         break;
+            case full: i0 = 1;             i1 = in.size();  break;
+            }
+
+            switch(check_)
+            {
+            default:
+            case once: j0 = check.size();     j1 = j0;              break;
+            case half: j0 = check.size() / 2; j1 = j0;              break;
+            case full: j0 = 1;                j1 = check.size();    break;
+            }
+
+            for(std::size_t i = i0; i <= i1; ++i)
+                for(std::size_t j = j0; j <= j1; ++j)
+                    f(i, j);
+        }
+    };
+
+    class Matrix
+    {
+        unit_test::suite& suite_;
+
+        int level_[2];
+        int window_[2];
+        int strategy_[2];
+
+    public:
+        explicit
+        Matrix(unit_test::suite& suite)
+            : suite_(suite)
+        {
+            level_[0] = 0;
+            level_[1] = 9;
+            window_[0] = 8;
+            window_[1] = 15;
+            strategy_[0] = 0;
+            strategy_[1] = 4;
+        }
+
+        void
+        level(int from, int to)
+        {
+            level_[0] = from;
+            level_[1] = to;
+        }
+
+        void
+        level(int what)
+        {
+            level(what, what);
+        }
+
+        void
+        window(int from, int to)
+        {
+            window_[0] = from;
+            window_[1] = to;
+        }
+
+        void
+        window(int what)
+        {
+            window(what, what);
+        }
+
+        void
+        strategy(int from, int to)
+        {
+            strategy_[0] = from;
+            strategy_[1] = to;
+        }
+
+        void
+        strategy(int what)
+        {
+            strategy(what, what);
+        }
+
+        template<class F>
+        void
+        operator()(
+            std::string label,
+            F const& f,
+            std::string const& check) const
+        {
+            using namespace std::chrono;
+            using clock_type = steady_clock;
+            auto const when = clock_type::now();
+
+            for(auto level = level_[0];
+                level <= level_[1]; ++level)
+            {
+                for(auto window = window_[0];
+                    window <= window_[1]; ++window)
+                {
+                    for(auto strategy = strategy_[0];
+                        strategy <= strategy_[1]; ++strategy)
+                    {
+                        z_deflator zd;
+                        zd.level(level);
+                        zd.windowBits(window);
+                        zd.strategy(strategy);
+                        auto const in = zd(check);
+                        f(window, in, check, suite_);
+                    }
                 }
             }
+            auto const elapsed = clock_type::now() - when;
+            suite_.log <<
+                label << ": " <<
+                duration_cast<
+                    milliseconds>(elapsed).count() << "ms\n";
+            suite_.log.flush();
         }
-        auto const elapsed = clock_type::now() - when;
-        log <<
-            label << ": " <<
-            duration_cast<
-                milliseconds>(elapsed).count() << "ms\n";
-        log.flush();
-    }
+    };
 
     void
     testInflate()
     {
-        auto const s1 = corpus1(300);
         {
-            doMatrix("1.zlib  ", "Hello, world!", &self::doInflate1_zlib);
-            doMatrix("1.beast ", "Hello, world!", &self::doInflate1_beast);
+            Matrix m{*this};
+            auto const check = corpus1(50000);
+            m("1. beast", Beast{half, half}, check);
+            m("1. zlib ", ZLib {half, half}, check);
         }
         {
-            doMatrix("2.zlib  ", "Hello, world!", &self::doInflate2_zlib);
-            doMatrix("2.beast ", "Hello, world!", &self::doInflate2_beast);
+            Matrix m{*this};
+            auto const check = corpus2(50000);
+            m("2. beast", Beast{half, half}, check);
+            m("2. zlib ", ZLib {half, half}, check);
         }
         {
-            doMatrix("3.zlib  ", s1, &self::doInflate1_zlib);
-            doMatrix("3.beast ", s1, &self::doInflate1_beast);
+            Matrix m{*this};
+            auto const check = corpus1(10000);
+            m.level(6);
+            m.window(9);
+            m.strategy(Z_DEFAULT_STRATEGY);
+            m("3. beast", Beast{once, full}, check);
+            m("3. zlib ", ZLib {once, full}, check);
         }
         {
-            doMatrix("4.zlib  ", s1, &self::doInflate2_zlib);
-            doMatrix("4.beast ", s1, &self::doInflate2_beast);
+            Matrix m{*this};
+            auto const check = corpus2(10000);
+            m.level(6);
+            m.window(9);
+            m.strategy(Z_DEFAULT_STRATEGY);
+            m("4. beast", Beast{once, full}, check);
+            m("4. zlib ", ZLib {once, full}, check);
         }
         {
-            doMatrix("5.zlib  ", s1, &self::doInflate3_zlib);
-            doMatrix("5.beast ", s1, &self::doInflate3_beast);
+            Matrix m{*this};
+            m.level(6);
+            m.window(9);
+            auto const check = corpus1(200);
+            m("5. beast", Beast{full, full}, check);
+            m("5. zlib ", ZLib {full, full}, check);
+        }
+        {
+            Matrix m{*this};
+            m.level(6);
+            m.window(9);
+            auto const check = corpus2(500);
+            m("6. beast", Beast{full, full}, check);
+            m("6. zlib ", ZLib {full, full}, check);
+        }
+        {
+            Matrix m{*this};
+            auto const check = corpus2(10000);
+            m.level(6);
+            m.window(9);
+            m.strategy(Z_DEFAULT_STRATEGY);
+            m("7. beast", Beast{full, once, Flush::block}, check);
+            m("7. zlib ", ZLib {full, once, Z_BLOCK}, check);
         }
 
+        // VFALCO This fails?
+#if 0
         {
-            doMatrix("6.zlib  ",
-                "iEYEARECAAYFAjdY"
-                "CQoACgkQJ9S6ULt1"
-                "dqz6IwCfQ7wP6i/i"
-                "8HhbcOSKF4ELyQB1"
-                "oCoAoOuqpRqEzr4k"
-                "OkQqHRLE/b8/Rw2k",
-                    &self::doInflate4_zlib);
-            doMatrix("6.beast ",
-                "iEYEARECAAYFAjdY"
-                "CQoACgkQJ9S6ULt1"
-                "dqz6IwCfQ7wP6i/i"
-                "8HhbcOSKF4ELyQB1"
-                "oCoAoOuqpRqEzr4k"
-                "OkQqHRLE/b8/Rw2k",
-                    &self::doInflate4_beast);
+            Matrix m{*this};
+            auto const check = corpus2(10000);
+            m.level(6);
+            m.window(9);
+            m.strategy(Z_DEFAULT_STRATEGY);
+            m("8. beast", Beast{full, once, Flush::trees}, check);
+            m("8. zlib ", ZLib {full, once, Z_TREES}, check);
         }
-        {
-            auto const s = corpus1(260);
-            doMatrix("7.zlib  ", s, &self::doInflate4_zlib);
-            doMatrix("7.beast ", s, &self::doInflate4_beast);
-        }
+#endif
     }
 
     void
