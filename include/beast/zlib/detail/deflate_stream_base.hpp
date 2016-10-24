@@ -167,6 +167,7 @@ protected:
 
     deflate_tables const& lut_;
 
+    bool inited_ = false;
     std::unique_ptr<std::uint8_t[]> buf_;
 
     int status_;                    // as the name implies
@@ -504,6 +505,13 @@ protected:
         }
     }
 
+    void
+    maybe_init()
+    {
+        if(! inited_)
+            init();
+    }
+
     template<class = void> void doReset             ();
     template<class = void> void doClear             ();
     template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
@@ -512,6 +520,7 @@ protected:
     template<class = void> int  doPrime             (int bits, int value);
     template<class = void> void doPending           (unsigned* value, int* bits);
 
+    template<class = void> void init                ();
     template<class = void> void lm_init             ();
     template<class = void> void init_block          ();
     template<class = void> void pqdownheap          (detail::ct_data const* tree, int k);
@@ -848,6 +857,15 @@ doPending(unsigned* value, int* bits)
 }
 
 //--------------------------------------------------------------------------
+
+// Do lazy initialization
+template<class>
+void
+deflate_stream_base::
+init()
+{
+    inited_ = true;
+}
 
 /*  Initialize the "longest match" routines for a new zlib stream
 */

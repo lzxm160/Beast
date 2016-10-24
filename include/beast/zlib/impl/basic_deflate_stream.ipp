@@ -42,8 +42,7 @@ template<class Allocator>
 basic_deflate_stream<Allocator>::
 basic_deflate_stream()
 {
-    // default level 6
-    //reset(this, 6, 15, DEF_MEM_LEVEL, Strategy::normal);
+    //reset(6, 15, DEF_MEM_LEVEL, Strategy::normal);
 }
 
 template<class Allocator>

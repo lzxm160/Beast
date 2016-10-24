@@ -70,12 +70,33 @@ class basic_deflate_stream
     : private detail::deflate_stream_base
 {
 public:
+    /** Construct a default deflate stream.
+
+        Upon construction, the stream settings will be set
+        to these default values:
+
+        @li `level = 6`
+
+        @li `windowBits = 15`
+
+        @li `memLevel = 8`
+
+        @li `strategy = Strategy::normal`
+
+        Although the stream is ready to be used immediately
+        after construction, any required internal buffers are
+        not dynamically allocated until needed.
+    */
     basic_deflate_stream();
 
     /** Reset the stream and compression settings.
 
         This function initializes the stream to the specified
         compression settings.
+
+        Although the stream is ready to be used immediately
+        after a reset, any required internal buffers are not
+        dynamically allocated until needed.
 
         @note Any unprocessed input or pending output from previous
         calls are discarded.
