@@ -520,7 +520,7 @@ protected:
     template<class = void> void doTune              (int good_length, int max_lazy, int nice_length, int max_chain);
     template<class = void> void doParams            (z_params& zs, int level, Strategy strategy, error_code& ec);
     template<class = void> void doWrite             (z_params& zs, Flush flush, error_code& ec);
-    template<class = void> int  doDictionary        (Byte const* dict, uInt dictLength);
+    template<class = void> void doDictionary        (Byte const* dict, uInt dictLength, error_code& ec);
     template<class = void> void doPrime             (int bits, int value, error_code& ec);
     template<class = void> void doPending           (unsigned* value, int* bits);
 
@@ -865,14 +865,15 @@ doWrite(z_params& zs, Flush flush, error_code& ec)
 }
 
 template<class>
-int
+void
 deflate_stream_base::
-doDictionary(Byte const* dict, uInt dictLength)
+doDictionary(Byte const* dict, uInt dictLength, error_code& ec)
 {
-    uInt str, n;
-
     if(lookahead_)
-        return Z_STREAM_ERROR;
+    {
+        ec = error::stream_error;
+        return;
+    }
 
     maybe_init();
 
@@ -896,8 +897,8 @@ doDictionary(Byte const* dict, uInt dictLength)
     fill_window(zs);
     while(lookahead_ >= limits::minMatch)
     {
-        str = strstart_;
-        n = lookahead_ - (limits::minMatch-1);
+        uInt str = strstart_;
+        uInt n = lookahead_ - (limits::minMatch-1);
         do
         {
             update_hash(ins_h_, window_[str + limits::minMatch-1]);
@@ -916,7 +917,6 @@ doDictionary(Byte const* dict, uInt dictLength)
     lookahead_ = 0;
     match_length_ = prev_length_ = limits::minMatch-1;
     match_available_ = 0;
-    return Z_OK;
 }
 
 template<class>

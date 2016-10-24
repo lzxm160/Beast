@@ -309,10 +309,10 @@ public:
         current implementation of deflate will use at most the window size
         minus 262 bytes of the provided dictionary.
     */
-    int
-    dictionary(Byte const* dict, uInt dictLength)
+    void
+    dictionary(Byte const* dict, uInt dictLength, error_code& ec)
     {
-        return doDictionary(dict, dictLength);
+        return doDictionary(dict, dictLength, ec);
     }
 
     /** Update the compression level and strategy.
