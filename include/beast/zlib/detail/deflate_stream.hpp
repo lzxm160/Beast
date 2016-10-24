@@ -817,7 +817,8 @@ deflate_stream::get_lut() ->
             for(std::uint8_t code = 0; code < lengthCodes-1; ++code)
             {
                 tables.base_length[code] = length;
-                for(std::size_t n = 0; n < (1U<<tables.extra_lbits[code]); ++n)
+                auto const run = 1U << tables.extra_lbits[code];
+                for(unsigned n = 0; n < run; ++n)
                     tables.length_code[length++] = code;
             }
             BOOST_ASSERT(length == 0);
@@ -833,7 +834,8 @@ deflate_stream::get_lut() ->
                 for(code = 0; code < 16; code++)
                 {
                     tables.base_dist[code] = dist;
-                    for(std::size_t n = 0; n < (1U<<tables.extra_dbits[code]); ++n)
+                    auto const run = 1U << tables.extra_dbits[code];
+                    for(unsigned n = 0; n < run; ++n)
                         tables.dist_code[dist++] = code;
                 }
                 BOOST_ASSERT(dist == 256);
@@ -842,7 +844,8 @@ deflate_stream::get_lut() ->
                 for(; code < dCodes; ++code)
                 {
                     tables.base_dist[code] = dist << 7;
-                    for(std::size_t n = 0; n < (1U<<(tables.extra_dbits[code]-7)); ++n)
+                    auto const run = 1U << (tables.extra_dbits[code]-7);
+                    for(std::size_t n = 0; n < run; ++n)
                         tables.dist_code[256 + dist++] = code;
                 }
                 BOOST_ASSERT(dist == 256);
@@ -851,7 +854,7 @@ deflate_stream::get_lut() ->
             // Construct the codes of the static literal tree
             std::uint16_t bl_count[maxBits+1];
             std::memset(bl_count, 0, sizeof(bl_count));
-            std::size_t n = 0;
+            unsigned n = 0;
             while (n <= 143)
                 tables.ltree[n++].dl = 8;
             bl_count[8] += 144;
@@ -871,7 +874,8 @@ deflate_stream::get_lut() ->
             for(n = 0; n < dCodes; ++n)
             {
                 tables.dtree[n].dl = 5;
-                tables.dtree[n].fc = bi_reverse(n, 5);
+                tables.dtree[n].fc =
+                    static_cast<std::uint16_t>(bi_reverse(n, 5));
             }
         }
     };
@@ -2647,7 +2651,8 @@ f_fast(z_params& zs, Flush flush) ->
             match_length_ = longest_match (hash_head);
             /* longest_match() sets match_start */
         }
-        if(match_length_ >= minMatch) {
+        if(match_length_ >= minMatch)
+        {
             tr_tally_dist(strstart_ - match_start_,
                            match_length_ - minMatch, bflush);
 
@@ -2659,15 +2664,18 @@ f_fast(z_params& zs, Flush flush) ->
             if(match_length_ <= max_lazy_match_ &&
                 lookahead_ >= minMatch) {
                 match_length_--; /* string at strstart already in table */
-                do {
+                do
+                {
                     strstart_++;
                     insert_string(hash_head);
                     /* strstart never exceeds WSIZE-maxMatch, so there are
                      * always minMatch bytes ahead.
                      */
-                } while(--match_length_ != 0);
+                }
+                while(--match_length_ != 0);
                 strstart_++;
-            } else
+            }
+            else
             {
                 strstart_ += match_length_;
                 match_length_ = 0;
@@ -2677,7 +2685,9 @@ f_fast(z_params& zs, Flush flush) ->
                  * matter since it will be recomputed at next deflate call.
                  */
             }
-        } else {
+        }
+        else
+        {
             /* No match, output a literal byte */
             Tracevv((stderr,"%c", window_[strstart_]));
             tr_tally_lit(window_[strstart_], bflush);
@@ -2730,21 +2740,21 @@ f_slow(z_params& zs, Flush flush) ->
          * for the next match, plus minMatch bytes to insert the
          * string following the next match.
          */
-        if(lookahead_ < kMinLookahead) {
+        if(lookahead_ < kMinLookahead)
+        {
             fill_window(zs);
-            if(lookahead_ < kMinLookahead && flush == Flush::none) {
+            if(lookahead_ < kMinLookahead && flush == Flush::none)
                 return need_more;
-            }
-            if(lookahead_ == 0) break; /* flush the current block */
+            if(lookahead_ == 0)
+                break; /* flush the current block */
         }
 
         /* Insert the string window[strstart .. strstart+2] in the
          * dictionary, and set hash_head to the head of the hash chain:
          */
         hash_head = 0;
-        if(lookahead_ >= minMatch) {
+        if(lookahead_ >= minMatch)
             insert_string(hash_head);
-        }
 
         /* Find the longest match, discarding those <= prev_length.
          */
@@ -2752,7 +2762,8 @@ f_slow(z_params& zs, Flush flush) ->
         match_length_ = minMatch-1;
 
         if(hash_head != 0 && prev_length_ < max_lazy_match_ &&
-            strstart_ - hash_head <= max_dist()) {
+            strstart_ - hash_head <= max_dist())
+        {
             /* To simplify the code, we prevent matches with the string
              * of window index 0 (in particular we have to avoid a match
              * of the string with itself at the start of the input file).
@@ -2763,8 +2774,8 @@ f_slow(z_params& zs, Flush flush) ->
             if(match_length_ <= 5 && (strategy_ == Strategy::filtered
                 || (match_length_ == minMatch &&
                     strstart_ - match_start_ > kTooFar)
-                )) {
-
+                ))
+            {
                 /* If prev_match is also minMatch, match_start is garbage
                  * but we will ignore the current match anyway.
                  */
@@ -2774,9 +2785,10 @@ f_slow(z_params& zs, Flush flush) ->
         /* If there was a match at the previous step and the current
          * match is not better, output the previous match:
          */
-        if(prev_length_ >= minMatch && match_length_ <= prev_length_) {
-            uInt max_insert = strstart_ + lookahead_ - minMatch;
+        if(prev_length_ >= minMatch && match_length_ <= prev_length_)
+        {
             /* Do not insert strings in hash table beyond this. */
+            uInt max_insert = strstart_ + lookahead_ - minMatch;
 
             tr_tally_dist(strstart_ -1 - prev_match_,
                            prev_length_ - minMatch, bflush);
@@ -2789,10 +2801,10 @@ f_slow(z_params& zs, Flush flush) ->
             lookahead_ -= prev_length_-1;
             prev_length_ -= 2;
             do {
-                if(++strstart_ <= max_insert) {
+                if(++strstart_ <= max_insert)
                     insert_string(hash_head);
-                }
-            } while(--prev_length_ != 0);
+            }
+            while(--prev_length_ != 0);
             match_available_ = 0;
             match_length_ = minMatch-1;
             strstart_++;
@@ -2804,20 +2816,24 @@ f_slow(z_params& zs, Flush flush) ->
                     return need_more;
             }
 
-        } else if(match_available_) {
+        }
+        else if(match_available_)
+        {
             /* If there was no match at the previous position, output a
              * single literal. If there was a match but the current match
              * is longer, truncate the previous match to a single literal.
              */
             Tracevv((stderr,"%c", window_[strstart_-1]));
             tr_tally_lit(window_[strstart_-1], bflush);
-            if(bflush) {
+            if(bflush)
                 flush_block(zs, false);
-            }
             strstart_++;
             lookahead_--;
-            if(zs.avail_out == 0) return need_more;
-        } else {
+            if(zs.avail_out == 0)
+                return need_more;
+        }
+        else
+        {
             /* There is no previous match to compare with, wait for
              * the next step to decide.
              */
@@ -2827,7 +2843,8 @@ f_slow(z_params& zs, Flush flush) ->
         }
     }
     Assert (flush != Flush::none, "no flush?");
-    if(match_available_) {
+    if(match_available_)
+    {
         Tracevv((stderr,"%c", window_[strstart_-1]));
         tr_tally_lit(window_[strstart_-1], bflush);
         match_available_ = 0;
