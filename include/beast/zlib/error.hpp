@@ -129,6 +129,11 @@ enum class error
 
     /// Incomplete length set
     incomplete_length_set,
+
+
+
+    /// general error
+    general
 };
 
 } // zlib

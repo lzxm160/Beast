@@ -83,6 +83,7 @@ public:
         case error::over_subscribed_length: return "over-subscribed length";
         case error::incomplete_length_set: return "incomplete length set";
 
+        case error::general:
         default:
             return "zlib error";
         }

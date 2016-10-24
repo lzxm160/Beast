@@ -50,6 +50,8 @@ public:
 
         check("zlib", error::over_subscribed_length);
         check("zlib", error::incomplete_length_set);
+
+        check("zlib", error::general);
     }
 };
 
