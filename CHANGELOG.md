@@ -11,6 +11,7 @@ HTTP
 WebSocket
 
 * Fix write_frame masking and auto-fragment handling
+* Write buffer option does not change capacity
 
 Extras
 
