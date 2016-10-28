@@ -1,3 +1,9 @@
+1.0.0-b18
+
+* Check invariants in parse_op:
+
+--------------------------------------------------------------------------------
+
 1.0.0-b17
 
 * Change implicit to default value in example
