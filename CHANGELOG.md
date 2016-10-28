@@ -1,6 +1,7 @@
 1.0.0-b18
 
 * Check invariants in parse_op:
+* Increase optimization settings for MSVC builds
 
 --------------------------------------------------------------------------------
 
