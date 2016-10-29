@@ -139,7 +139,6 @@ operator()(error_code ec, bool again)
     using boost::asio::buffer;
     using boost::asio::buffer_copy;
     using boost::asio::buffer_size;
-    using boost::asio::mutable_buffers_1;
     enum
     {
         do_init = 0,
@@ -173,7 +172,11 @@ operator()(error_code ec, bool again)
                 d.ws.role_ == detail::role_type::client;
             d.ws.wr_.cont = ! d.fin;
 
-            if(! d.fh.mask)
+            if(d.ws.wr_.compress)
+            {
+                d.entry = do_deflate;
+            }
+            else if(! d.fh.mask)
             {
                 if(! d.ws.wr_.autofrag)
                 {
@@ -188,7 +191,6 @@ operator()(error_code ec, bool again)
                     else
                         d.entry = do_nomask_nofrag;
                 }
-                d.state = do_maybe_suspend;
             }
             else
             {
@@ -205,8 +207,8 @@ operator()(error_code ec, bool again)
                     else
                         d.entry = do_mask_nofrag;
                 }
-                d.state = do_maybe_suspend;
             }
+            d.state = do_maybe_suspend;
             break;
 
         //----------------------------------------------------------------------
@@ -336,8 +338,8 @@ operator()(error_code ec, bool again)
             d.cb.consume(d.fh.len);
             d.fh_buf.reset();
             d.fh.op = opcode::cont;
-            if(d.ws.wr_block_ == &d)
-                d.ws.wr_block_ = nullptr;
+            BOOST_ASSERT(d.ws.wr_block_ == &d);
+            d.ws.wr_block_ = nullptr;
             d.ws.rd_op_.maybe_invoke();
             d.state = do_maybe_suspend;
             d.ws.get_io_service().post(
@@ -347,8 +349,51 @@ operator()(error_code ec, bool again)
         //----------------------------------------------------------------------
 
         case do_deflate:
+        {
+            std::size_t ni;
+            std::size_t no;
+            std::tie(ni, no) = detail::deflate(
+                d.ws.pmd_->zo, buffer(d.ws.wr_.buf.get(),
+                    d.ws.wr_.buf_size), d.cb, d.fin, ec);
+            if(ec == zlib::error::need_buffers)
+                ec = {};
+            d.ws.failed_ = ec != 0;
+            if(d.ws.failed_)
+                goto upcall;
+            auto const b =
+                buffer(d.ws.wr_.buf.get(), no);
+            if(d.fh.mask)
+            {
+                d.fh.key = d.ws.maskgen_();
+                detail::prepared_key key;
+                detail::prepare_key(key, d.fh.key);
+                detail::mask_inplace(b, key);
+            }
+            d.fh.fin = d.fin ? no < d.ws.wr_.buf_size : false;
+            d.fh.len = no;
+            detail::fh_streambuf fh_buf;
+            detail::write<static_streambuf>(fh_buf, d.fh);
+            // Send frame
+            d.state = (no < d.ws.wr_.buf_size) ?
+                do_upcall : do_deflate + 1;
+            BOOST_ASSERT(! d.ws.wr_block_);
+            d.ws.wr_block_ = &d;
+            boost::asio::async_write(d.ws.stream_,
+                buffer_cat(fh_buf.data(), b),
+                    std::move(*this));
+            return;
+        }
 
-            break;
+        case do_deflate + 1:
+            d.fh.op = opcode::cont;
+            d.fh.rsv1 = false;
+            BOOST_ASSERT(d.ws.wr_block_ == &d);
+            d.ws.wr_block_ = nullptr;
+            d.ws.rd_op_.maybe_invoke();
+            d.state = do_maybe_suspend;
+            d.ws.get_io_service().post(
+                std::move(*this));
+            return;
 
         //----------------------------------------------------------------------
 
@@ -484,22 +529,23 @@ write_frame(bool fin,
                     cb, fin, ec);
             if(ec == zlib::error::need_buffers)
                 ec = {};
-            if(ec)
-                failed_ = true;
-            auto const mb = buffer(wr_.buf.get(), no);
+            failed_ = ec != 0;
+            if(failed_)
+                return;
+            auto const b = buffer(wr_.buf.get(), no);
             if(fh.mask)
             {
                 fh.key = maskgen_();
                 detail::prepared_key key;
                 detail::prepare_key(key, fh.key);
-                detail::mask_inplace(mb, key);
+                detail::mask_inplace(b, key);
             }
             fh.fin = fin ? no < wr_.buf_size : false;
             fh.len = no;
             detail::fh_streambuf fh_buf;
             detail::write<static_streambuf>(fh_buf, fh);
             boost::asio::write(stream_,
-                buffer_cat(fh_buf.data(), mb), ec);
+                buffer_cat(fh_buf.data(), b), ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
@@ -572,13 +618,13 @@ write_frame(bool fin,
             ConstBufferSequence> cb{buffers};
         {
             auto const n = clamp(remain, wr_.buf_size);
-            auto const mb = buffer(wr_.buf.get(), n);
-            buffer_copy(mb, cb);
+            auto const b = buffer(wr_.buf.get(), n);
+            buffer_copy(b, cb);
             cb.consume(n);
             remain -= n;
-            detail::mask_inplace(mb, key);
+            detail::mask_inplace(b, key);
             boost::asio::write(stream_,
-                buffer_cat(fh_buf.data(), mb), ec);
+                buffer_cat(fh_buf.data(), b), ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
@@ -586,12 +632,12 @@ write_frame(bool fin,
         while(remain > 0)
         {
             auto const n = clamp(remain, wr_.buf_size);
-            auto const mb = buffer(wr_.buf.get(), n);
-            buffer_copy(mb, cb);
+            auto const b = buffer(wr_.buf.get(), n);
+            buffer_copy(b, cb);
             cb.consume(n);
             remain -= n;
-            detail::mask_inplace(mb, key);
-            boost::asio::write(stream_, mb, ec);
+            detail::mask_inplace(b, key);
+            boost::asio::write(stream_, b, ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
@@ -609,16 +655,16 @@ write_frame(bool fin,
             detail::prepared_key key;
             detail::prepare_key(key, fh.key);
             auto const n = clamp(remain, wr_.buf_size);
-            auto const mb = buffer(wr_.buf.get(), n);
-            buffer_copy(mb, cb);
-            detail::mask_inplace(mb, key);
+            auto const b = buffer(wr_.buf.get(), n);
+            buffer_copy(b, cb);
+            detail::mask_inplace(b, key);
             fh.len = n;
             remain -= n;
             fh.fin = fin ? remain == 0 : false;
             detail::fh_streambuf fh_buf;
             detail::write<static_streambuf>(fh_buf, fh);
             boost::asio::write(stream_,
-                buffer_cat(fh_buf.data(), mb), ec);
+                buffer_cat(fh_buf.data(), b), ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
