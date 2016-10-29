@@ -137,17 +137,8 @@ protected:
         // `true` if current read message is compressed
         bool rd_set;
 
-#if 0
         zlib::deflate_stream zo;
-#else
-        zdeflate_stream zo;
-#endif
-
-#if 1
         zlib::inflate_stream zi;
-#else
-        zinflate_stream zi;
-#endif
     };
 
     // If not engaged, then permessage-deflate is not
