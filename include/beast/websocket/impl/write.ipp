@@ -457,10 +457,8 @@ write_frame(bool fin,
             "ConstBufferSequence requirements not met");
     using beast::detail::clamp;
     using boost::asio::buffer;
-    using boost::asio::buffer_cast;
     using boost::asio::buffer_copy;
     using boost::asio::buffer_size;
-    using boost::asio::mutable_buffers_1;
     detail::frame_header fh;
     if(! wr_.cont)
     {
@@ -488,8 +486,7 @@ write_frame(bool fin,
                 ec = {};
             if(ec)
                 failed_ = true;
-            auto mb =
-                mutable_buffers_1{wr_.buf.get(), no};
+            auto const mb = buffer(wr_.buf.get(), no);
             if(fh.mask)
             {
                 fh.key = maskgen_();
@@ -519,46 +516,51 @@ write_frame(bool fin,
             pmd_->zo.reset();
         return;
     }
-    else if(! fh.mask && ! wr_.autofrag)
+    if(! fh.mask)
     {
-        fh.fin = fin;
-        fh.len = remain;
-        detail::fh_streambuf fh_buf;
-        detail::write<static_streambuf>(fh_buf, fh);
-        boost::asio::write(stream_,
-            buffer_cat(fh_buf.data(), buffers), ec);
-        failed_ = ec != 0;
-        if(failed_)
-            return;
-        return;
-    }
-    else if(! fh.mask && wr_.autofrag)
-    {
-        BOOST_ASSERT(wr_.buf_size != 0);
-        consuming_buffers<
-            ConstBufferSequence> cb{buffers};
-        for(;;)
+        if(! wr_.autofrag)
         {
-            fh.len = clamp(remain, wr_.buf_size);
-            remain -= fh.len;
-            fh.fin = fin ? remain == 0 : false;
+            // no mask, no autofrag
+            fh.fin = fin;
+            fh.len = remain;
             detail::fh_streambuf fh_buf;
             detail::write<static_streambuf>(fh_buf, fh);
             boost::asio::write(stream_,
-                buffer_cat(fh_buf.data(),
-                    prepare_buffers(fh.len, cb)), ec);
+                buffer_cat(fh_buf.data(), buffers), ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
-            if(remain == 0)
-                break;
-            fh.op = opcode::cont;
-            cb.consume(fh.len);
+        }
+        else
+        {
+            // no mask, autofrag
+            BOOST_ASSERT(wr_.buf_size != 0);
+            consuming_buffers<
+                ConstBufferSequence> cb{buffers};
+            for(;;)
+            {
+                fh.len = clamp(remain, wr_.buf_size);
+                remain -= fh.len;
+                fh.fin = fin ? remain == 0 : false;
+                detail::fh_streambuf fh_buf;
+                detail::write<static_streambuf>(fh_buf, fh);
+                boost::asio::write(stream_,
+                    buffer_cat(fh_buf.data(),
+                        prepare_buffers(fh.len, cb)), ec);
+                failed_ = ec != 0;
+                if(failed_)
+                    return;
+                if(remain == 0)
+                    break;
+                fh.op = opcode::cont;
+                cb.consume(fh.len);
+            }
         }
         return;
     }
-    else if(fh.mask && ! wr_.autofrag)
+    if(! wr_.autofrag)
     {
+        // mask, no autofrag
         fh.fin = fin;
         fh.len = remain;
         fh.key = maskgen_();
@@ -596,8 +598,8 @@ write_frame(bool fin,
         }
         return;
     }
-    else if(fh.mask && wr_.autofrag)
     {
+        // mask, autofrag
         BOOST_ASSERT(wr_.buf_size != 0);
         consuming_buffers<
             ConstBufferSequence> cb{buffers};
