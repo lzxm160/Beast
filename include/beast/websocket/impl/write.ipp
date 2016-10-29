@@ -22,6 +22,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <beast/unit_test/dstream.hpp>
+
 namespace beast {
 namespace websocket {
 
@@ -255,11 +257,15 @@ operator()(error_code ec, bool again)
             d.fh.op = opcode::cont;
             if(d.ws.wr_block_ == &d)
                 d.ws.wr_block_ = nullptr;
-            d.ws.rd_op_.maybe_invoke();
-            d.state = do_maybe_suspend;
-            d.ws.get_io_service().post(
-                std::move(*this));
-            return;
+            if(d.ws.rd_op_.maybe_invoke())
+            {
+                d.state = do_maybe_suspend;
+                d.ws.get_io_service().post(
+                    std::move(*this));
+                return;
+            }
+            d.state = d.entry;
+            break;
 
         //----------------------------------------------------------------------
 
@@ -340,28 +346,44 @@ operator()(error_code ec, bool again)
             d.fh.op = opcode::cont;
             BOOST_ASSERT(d.ws.wr_block_ == &d);
             d.ws.wr_block_ = nullptr;
-            d.ws.rd_op_.maybe_invoke();
-            d.state = do_maybe_suspend;
-            d.ws.get_io_service().post(
-                std::move(*this));
-            return;
+            if(d.ws.rd_op_.maybe_invoke())
+            {
+                d.state = do_maybe_suspend;
+                d.ws.get_io_service().post(
+                    std::move(*this));
+                return;
+            }
+            d.state = d.entry;
+            break;
 
         //----------------------------------------------------------------------
 
         case do_deflate:
         {
-            std::size_t ni;
-            std::size_t no;
-            std::tie(ni, no) = detail::deflate(
-                d.ws.pmd_->zo, buffer(d.ws.wr_.buf.get(),
-                    d.ws.wr_.buf_size), d.cb, d.fin, ec);
-            if(ec == zlib::error::need_buffers)
-                ec = {};
+            auto b = buffer(d.ws.wr_.buf.get(),
+                d.ws.wr_.buf_size);
+            auto const more = detail::deflate(
+                d.ws.pmd_->zo, b, d.cb, d.fin, ec);
             d.ws.failed_ = ec != 0;
             if(d.ws.failed_)
                 goto upcall;
-            auto const b =
-                buffer(d.ws.wr_.buf.get(), no);
+            auto const n = buffer_size(b);
+            if(n == 0)
+            {
+                // The input was consumed, but there
+                // is no output due to compression
+                // latency.
+                BOOST_ASSERT(! d.fin);
+                BOOST_ASSERT(buffer_size(d.cb) == 0);
+                
+                // We can skip the dispatch if the
+                // asynchronous initiation function is
+                // not on call stack but its hard to
+                // figure out so be safe and dispatch.
+                d.state = do_upcall;
+                d.ws.get_io_service().post(std::move(*this));
+                return;
+            }
             if(d.fh.mask)
             {
                 d.fh.key = d.ws.maskgen_();
@@ -369,13 +391,13 @@ operator()(error_code ec, bool again)
                 detail::prepare_key(key, d.fh.key);
                 detail::mask_inplace(b, key);
             }
-            d.fh.fin = d.fin ? no < d.ws.wr_.buf_size : false;
-            d.fh.len = no;
+            d.fh.fin = ! more;
+            d.fh.len = n;
             detail::fh_streambuf fh_buf;
             detail::write<static_streambuf>(fh_buf, d.fh);
             // Send frame
-            d.state = (no < d.ws.wr_.buf_size) ?
-                do_upcall : do_deflate + 1;
+            d.state = more ?
+                do_deflate + 1 : do_deflate + 2;
             BOOST_ASSERT(! d.ws.wr_block_);
             d.ws.wr_block_ = &d;
             boost::asio::async_write(d.ws.stream_,
@@ -389,11 +411,24 @@ operator()(error_code ec, bool again)
             d.fh.rsv1 = false;
             BOOST_ASSERT(d.ws.wr_block_ == &d);
             d.ws.wr_block_ = nullptr;
-            d.ws.rd_op_.maybe_invoke();
-            d.state = do_maybe_suspend;
-            d.ws.get_io_service().post(
-                std::move(*this));
-            return;
+            if(d.ws.rd_op_.maybe_invoke())
+            {
+                d.state = do_maybe_suspend;
+                d.ws.get_io_service().post(
+                    std::move(*this));
+                return;
+            }
+            d.state = d.entry;
+            break;
+
+        case do_deflate + 2:
+            if(d.fh.fin && (
+                (d.ws.role_ == detail::role_type::client &&
+                    d.ws.pmd_config_.client_no_context_takeover) ||
+                (d.ws.role_ == detail::role_type::server &&
+                    d.ws.pmd_config_.server_no_context_takeover)))
+                d.ws.pmd_->zo.reset();
+            goto upcall;
 
         //----------------------------------------------------------------------
 
@@ -522,17 +557,24 @@ write_frame(bool fin,
             ConstBufferSequence> cb{buffers};
         for(;;)
         {
-            std::size_t ni;
-            std::size_t no;
-            std::tie(ni, no) = detail::deflate(pmd_->zo,
-                buffer(wr_.buf.get(), wr_.buf_size),
-                    cb, fin, ec);
-            if(ec == zlib::error::need_buffers)
-                ec = {};
+            auto b = buffer(
+                wr_.buf.get(), wr_.buf_size);
+            auto const more = detail::deflate(
+                pmd_->zo, b, cb, fin, ec);
             failed_ = ec != 0;
             if(failed_)
                 return;
-            auto const b = buffer(wr_.buf.get(), no);
+            auto const n = buffer_size(b);
+            if(n == 0)
+            {
+                // The input was consumed, but there
+                // is no output due to compression
+                // latency.
+                BOOST_ASSERT(! fin);
+                BOOST_ASSERT(buffer_size(cb) == 0);
+                fh.fin = false;
+                break;
+            }
             if(fh.mask)
             {
                 fh.key = maskgen_();
@@ -540,8 +582,8 @@ write_frame(bool fin,
                 detail::prepare_key(key, fh.key);
                 detail::mask_inplace(b, key);
             }
-            fh.fin = fin ? no < wr_.buf_size : false;
-            fh.len = no;
+            fh.fin = ! more;
+            fh.len = n;
             detail::fh_streambuf fh_buf;
             detail::write<static_streambuf>(fh_buf, fh);
             boost::asio::write(stream_,
@@ -549,7 +591,7 @@ write_frame(bool fin,
             failed_ = ec != 0;
             if(failed_)
                 return;
-            if(no < wr_.buf_size)
+            if(! more)
                 break;
             fh.op = opcode::cont;
             fh.rsv1 = false;

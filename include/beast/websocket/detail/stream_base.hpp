@@ -27,6 +27,8 @@
 #include <cstdint>
 #include <memory>
 
+#include "../test/zlib/zio.hpp"
+
 namespace beast {
 namespace websocket {
 namespace detail {
@@ -137,8 +139,13 @@ protected:
         // `true` if current read message is compressed
         bool rd_set;
 
+#if 0
         zlib::deflate_stream zo;
         zlib::inflate_stream zi;
+#else
+        zdeflate_stream zo;
+        zinflate_stream zi;
+#endif
     };
 
     // If not engaged, then permessage-deflate is not

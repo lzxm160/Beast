@@ -390,47 +390,71 @@ inflate(
 }
 
 // Compress a buffer sequence
-// Returns: input used, output used
+// Returns: `true` if more calls are needed
+//
+// Compress a buffer sequence
+// Returns: `true` if more calls are needed
 //
 template<class DeflateStream, class ConstBufferSequence>
-std::pair<std::size_t, std::size_t>
+bool
 deflate(
     DeflateStream& zo,
-    boost::asio::mutable_buffer const& out,
+    boost::asio::mutable_buffer& out,
     consuming_buffers<ConstBufferSequence>& cb,
-    bool last,
+    bool fin,
     error_code& ec)
 {
+    using boost::asio::buffer;
     using boost::asio::buffer_cast;
     using boost::asio::buffer_size;
     zlib::z_params zs;
     zs.avail_out = buffer_size(out);
     zs.next_out = buffer_cast<void*>(out);
-    for(auto const& in : cb)
+    if(cb.begin() != cb.end())
     {
-        zs.avail_in = buffer_size(in);
-        zs.next_in = buffer_cast<void const*>(in);
+        for(auto const& in : cb)
+        {
+            zs.avail_in = buffer_size(in);
+            zs.next_in = buffer_cast<void const*>(in);
+            zo.write(zs, zlib::Flush::block, ec);
+            if(ec == zlib::error::need_buffers)
+            {
+                ec = {};
+                break;
+            }
+            if(ec)
+                return false;
+            BOOST_ASSERT(zs.avail_in == 0);
+        }
+        cb.consume(zs.total_in);
+    }
+    else
+    {
+        zs.avail_in = 0;
+        zs.next_in = nullptr;
         zo.write(zs, zlib::Flush::block, ec);
         if(ec == zlib::error::need_buffers)
-        {
             ec = {};
-            break;
-        }
         if(ec)
-            return { 0, 0 };
-        BOOST_ASSERT(zs.avail_in == 0);
+            return false;
     }
-    if( last &&
-        zs.avail_in == 0 &&
-        buffer_size(out) - zs.total_out >= 6)
+
+    if(fin &&
+       buffer_size(cb) == 0 &&
+       zs.avail_out >= 6)
     {
         zo.write(zs, zlib::Flush::full, ec);
         BOOST_ASSERT(! ec);
         // remove flush marker
         zs.total_out -= 4;
+        out = buffer(
+            buffer_cast<void*>(out), zs.total_out);
+        return false;
     }
-    cb.consume(zs.total_in);
-    return { zs.total_in, zs.total_out };
+
+    out = buffer(
+        buffer_cast<void*>(out), zs.total_out);
+    return true;
 }
 
 } // detail
