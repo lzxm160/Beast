@@ -16,6 +16,13 @@ if (MSVC)
     set (CMAKE_EXE_LINKER_FLAGS_RELEASE               "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
     set (CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /LTCG")
 
+    # for RelWithDebInfo builds, disable incremental linking
+    # since CMake sets it ON by default for that build type and it
+    # causes warnings
+    string (REPLACE "/INCREMENTAL" "/INCREMENTAL:NO" replacement_flags
+        ${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO})
+    set (CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO ${replacement_flags})
+
 else()
     set(Boost_USE_STATIC_LIBS ON)
     set(Boost_USE_MULTITHREADED ON)
