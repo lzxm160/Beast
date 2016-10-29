@@ -137,7 +137,7 @@ protected:
         // `true` if current read message is compressed
         bool rd_set;
 
-#if 1
+#if 0
         zlib::deflate_stream zo;
 #else
         zdeflate_stream zo;

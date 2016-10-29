@@ -518,7 +518,14 @@ public:
         deflateEnd(&zs_);
     }
 
-    void reset(
+    void
+    reset()
+    {
+        deflateReset(&zs_);
+    }
+
+    void
+    reset(
         int compLevel,
         int windowBits,
         int memLevel,

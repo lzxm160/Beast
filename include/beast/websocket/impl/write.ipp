@@ -56,18 +56,6 @@ class stream<NextLayer>::write_frame_op
             , cont(boost_asio_handler_cont_helpers::
                 is_continuation(h))
         {
-            fh.rsv2 = false;
-            fh.rsv3 = false;
-            fh.mask = ws.role_ == detail::role_type::client;
-            if(! ws.wr_.cont)
-                ws.wr_begin();
-
-            using beast::detail::clamp;
-            fh.op = ws.wr_.cont ?
-                opcode::cont : ws.wr_opcode_;
-            ws.wr_.cont = ! fin;
-            fh.fin = fin;
-            fh.rsv1 = false;
         }
     };
 
@@ -159,6 +147,7 @@ operator()(error_code ec, bool again)
         do_nomask_frag = 30,
         do_mask_nofrag = 40,
         do_mask_frag = 50,
+        do_deflate = 60,
         do_maybe_suspend = 80,
         do_upcall = 99
     };
@@ -171,6 +160,19 @@ operator()(error_code ec, bool again)
         switch(d.state)
         {
         case do_init:
+            if(! d.ws.wr_.cont)
+            {
+                d.ws.wr_begin();
+                d.fh.rsv1 = d.ws.wr_.compress;
+            }
+            d.fh.rsv2 = false;
+            d.fh.rsv3 = false;
+            d.fh.op = d.ws.wr_.cont ?
+                opcode::cont : d.ws.wr_opcode_;
+            d.fh.mask =
+                d.ws.role_ == detail::role_type::client;
+            d.ws.wr_.cont = ! d.fin;
+
             if(! d.fh.mask)
             {
                 if(! d.ws.wr_.autofrag)
@@ -211,11 +213,6 @@ operator()(error_code ec, bool again)
 
         case do_nomask_nofrag:
         {
-            d.fh.op = d.ws.wr_.cont ?
-                opcode::cont : d.ws.wr_opcode_;
-            d.fh.rsv1 = false;
-            d.ws.wr_.cont = ! d.fin;
-
             d.fh.fin = d.fin;
             d.fh.len = buffer_size(d.cb);
             detail::write<static_streambuf>(
@@ -233,8 +230,6 @@ operator()(error_code ec, bool again)
         //----------------------------------------------------------------------
 
         case do_nomask_frag:
-            d.fh.rsv1 = false;
-
             d.fh.len = clamp(
                 d.remain, d.ws.wr_.buf_size);
             d.remain -= d.fh.len;
@@ -268,7 +263,6 @@ operator()(error_code ec, bool again)
 
         case do_mask_nofrag:
         {
-            d.fh.rsv1 = false;
             d.fh.fin = d.fin;
             d.fh.len = d.remain;
             d.fh.key = d.ws.maskgen_();
@@ -315,7 +309,6 @@ operator()(error_code ec, bool again)
 
         case do_mask_frag:
         {
-            d.fh.rsv1 = false;
             d.fh.len = clamp(
                 d.remain, d.ws.wr_.buf_size);
             d.fh.key = d.ws.maskgen_();
@@ -350,6 +343,12 @@ operator()(error_code ec, bool again)
             d.ws.get_io_service().post(
                 std::move(*this));
             return;
+
+        //----------------------------------------------------------------------
+
+        case do_deflate:
+
+            break;
 
         //----------------------------------------------------------------------
 
@@ -462,13 +461,15 @@ write_frame(bool fin,
     using boost::asio::buffer_copy;
     using boost::asio::buffer_size;
     using boost::asio::mutable_buffers_1;
-    if(! wr_.cont)
-        wr_begin();
     detail::frame_header fh;
-    fh.op = wr_.cont ? opcode::cont : wr_opcode_;
-    fh.rsv1 = false;
+    if(! wr_.cont)
+    {
+        wr_begin();
+        fh.rsv1 = wr_.compress;
+    }
     fh.rsv2 = false;
     fh.rsv3 = false;
+    fh.op = wr_.cont ? opcode::cont : wr_opcode_;
     fh.mask = role_ == detail::role_type::client;
     wr_.cont = ! fin;
     auto remain = buffer_size(buffers);
@@ -476,7 +477,6 @@ write_frame(bool fin,
     {
         consuming_buffers<
             ConstBufferSequence> cb{buffers};
-        fh.rsv1 = true;
         for(;;)
         {
             std::size_t ni;
@@ -484,7 +484,6 @@ write_frame(bool fin,
             std::tie(ni, no) = detail::deflate(pmd_->zo,
                 buffer(wr_.buf.get(), wr_.buf_size),
                     cb, fin, ec);
-
             if(ec == zlib::error::need_buffers)
                 ec = {};
             if(ec)
@@ -512,11 +511,11 @@ write_frame(bool fin,
             fh.op = opcode::cont;
             fh.rsv1 = false;
         }
-        if(fh.fin &&
+        if(fh.fin && (
             (role_ == detail::role_type::client &&
                 pmd_config_.client_no_context_takeover) ||
             (role_ == detail::role_type::server &&
-                pmd_config_.server_no_context_takeover))
+                pmd_config_.server_no_context_takeover)))
             pmd_->zo.reset();
         return;
     }
