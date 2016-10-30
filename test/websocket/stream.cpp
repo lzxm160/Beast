@@ -1020,10 +1020,8 @@ public:
                 if(! restart(error::failed))
                     return;
             }
-            catch(system_error const& e)
+            catch(system_error const&)
             {
-                if(n == limit)
-                    fail(e.what());
                 continue;
             }
             break;

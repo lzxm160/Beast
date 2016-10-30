@@ -717,25 +717,26 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
             fb.commit(boost::asio::read(
                 stream_, fb.prepare(2), ec));
             failed_ = ec != 0;
-            if(ec)
+            if(failed_)
                 return;
             auto const n = read_fh1(fh, fb, code);
             if(code != close_code::none)
-                goto fail;
+                goto do_close;
             if(n > 0)
             {
                 fb.commit(boost::asio::read(
                     stream_, fb.prepare(n), ec));
                 failed_ = ec != 0;
-                if(ec)
+                if(failed_)
                     return;
             }
             read_fh2(fh, fb, code);
+
             failed_ = ec != 0;
             if(failed_)
                 return;
             if(code != close_code::none)
-                goto fail;
+                goto do_close;
         }
         if(detail::is_control(fh.op))
         {
@@ -782,7 +783,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
             {
                 detail::read(cr_, fb.data(), code);
                 if(code != close_code::none)
-                    goto fail;
+                    goto do_close;
                 if(! wr_close_)
                 {
                     auto cr = cr_;
@@ -819,7 +820,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 rd_msg_max_ - rd_.size)
             {
                 code = close_code::too_big;
-                goto fail;
+                goto do_close;
             }
             rd_.size += fh.len;
             // Read message frame payload
@@ -845,7 +846,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                             ! rd_.utf8.finish()))
                     {
                         code = close_code::bad_payload;
-                        goto fail;
+                        goto do_close;
                     }
                 }
                 dynabuf.commit(bytes_transferred);
@@ -893,7 +894,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                                     ! rd_.utf8.finish()))
                     {
                         code = close_code::bad_payload;
-                        goto fail;
+                        goto do_close;
                     }
                 }
                 if(remain == 0)
@@ -910,7 +911,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
         fi.fin = fh.fin;
         return;
     }
-fail:
+do_close:
     if(code != close_code::none)
     {
         // Fail the connection (per rfc6455)

@@ -166,6 +166,10 @@ operator()(error_code ec, bool again)
                 d.ws.wr_begin();
                 d.fh.rsv1 = d.ws.wr_.compress;
             }
+            else
+            {
+                d.fh.rsv1 = false;
+            }
             d.fh.rsv2 = false;
             d.fh.rsv3 = false;
             d.fh.op = d.ws.wr_.cont ?
@@ -271,6 +275,7 @@ operator()(error_code ec, bool again)
 
         case do_mask_nofrag:
         {
+            d.remain = buffer_size(d.cb);
             d.fh.fin = d.fin;
             d.fh.len = d.remain;
             d.fh.key = d.ws.maskgen_();
@@ -544,6 +549,10 @@ write_frame(bool fin,
     {
         wr_begin();
         fh.rsv1 = wr_.compress;
+    }
+    else
+    {
+        fh.rsv1 = false;
     }
     fh.rsv2 = false;
     fh.rsv3 = false;
