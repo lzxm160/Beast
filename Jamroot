@@ -98,7 +98,6 @@ project beast
     <toolset>msvc:<define>_SCL_SECURE_NO_WARNINGS=1
     <toolset>msvc:<define>_CRT_SECURE_NO_WARNINGS=1
     <toolset>msvc:<cxxflags>"/wd4100 /bigobj"
-    <toolset>msvc,<variant>release:<cxxflags>"/Ob2 /Oi /Ot /GL /MT"
     <os>LINUX:<define>_XOPEN_SOURCE=600
     <os>LINUX:<define>_GNU_SOURCE=1
     <os>SOLARIS:<define>_XOPEN_SOURCE=500

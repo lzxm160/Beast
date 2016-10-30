@@ -151,7 +151,8 @@ template<class NextLayer>
 template<class DynamicBuffer, class Handler>
 void
 stream<NextLayer>::read_frame_op<DynamicBuffer, Handler>::
-operator()(error_code ec,std::size_t bytes_transferred, bool again)
+operator()(error_code ec,
+    std::size_t bytes_transferred, bool again)
 {
     using beast::detail::clamp;
     using boost::asio::buffer;

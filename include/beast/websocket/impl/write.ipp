@@ -74,17 +74,24 @@ public:
             std::forward<DeducedHandler>(h), ws,
                 std::forward<Args>(args)...))
     {
-        (*this)(error_code{}, false);
+        (*this)(error_code{}, 0, false);
     }
 
     void operator()()
     {
-        (*this)(error_code{});
+        (*this)(error_code{}, 0, true);
     }
 
-    void operator()(error_code ec, std::size_t);
+    void operator()(error_code const& ec)
+    {
+        (*this)(ec, 0, true);
+    }
 
-    void operator()(error_code ec, bool again = true);
+    void operator()(error_code ec,
+        std::size_t bytes_transferred);
+
+    void operator()(error_code ec,
+        std::size_t bytes_transferred, bool again);
 
     friend
     void* asio_handler_allocate(
@@ -122,12 +129,12 @@ template<class Buffers, class Handler>
 void 
 stream<NextLayer>::
 write_frame_op<Buffers, Handler>::
-operator()(error_code ec, std::size_t)
+operator()(error_code ec, std::size_t bytes_transferred)
 {
     auto& d = *d_;
     if(ec)
         d.ws.failed_ = true;
-    (*this)(ec);
+    (*this)(ec, bytes_transferred, true);
 }
 
 template<class NextLayer>
@@ -135,7 +142,8 @@ template<class Buffers, class Handler>
 void
 stream<NextLayer>::
 write_frame_op<Buffers, Handler>::
-operator()(error_code ec, bool again)
+operator()(error_code ec,
+    std::size_t bytes_transferred, bool again)
 {
     using beast::detail::clamp;
     using boost::asio::buffer;
@@ -238,9 +246,11 @@ operator()(error_code ec, bool again)
         //----------------------------------------------------------------------
 
         case do_nomask_frag:
-            d.fh.len = clamp(
+        {
+            auto const n = clamp(
                 d.remain, d.ws.wr_.buf_size);
-            d.remain -= d.fh.len;
+            d.remain -= n;
+            d.fh.len = n;
             d.fh.fin = d.fin ? d.remain == 0 : false;
             detail::write<static_streambuf>(
                 d.fh_buf, d.fh);
@@ -251,12 +261,14 @@ operator()(error_code ec, bool again)
             d.ws.wr_block_ = &d;
             boost::asio::async_write(d.ws.stream_,
                 buffer_cat(d.fh_buf.data(),
-                    prepare_buffers(d.fh.len, d.cb)),
+                    prepare_buffers(n, d.cb)),
                         std::move(*this));
             return;
+        }
 
         case do_nomask_frag + 1:
-            d.cb.consume(d.fh.len);
+            d.cb.consume(
+                bytes_transferred - d.fh_buf.size());
             d.fh_buf.reset();
             d.fh.op = opcode::cont;
             if(d.ws.wr_block_ == &d)
@@ -322,16 +334,17 @@ operator()(error_code ec, bool again)
 
         case do_mask_frag:
         {
-            d.fh.len = clamp(
+            auto const n = clamp(
                 d.remain, d.ws.wr_.buf_size);
+            d.remain -= n;
+            d.fh.len = n;
             d.fh.key = d.ws.maskgen_();
+            d.fh.fin = d.fin ? d.remain == 0 : false;
             detail::prepare_key(d.key, d.fh.key);
             auto const b = buffer(
-                d.ws.wr_.buf.get(), d.fh.len);
+                d.ws.wr_.buf.get(), n);
             buffer_copy(b, d.cb);
             detail::mask_inplace(b, d.key);
-            d.remain -= d.fh.len;
-            d.fh.fin = d.fin ? d.remain == 0 : false;
             detail::write<static_streambuf>(
                 d.fh_buf, d.fh);
             // Send frame
@@ -346,7 +359,8 @@ operator()(error_code ec, bool again)
         }
 
         case do_mask_frag + 1:
-            d.cb.consume(d.fh.len);
+            d.cb.consume(
+                bytes_transferred - d.fh_buf.size());
             d.fh_buf.reset();
             d.fh.op = opcode::cont;
             BOOST_ASSERT(d.ws.wr_block_ == &d);
@@ -636,21 +650,22 @@ write_frame(bool fin,
                 ConstBufferSequence> cb{buffers};
             for(;;)
             {
-                fh.len = clamp(remain, wr_.buf_size);
-                remain -= fh.len;
+                auto const n = clamp(remain, wr_.buf_size);
+                remain -= n;
+                fh.len = n;
                 fh.fin = fin ? remain == 0 : false;
                 detail::fh_streambuf fh_buf;
                 detail::write<static_streambuf>(fh_buf, fh);
                 boost::asio::write(stream_,
                     buffer_cat(fh_buf.data(),
-                        prepare_buffers(fh.len, cb)), ec);
+                        prepare_buffers(n, cb)), ec);
                 failed_ = ec != 0;
                 if(failed_)
                     return;
                 if(remain == 0)
                     break;
                 fh.op = opcode::cont;
-                cb.consume(fh.len);
+                cb.consume(n);
             }
         }
         return;
