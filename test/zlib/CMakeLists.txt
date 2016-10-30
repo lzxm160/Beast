@@ -11,6 +11,7 @@ endif()
 add_executable (zlib-tests
     ${BEAST_INCLUDES}
     ${EXTRAS_INCLUDES}
+    ${ZLIB_SOURCES}
     ../../extras/beast/unit_test/main.cpp
     ztest.hpp
     deflate_stream.cpp
