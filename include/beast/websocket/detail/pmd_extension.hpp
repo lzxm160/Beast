@@ -260,6 +260,7 @@ pmd_negotiate(
     config.server_no_context_takeover =
         offer.server_no_context_takeover ||
             o.server_no_context_takeover;
+config.server_no_context_takeover = true;
     if(config.server_no_context_takeover)
         s += "; server_no_context_takeover";
 
@@ -278,11 +279,17 @@ pmd_negotiate(
             o.server_max_window_bits;
     if(config.server_max_window_bits < 15)
     {
+        // ZLib's deflateInit silently treats 8 as
+        // 9 due to a bug, so prevent 8 from being used.
+        //
+        if(config.server_max_window_bits < 9)
+            config.server_max_window_bits = 9;
+
         s += "; server_max_window_bits=";
         s += std::to_string(
             config.server_max_window_bits);
     }
-    
+
     switch(offer.client_max_window_bits)
     {
     case -1:

@@ -25,6 +25,7 @@
 #include <boost/endian/buffers.hpp>
 #include <algorithm>
 #include <memory>
+#include <stdexcept>
 #include <utility>
 
 namespace beast {
@@ -36,6 +37,30 @@ stream<NextLayer>::
 stream(Args&&... args)
     : stream_(std::forward<Args>(args)...)
 {
+}
+
+template<class NextLayer>
+void
+stream<NextLayer>::
+set_option(permessage_deflate const& o)
+{
+    if( o.server_max_window_bits > 15 ||
+        o.server_max_window_bits < 9)
+        throw std::invalid_argument{
+            "invalid server_max_window_bits"};
+    if( o.client_max_window_bits > 15 ||
+        o.client_max_window_bits < 9)
+        throw std::invalid_argument{
+            "invalid client_max_window_bits"};
+    if( o.compLevel < 0 ||
+        o.compLevel > 9)
+        throw std::invalid_argument{
+            "invalid compLevel"};
+    if( o.memLevel < 1 ||
+        o.memLevel > 9)
+        throw std::invalid_argument{
+            "invalid memLevel"};
+    pmd_opts_ = o;
 }
 
 //------------------------------------------------------------------------------

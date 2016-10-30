@@ -115,7 +115,7 @@ public:
         deflateInit2(&zs_,
             Z_DEFAULT_COMPRESSION,
             Z_DEFLATED,
-            -15,
+            -windowBits,
             4,
             Z_DEFAULT_STRATEGY);
     }

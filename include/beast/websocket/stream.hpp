@@ -216,10 +216,7 @@ public:
 
     /// Set the permessage-deflate extension options
     void
-    set_option(permessage_deflate const& o)
-    {
-        pmd_opts_ = o;
-    }
+    set_option(permessage_deflate const& o);
 
     /// Get the permessage-deflate extension options
     void
