@@ -17,6 +17,7 @@
 #include <beast/core/detail/clamp.hpp>
 #include <boost/assert.hpp>
 #include <boost/optional.hpp>
+#include <limits>
 #include <memory>
 
 namespace beast {
@@ -201,6 +202,15 @@ operator()(error_code ec,std::size_t bytes_transferred, bool again)
                     d.state = do_frame_done;
                     break;
                 }
+                // Enforce message size limit
+                if(d.ws.rd_msg_max_ && d.fh.len >
+                    d.ws.rd_msg_max_ - d.ws.rd_.size)
+                {
+                    code = close_code::too_big;
+                    d.state = do_fail;
+                    break;
+                }
+                d.ws.rd_.size += d.fh.len;
                 d.remain = d.fh.len;
                 if(d.fh.mask)
                     detail::prepare_key(d.key, d.fh.key);
@@ -711,7 +721,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                 return;
             auto const n = read_fh1(fh, fb, code);
             if(code != close_code::none)
-                break;
+                goto fail;
             if(n > 0)
             {
                 fb.commit(boost::asio::read(
@@ -725,7 +735,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
             if(failed_)
                 return;
             if(code != close_code::none)
-                break;
+                goto fail;
         }
         if(detail::is_control(fh.op))
         {
@@ -772,7 +782,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
             {
                 detail::read(cr_, fb.data(), code);
                 if(code != close_code::none)
-                    break;
+                    goto fail;
                 if(! wr_close_)
                 {
                     auto cr = cr_;
@@ -804,6 +814,14 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
             detail::prepare_key(key, fh.key);
         if(! pmd_ || ! pmd_->rd_set)
         {
+            // Enforce message size limit
+            if(rd_msg_max_ && fh.len >
+                rd_msg_max_ - rd_.size)
+            {
+                code = close_code::too_big;
+                goto fail;
+            }
+            rd_.size += fh.len;
             // Read message frame payload
             while(remain > 0)
             {
@@ -875,7 +893,7 @@ read_frame(frame_info& fi, DynamicBuffer& dynabuf, error_code& ec)
                                     ! rd_.utf8.finish()))
                     {
                         code = close_code::bad_payload;
-                        break;
+                        goto fail;
                     }
                 }
                 if(remain == 0)

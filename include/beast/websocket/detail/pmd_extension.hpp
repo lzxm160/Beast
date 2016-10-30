@@ -399,9 +399,6 @@ inflate(
 // Compress a buffer sequence
 // Returns: `true` if more calls are needed
 //
-// Compress a buffer sequence
-// Returns: `true` if more calls are needed
-//
 template<class DeflateStream, class ConstBufferSequence>
 bool
 deflate(
